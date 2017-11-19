@@ -7,6 +7,7 @@
 #include "PorousFlowActionBase.h"
 
 #include "FEProblem.h"
+#include "MooseMesh.h"
 #include "libmesh/string_to_enum.h"
 #include "Conversion.h"
 
@@ -42,6 +43,13 @@ validParams<PorousFlowActionBase>()
       "displacements",
       "The name of the displacement variables (relevant only for "
       "mechanically-coupled simulations)");
+  params.addParam<std::string>("thermal_eigenstrain_name",
+                               "thermal_eigenstrain",
+                               "The eigenstrain_name used in the "
+                               "ComputeThermalExpansionEigenstrain.  Only needed for "
+                               "thermally-coupled simulations with thermal expansion.");
+  params.addParam<bool>(
+      "use_displaced_mesh", false, "Use displaced mesh computations in mechanical kernels");
   return params;
 }
 
@@ -66,6 +74,15 @@ PorousFlowActionBase::PorousFlowActionBase(const InputParameters & params)
 void
 PorousFlowActionBase::act()
 {
+  const auto & all_subdomains = _problem->mesh().meshSubdomains();
+  if (all_subdomains.empty())
+    mooseError("No subdomains found");
+  _coord_system = _problem->getCoordSystem(*all_subdomains.begin());
+  for (const auto & subdomain : all_subdomains)
+    if (_problem->getCoordSystem(subdomain) != _coord_system)
+      mooseError(
+          "The PorousFlow Actions require all subdomains to have the same coordinate system.");
+
   if (_current_task == "add_user_object")
     addDictator();
 }
@@ -338,6 +355,35 @@ PorousFlowActionBase::addSingleComponentFluidMaterial(bool at_nodes,
     params.set<bool>("compute_internal_energy") = compute_internal_energy;
     params.set<bool>("compute_enthalpy") = compute_enthalpy;
     params.set<UserObjectName>("fp") = fp;
+
+    std::string material_name = "PorousFlowActionBase_FluidProperties_qp";
+    if (at_nodes)
+      material_name = "PorousFlowActionBase_FluidProperties";
+
+    params.set<bool>("at_nodes") = at_nodes;
+    _problem->addMaterial(material_type, material_name, params);
+  }
+}
+
+void
+PorousFlowActionBase::addBrineMaterial(VariableName nacl_brine,
+                                       bool at_nodes,
+                                       unsigned phase,
+                                       bool compute_density_and_viscosity,
+                                       bool compute_internal_energy,
+                                       bool compute_enthalpy)
+{
+  if (_current_task == "add_material")
+  {
+    std::string material_type = "PorousFlowBrine";
+    InputParameters params = _factory.getValidParams(material_type);
+
+    params.set<std::vector<VariableName>>("xnacl") = {nacl_brine};
+    params.set<UserObjectName>("PorousFlowDictator") = _dictator_name;
+    params.set<unsigned int>("phase") = phase;
+    params.set<bool>("compute_density_and_viscosity") = compute_density_and_viscosity;
+    params.set<bool>("compute_internal_energy") = compute_internal_energy;
+    params.set<bool>("compute_enthalpy") = compute_enthalpy;
 
     std::string material_name = "PorousFlowActionBase_FluidProperties_qp";
     if (at_nodes)

@@ -12,8 +12,8 @@
 /*            See COPYRIGHT for full restrictions               */
 /****************************************************************/
 
-// STL includes
-#include <cmath> // provides round, not std::round (see http://www.cplusplus.com/reference/cmath/round/)
+// provides round, not std::round (see http://www.cplusplus.com/reference/cmath/round/)
+#include <cmath>
 
 // MOOSE includes
 #include "ImageSubdomain.h"
@@ -24,6 +24,8 @@ InputParameters
 validParams<ImageSubdomain>()
 {
   InputParameters params = validParams<MeshModifier>();
+  params.addClassDescription("Samples an image at the coordinates of each element centroid using "
+                             "the resulting value as each element's subdomain ID");
   params += validParams<ImageSampler>();
   return params;
 }
@@ -48,11 +50,9 @@ ImageSubdomain::modify()
 
   // Loop over the elements and sample the image at the element centroid and use the value for the
   // subdomain id
-  for (MeshBase::element_iterator el = mesh.active_elements_begin();
-       el != mesh.active_elements_end();
-       ++el)
+  for (auto & elem : mesh.active_element_ptr_range())
   {
-    SubdomainID id = static_cast<SubdomainID>(round(sample((*el)->centroid())));
-    (*el)->subdomain_id() = id;
+    SubdomainID id = static_cast<SubdomainID>(round(sample(elem->centroid())));
+    elem->subdomain_id() = id;
   }
 }

@@ -13,7 +13,6 @@
 /****************************************************************/
 
 #include "FEProblemBase.h"
-
 #include "AuxiliarySystem.h"
 #include "MaterialPropertyStorage.h"
 #include "MooseEnum.h"
@@ -690,20 +689,13 @@ FEProblemBase::initialSetup()
     backupMultiApps(EXEC_INITIAL);
     Moose::perf_log.pop("execMultiApps()", "Setup");
 
-    // Yak is currently relying on doing this after initial Transfers
-    Moose::setup_perf_log.push("computeUserObjects()", "Setup");
-
     // TODO: user object evaluation could fail.
     computeUserObjects(EXEC_INITIAL, Moose::PRE_AUX);
 
-    Moose::setup_perf_log.push("computeAux()", "Setup");
     _aux->compute(EXEC_INITIAL);
-    Moose::setup_perf_log.pop("computeAux()", "Setup");
 
     // The only user objects that should be computed here are the initial UOs
     computeUserObjects(EXEC_INITIAL, Moose::POST_AUX);
-
-    Moose::setup_perf_log.pop("computeUserObjects()", "Setup");
 
     _current_execute_on_flag = EXEC_NONE;
   }
@@ -4270,8 +4262,7 @@ FEProblemBase::computePostCheck(NonlinearImplicitSystem & sys,
   Moose::perf_log.push("computePostCheck()", "Execution");
 
   // MOOSE's FEProblemBase doesn't update the solution during the
-  // postcheck, but FEProblemBase-derived classes (see e.g.
-  // FrictionalContactProblem) might.
+  // postcheck, but FEProblemBase-derived classes might.
   if (_has_dampers || shouldUpdateSolution())
   {
     // We need ghosted versions of new_soln and search_direction (the
@@ -4920,16 +4911,13 @@ FEProblemBase::checkDependMaterialsHelper(
 void
 FEProblemBase::checkCoordinateSystems()
 {
-  MeshBase::const_element_iterator it = _mesh.getMesh().elements_begin();
-  MeshBase::const_element_iterator it_end = _mesh.getMesh().elements_end();
-
-  for (; it != it_end; ++it)
+  for (const auto & elem : _mesh.getMesh().element_ptr_range())
   {
-    SubdomainID sid = (*it)->subdomain_id();
-    if (_coord_sys[sid] == Moose::COORD_RZ && (*it)->dim() == 3)
+    SubdomainID sid = elem->subdomain_id();
+    if (_coord_sys[sid] == Moose::COORD_RZ && elem->dim() == 3)
       mooseError("An RZ coordinate system was requested for subdomain " + Moose::stringify(sid) +
                  " which contains 3D elements.");
-    if (_coord_sys[sid] == Moose::COORD_RSPHERICAL && (*it)->dim() > 1)
+    if (_coord_sys[sid] == Moose::COORD_RSPHERICAL && elem->dim() > 1)
       mooseError("An RSPHERICAL coordinate system was requested for subdomain " +
                  Moose::stringify(sid) + " which contains 2D or 3D elements.");
   }

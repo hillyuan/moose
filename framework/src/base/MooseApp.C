@@ -14,6 +14,7 @@
 
 // MOOSE includes
 #include "MooseApp.h"
+#include "MooseRevision.h"
 #include "AppFactory.h"
 #include "MooseSyntax.h"
 #include "MooseInit.h"
@@ -60,6 +61,8 @@ validParams<MooseApp>()
 {
   InputParameters params;
 
+  params.addCommandLineParam<bool>(
+      "display_version", "-v --version", false, "Print application version");
   params.addCommandLineParam<std::string>("input_file", "-i <input_file>", "Specify an input file");
   params.addCommandLineParam<std::string>(
       "mesh_only", "--mesh-only", "Setup and Output the input mesh only.");
@@ -253,7 +256,7 @@ MooseApp::MooseApp(InputParameters parameters)
     int argc = getParam<int>("_argc");
     char ** argv = getParam<char **>("_argv");
 
-    _sys_info = std::make_shared<SystemInfo>(argc, argv);
+    _sys_info = libmesh_make_unique<SystemInfo>(argc, argv);
   }
   if (isParamValid("_command_line"))
     _command_line = getParam<std::shared_ptr<CommandLine>>("_command_line");
@@ -276,6 +279,24 @@ MooseApp::~MooseApp()
   for (const auto & it : _lib_handles)
     dlclose(it.second);
 #endif
+}
+
+std::string
+MooseApp::getFrameworkVersion() const
+{
+  return MOOSE_VERSION;
+}
+
+std::string
+MooseApp::getVersion() const
+{
+  return MOOSE_VERSION;
+}
+
+std::string
+MooseApp::getPrintableVersion() const
+{
+  return getPrintableName() + " Version: " + getVersion();
 }
 
 void
@@ -368,6 +389,13 @@ MooseApp::setupOptions()
   if (getParam<bool>("minimal"))
     createMinimalApp();
 
+  else if (getParam<bool>("display_version"))
+  {
+    Moose::perf_log.disable_logging();
+    Moose::out << getPrintableVersion() << std::endl;
+    _ready_to_exit = true;
+    return;
+  }
   else if (getParam<bool>("help"))
   {
     Moose::perf_log.disable_logging();
@@ -391,7 +419,8 @@ MooseApp::setupOptions()
     JsonSyntaxTree tree(param_search);
     _parser.buildJsonSyntaxTree(tree);
     JsonInputFileFormatter formatter;
-    Moose::out << formatter.toString(tree.getRoot()) << "\n";
+    Moose::out << "### START DUMP DATA ###\n"
+               << formatter.toString(tree.getRoot()) << "\n### END DUMP DATA ###\n";
     _ready_to_exit = true;
   }
   else if (isParamValid("definition"))
@@ -1115,6 +1144,15 @@ const MeshModifier &
 MooseApp::getMeshModifier(const std::string & name) const
 {
   return *_mesh_modifiers.find(MooseUtils::shortName(name))->second.get();
+}
+
+std::vector<std::string>
+MooseApp::getMeshModifierNames() const
+{
+  std::vector<std::string> names;
+  for (auto & pair : _mesh_modifiers)
+    names.push_back(pair.first);
+  return names;
 }
 
 void

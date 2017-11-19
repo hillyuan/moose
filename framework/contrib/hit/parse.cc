@@ -375,17 +375,19 @@ std::string
 Section::render(int indent)
 {
   std::string s;
-  if (root() != this)
+  if (path() != "")
     s = "\n" + strRepeat(indentString, indent) + "[" + _path + "]";
-  else
-    indent--; // don't indent the root section contents extra
 
   for (auto child : children())
-    s += child->render(indent + 1);
+    if (path() == "")
+      s += child->render(indent);
+    else
+      s += child->render(indent + 1);
 
-  if (root() != this)
+  if (path() != "")
     s += "\n" + strRepeat(indentString, indent) + "[]";
-  else
+
+  if (indent == 0 && s[0] == '\n')
     s = s.substr(1);
   return s;
 }
@@ -413,7 +415,10 @@ Field::path()
 std::string
 Field::render(int indent)
 {
-  return "\n" + strRepeat(indentString, indent) + _field + " = " + _val;
+  std::string s = "\n" + strRepeat(indentString, indent) + _field + " = " + _val;
+  for (auto child : children())
+    s += child->render(indent + 1);
+  return s;
 }
 
 Node *
@@ -760,7 +765,10 @@ parseComment(Parser * p, Node * n)
     p->error(tok, "the parser is broken");
 
   auto comment = p->emit(new Comment(tok.val, isinline));
-  n->addChild(comment);
+  if (tok.type == TokType::InlineComment && n->children().size() > 0)
+    n->children()[n->children().size() - 1]->addChild(comment);
+  else
+    n->addChild(comment);
 }
 
 // parse tokenizes the given hit input from fname using a Lexer with the lexHit as the
@@ -834,7 +842,7 @@ merge(Node * from, Node * into)
   from->walk(&sw, NodeType::Section);
 }
 
-void
+Node *
 explode(Node * n)
 {
   if (n->type() == NodeType::Field || n->type() == NodeType::Section)
@@ -844,7 +852,9 @@ explode(Node * n)
     {
       auto prefix = n->path().substr(0, pos);
       auto postfix = n->path().substr(pos + 1, n->path().size() - pos - 1);
-      auto existing = n->parent()->find(prefix);
+      hit::Node * existing = nullptr;
+      if (n->parent())
+        existing = n->parent()->find(prefix);
 
       Node * newnode = nullptr;
       if (n->type() == NodeType::Field)
@@ -864,17 +874,19 @@ explode(Node * n)
       else
       {
         auto newsec = new Section(prefix);
-        n->parent()->addChild(newsec);
+        if (n->parent())
+          n->parent()->addChild(newsec);
         newsec->addChild(newnode);
       }
-      explode(newnode);
+      auto newroot = explode(newnode);
       delete n;
-      return;
+      return newroot->root();
     }
   }
 
   for (auto child : n->children())
     explode(child);
+  return n->root();
 }
 
 #define EOF TMPEOF

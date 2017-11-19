@@ -28,6 +28,8 @@ InputParameters
 validParams<SideSetsFromNormals>()
 {
   InputParameters params = validParams<AddSideSetsBase>();
+  params.addClassDescription(
+      "Adds a new named sideset to the mesh for all faces matching the specified normal.");
   params.addRequiredParam<std::vector<BoundaryName>>("new_boundary",
                                                      "The name of the boundary to create");
   params.addRequiredParam<std::vector<Point>>(
@@ -70,12 +72,7 @@ SideSetsFromNormals::modify()
 
   // We'll need to loop over all of the elements to find ones that match this normal.
   // We can't rely on flood catching them all here...
-  MeshBase::const_element_iterator el = _mesh_ptr->getMesh().elements_begin();
-  const MeshBase::const_element_iterator end_el = _mesh_ptr->getMesh().elements_end();
-  for (; el != end_el; ++el)
-  {
-    const Elem * elem = *el;
-
+  for (const auto & elem : _mesh_ptr->getMesh().element_ptr_range())
     for (unsigned int side = 0; side < elem->n_sides(); ++side)
     {
       if (elem->neighbor_ptr(side))
@@ -87,10 +84,9 @@ SideSetsFromNormals::modify()
       for (unsigned int i = 0; i < boundary_ids.size(); ++i)
       {
         if (std::abs(1.0 - _normals[i] * normals[0]) < 1e-5)
-          flood(*el, _normals[i], boundary_ids[i]);
+          flood(elem, _normals[i], boundary_ids[i]);
       }
     }
-  }
 
   finalize();
 

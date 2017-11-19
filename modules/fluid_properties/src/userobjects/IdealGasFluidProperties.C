@@ -71,10 +71,22 @@ Real IdealGasFluidProperties::mu(Real, Real) const { return _mu; }
 
 Real IdealGasFluidProperties::k(Real, Real) const { return _k; }
 
-Real IdealGasFluidProperties::s(Real, Real) const
+Real IdealGasFluidProperties::s(Real, Real) const { mooseError(name(), ": s() not implemented."); }
+
+void
+IdealGasFluidProperties::s_from_h_p(Real h, Real p, Real & s, Real & ds_dh, Real & ds_dp) const
 {
-  mooseError(name(), ": s() not implemented.");
-  return 0.0;
+  const Real aux = p * std::pow(h / (_gamma * _cv), -_gamma / (_gamma - 1));
+  if (aux <= 0.0)
+    mooseError(name(), ": Non-positive argument in the ln() function.");
+
+  const Real daux_dh = p * std::pow(h / (_gamma * _cv), -_gamma / (_gamma - 1) - 1) *
+                       (-_gamma / (_gamma - 1)) / (_gamma * _cv);
+  const Real daux_dp = std::pow(h / (_gamma * _cv), -_gamma / (_gamma - 1));
+
+  s = -(_gamma - 1) * _cv * std::log(aux);
+  ds_dh = -(_gamma - 1) * _cv / aux * daux_dh;
+  ds_dp = -(_gamma - 1) * _cv / aux * daux_dp;
 }
 
 void
@@ -176,19 +188,16 @@ IdealGasFluidProperties::h_dpT(
 Real IdealGasFluidProperties::p_from_h_s(Real /*h*/, Real /*s*/) const
 {
   mooseError(name(), ": p_from_h_s() not implemented.");
-  return 0.0;
 }
 
 Real IdealGasFluidProperties::dpdh_from_h_s(Real /*h*/, Real /*s*/) const
 {
   mooseError(name(), ": dpdh_from_h_s() not implemented.");
-  return 0.0;
 }
 
 Real IdealGasFluidProperties::dpds_from_h_s(Real /*h*/, Real /*s*/) const
 {
   mooseError(name(), ": dpds_from_h_s() not implemented.");
-  return 0;
 }
 
 Real

@@ -32,6 +32,7 @@
 #include "ImageMesh.h"
 #include "PatternedMesh.h"
 #include "StitchedMesh.h"
+#include "AnnularMesh.h"
 
 // MeshModifiers
 #include "MeshExtruder.h"
@@ -54,6 +55,7 @@
 #include "ParsedAddSideset.h"
 #include "AssignSubdomainID.h"
 #include "MeshSideSet.h"
+#include "AddSideSetsFromBoundingBox.h"
 
 // problems
 #include "DisplacedProblem.h"
@@ -127,6 +129,7 @@
 #include "ElementLpNormAux.h"
 #include "ElementL2ErrorFunctionAux.h"
 #include "ElementH1ErrorFunctionAux.h"
+#include "DiffusionFluxAux.h"
 
 // dirac kernels
 #include "ConstantPointSource.h"
@@ -227,7 +230,9 @@
 #include "NodalExtremeValue.h"
 #include "ElementExtremeValue.h"
 #include "DifferencePostprocessor.h"
+#include "RelativeDifferencePostprocessor.h"
 #include "ScalePostprocessor.h"
+#include "LinearCombinationPostprocessor.h"
 #include "NumPicardIterations.h"
 #include "FunctionSideIntegral.h"
 #include "ExecutionerAttributeReporter.h"
@@ -272,6 +277,7 @@
 #include "NodalNormalsCorner.h"
 #include "NodalNormalsPreprocessor.h"
 #include "SolutionUserObject.h"
+#include "PerflogDumper.h"
 #ifdef LIBMESH_HAVE_FPARSER
 #include "Terminator.h"
 #endif
@@ -488,6 +494,7 @@ registerObjects(Factory & factory)
   registerMesh(ImageMesh);
   registerMesh(PatternedMesh);
   registerMesh(StitchedMesh);
+  registerMesh(AnnularMesh);
 
   // mesh modifiers
   registerMeshModifier(MeshExtruder);
@@ -510,6 +517,7 @@ registerObjects(Factory & factory)
   registerMeshModifier(ParsedAddSideset);
   registerMeshModifier(AssignSubdomainID);
   registerMeshModifier(MeshSideSet);
+  registerMeshModifier(AddSideSetsFromBoundingBox);
 
   // problems
   registerProblem(DisplacedProblem);
@@ -591,6 +599,7 @@ registerObjects(Factory & factory)
   registerAux(ElementLpNormAux);
   registerAux(ElementL2ErrorFunctionAux);
   registerAux(ElementH1ErrorFunctionAux);
+  registerAux(DiffusionFluxAux);
 
   // Initial Conditions
   registerInitialCondition(ConstantIC);
@@ -681,7 +690,9 @@ registerObjects(Factory & factory)
   registerPostprocessor(NodalExtremeValue);
   registerPostprocessor(ElementExtremeValue);
   registerPostprocessor(DifferencePostprocessor);
+  registerPostprocessor(RelativeDifferencePostprocessor);
   registerPostprocessor(ScalePostprocessor);
+  registerPostprocessor(LinearCombinationPostprocessor);
   registerPostprocessor(FunctionValuePostprocessor);
   registerPostprocessor(NumPicardIterations);
   registerPostprocessor(FunctionSideIntegral);
@@ -727,6 +738,7 @@ registerObjects(Factory & factory)
   registerUserObject(NodalNormalsCorner);
   registerUserObject(NodalNormalsEvaluator);
   registerUserObject(SolutionUserObject);
+  registerUserObject(PerflogDumper);
 #ifdef LIBMESH_HAVE_FPARSER
   registerUserObject(Terminator);
 #endif
@@ -1242,8 +1254,6 @@ enableFPE(bool on)
   if (_trap_fpe)
     libMesh::enableFPE(on);
 }
-
-PerfLog setup_perf_log("Setup");
 
 /**
  * Initialize global variables

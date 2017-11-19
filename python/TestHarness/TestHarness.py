@@ -4,32 +4,64 @@ if sys.version_info[0:2] != (2, 7):
     sys.exit(1)
 
 import os, re, inspect, errno, time, copy
+import shlex
 
 from socket import gethostname
 from FactorySystem.Factory import Factory
 from FactorySystem.Parser import Parser
 from FactorySystem.Warehouse import Warehouse
 import util
+import hit
 
 import argparse
 from timeit import default_timer as clock
+
+def findTestRoot(start=os.getcwd(), method=os.environ.get('METHOD', 'opt')):
+    rootdir = os.path.abspath(start)
+    while os.path.dirname(rootdir) != rootdir:
+        fname = os.path.join(rootdir, 'testroot')
+        if os.path.exists(fname):
+            with open(fname, 'r') as f:
+                data = f.read()
+            root = hit.parse(fname, data)
+            args = []
+            if root.find('cli_args'):
+                args = shlex.split(root.param('cli_args'))
+            # TODO: add check to see if the binary exists before returning. This can be used to
+            # allow users to control fallthrough for e.g. individual module binaries vs. the
+            # combined binary.
+            return rootdir, root.param('app_name'), args
+        rootdir = os.path.dirname(rootdir)
+    raise RuntimeError('test root directory not found')
 
 class TestHarness:
 
     @staticmethod
     def buildAndRun(argv, app_name, moose_dir):
         if '--store-timing' in argv:
-            harness = TestTimer(argv, app_name, moose_dir)
+            harness = TestTimer(argv, moose_dir, app_name=app_name)
         else:
-            harness = TestHarness(argv, app_name, moose_dir)
+            harness = TestHarness(argv, moose_dir, app_name=app_name)
 
         harness.findAndRunTests()
-
         sys.exit(harness.error_code)
 
+    def __init__(self, argv, moose_dir, app_name=None):
+        os.environ['MOOSE_DIR'] = moose_dir
+        os.environ['PYTHONPATH'] = os.path.join(moose_dir, 'python') + ':' + os.environ.get('PYTHONPATH', '')
 
-    def __init__(self, argv, app_name, moose_dir):
+        if app_name:
+            rootdir, app_name, args = '.', app_name, []
+        else:
+            rootdir, app_name, args = findTestRoot(start=os.getcwd())
+
+        orig_cwd = os.getcwd()
+        os.chdir(rootdir)
+        argv = argv[:1] + args + argv[1:]
+
         self.factory = Factory()
+
+        self.app_name = app_name
 
         # Build a Warehouse to hold the MooseObjects
         self.warehouse = Warehouse()
@@ -47,6 +79,8 @@ class TestHarness:
         # Finally load the plugins!
         self.factory.loadPlugins(dirs, 'testers', "IS_TESTER")
 
+        self._infiles = ['tests', 'speedtests']
+        self.parse_errors = []
         self.test_table = []
         self.num_passed = 0
         self.num_failed = 0
@@ -127,7 +161,7 @@ class TestHarness:
               (self.options.cli_args != None and \
                (self.options.cli_args.find('--parallel-mesh') != -1 or self.options.cli_args.find('--distributed-mesh') != -1)):
 
-            option_set = set(['ALL', 'PARALLEL'])
+            option_set = set(['ALL', 'DISTRIBUTED'])
             checks['mesh_mode'] = option_set
 
         method = set(['ALL', self.options.method.upper()])
@@ -138,11 +172,12 @@ class TestHarness:
 
         self.initialize(argv, app_name)
 
+        os.chdir(orig_cwd)
+
     """
     Recursively walks the current tree looking for tests to run
     Error codes:
     0x0  - Success
-    0x7F - Parser error (any flag in this range)
     0x80 - TestHarness error
     """
     def findAndRunTests(self, find_only=False):
@@ -150,6 +185,8 @@ class TestHarness:
         self.preRun()
         self.start_time = clock()
         launched_tests = []
+        if self.options.input_file_name != '':
+            self._infiles = self.options.input_file_name.split(',')
 
         try:
             self.base_dir = os.getcwd()
@@ -162,7 +199,7 @@ class TestHarness:
                 if "contrib" not in os.path.relpath(dirpath, os.getcwd()):
                     for file in filenames:
                         # See if there were other arguments (test names) passed on the command line
-                        if file == self.options.input_file_name \
+                        if file in self._infiles \
                                and os.path.abspath(os.path.join(dirpath, file)) not in launched_tests:
 
                             if self.prunePath(file):
@@ -200,7 +237,7 @@ class TestHarness:
 
             self.cleanup()
 
-            # Flags for the parser start at the low bit, flags for the TestHarness start at the high bit
+            # flags for the TestHarness start at the high bit
             if self.num_failed:
                 self.error_code = self.error_code | 0x80
 
@@ -222,7 +259,8 @@ class TestHarness:
         parser = Parser(self.factory, self.warehouse)
 
         # Parse it
-        self.error_code = self.error_code | parser.parse(file)
+        parser.parse(file)
+        self.parse_errors.extend(parser.errors)
 
         # Retrieve the tests from the warehouse
         testers = self.warehouse.getActiveObjects()
@@ -272,7 +310,10 @@ class TestHarness:
         test_dir = os.path.abspath(os.path.dirname(filename))
         relative_path = test_dir.replace(self.run_tests_dir, '')
         first_directory = relative_path.split(os.path.sep)[1] # Get first directory
-        relative_path = relative_path.replace('/' + self.options.input_file_name + '/', ':')
+        for infile in self._infiles:
+            if infile in relative_path:
+                relative_path = relative_path.replace('/' + infile + '/', ':')
+                break
         relative_path = re.sub('^[/:]*', '', relative_path)  # Trim slashes and colons
         formatted_name = relative_path + '.' + tester.name()
 
@@ -300,7 +341,7 @@ class TestHarness:
             tester.setStatus('Max Fails Exceeded', tester.bucket_fail)
         elif self.num_failed > self.options.max_fails:
             tester.setStatus('Max Fails Exceeded', tester.bucket_fail)
-        elif tester.parameters().isValid('error_code'):
+        elif tester.parameters().isValid('have_errors') and tester.parameters()['have_errors']:
             tester.setStatus('Parser Error', tester.bucket_skip)
 
     # This method splits a lists of tests into two pieces each, the first piece will run the test for
@@ -343,6 +384,16 @@ class TestHarness:
         else:
             return True
 
+    # Method contianing logic on whether or not we should print results of given tester
+    def canPrint(self, tester):
+        if tester.isSkipped() and self.options.report_skipped is False:
+            return False
+
+        elif tester.isSilent() or (tester.isDeleted() and not self.options.extra_info):
+            return False
+
+        return True
+
     # Format the status message to make any caveats easy to read when they are printed
     def formatCaveats(self, tester):
         caveats = []
@@ -382,12 +433,10 @@ class TestHarness:
     def printResult(self, tester_data):
         """ Method to print a testers status to the screen """
         tester = tester_data.getTester()
+        caveat_formatted_results = None
 
-        # The test has no status to print
-        if tester.isSilent() or (tester.isDeleted() and not self.options.extra_info):
-            caveat_formatted_results = None
         # Print what ever status the tester has at the time
-        else:
+        if self.canPrint(tester):
             if self.options.verbose or (tester.didFail() and not self.options.quiet):
                 output = 'Working Directory: ' + tester.getTestDir() + '\nRunning command: ' + tester.getCommand(self.options) + '\n'
 
@@ -450,6 +499,11 @@ class TestHarness:
     def cleanup(self):
         # Print the results table again if a bunch of output was spewed to the screen between
         # tests as they were running
+        if len(self.parse_errors) > 0:
+            print('\n\nParser Errors:\n' + ('-' * (util.TERM_COLS-1)))
+            for err in self.parse_errors:
+                print(util.colorText(err, 'RED', html=True, colored=self.options.colored, code=self.options.code))
+
         if (self.options.verbose or (self.num_failed != 0 and not self.options.quiet)) and not self.options.dry_run:
             print('\n\nFinal Test Results:\n' + ('-' * (util.TERM_COLS-1)))
             for (tester_data, result, timing) in sorted(self.test_table, key=lambda x: x[1], reverse=True):
@@ -461,10 +515,11 @@ class TestHarness:
 
         # Mask off TestHarness error codes to report parser errors
         fatal_error = ''
-        if self.error_code & Parser.getErrorCodeMask():
-            fatal_error += ', <r>FATAL PARSER ERROR</r>'
-        if self.error_code & ~Parser.getErrorCodeMask():
+        if self.error_code:
             fatal_error += ', <r>FATAL TEST HARNESS ERROR</r>'
+        if len(self.parse_errors) > 0:
+            fatal_error += ', <r>FATAL PARSER ERROR</r>'
+            self.error_code = 1
 
         # Alert the user to their session file
         if self.options.queueing:
@@ -569,6 +624,7 @@ class TestHarness:
         parser.add_argument('--devel', action='store_const', dest='method', const='devel', help='test the app_name-devel binary')
         parser.add_argument('--oprof', action='store_const', dest='method', const='oprof', help='test the app_name-oprof binary')
         parser.add_argument('--pro', action='store_const', dest='method', const='pro', help='test the app_name-pro binary')
+        parser.add_argument('--run', type=str, default='', dest='run', help='only run tests of the specified of tag(s)')
         parser.add_argument('--ignore', nargs='?', action='store', metavar='caveat', dest='ignored_caveats', const='all', type=str, help='ignore specified caveats when checking if a test should run: (--ignore "method compiler") Using --ignore with out a conditional will ignore all caveats')
         parser.add_argument('-j', '--jobs', nargs='?', metavar='int', action='store', type=int, dest='jobs', const=1, help='run test binaries in parallel')
         parser.add_argument('-e', action='store_true', dest='extra_info', help='Display "extra" information including all caveats and deleted tests')
@@ -582,7 +638,7 @@ class TestHarness:
         parser.add_argument('-l', '--load-average', action='store', type=float, dest='load', help='Do not run additional tests if the load average is at least LOAD')
         parser.add_argument('-t', '--timing', action='store_true', dest='timing', help='Report Timing information for passing tests')
         parser.add_argument('-s', '--scale', action='store_true', dest='scaling', help='Scale problems that have SCALE_REFINE set')
-        parser.add_argument('-i', nargs=1, action='store', type=str, dest='input_file_name', default='tests', help='The default test specification file to look for (default="tests").')
+        parser.add_argument('-i', nargs=1, action='store', type=str, dest='input_file_name', default='', help='The default test specification file to look for (default="tests").')
         parser.add_argument('--libmesh_dir', nargs=1, action='store', type=str, dest='libmesh_dir', help='Currently only needed for bitten code coverage')
         parser.add_argument('--skip-config-checks', action='store_true', dest='skip_config_checks', help='Skip configuration checks (all tests will run regardless of restrictions)')
         parser.add_argument('--parallel', '-p', nargs='?', action='store', type=int, dest='parallel', const=1, help='Number of processors to use when running mpiexec')
@@ -597,6 +653,7 @@ class TestHarness:
         parser.add_argument('--re', action='store', type=str, dest='reg_exp', help='Run tests that match --re=regular_expression')
         parser.add_argument('--failed-tests', action='store_true', dest='failed_tests', help='Run tests that previously failed')
         parser.add_argument('--check-input', action='store_true', dest='check_input', help='Run check_input (syntax) tests only')
+        parser.add_argument('--no-check-input', action='store_true', dest='no_check_input', help='Do not run check_input (syntax) tests')
 
         # Options that pass straight through to the executable
         parser.add_argument('--parallel-mesh', action='store_true', dest='parallel_mesh', help='Deprecated, use --distributed-mesh instead')
@@ -639,6 +696,8 @@ class TestHarness:
         self.tests = self.options.test_name
         self.options.code = code
 
+        self.options.runtags = [tag for tag in self.options.run.split(',') if tag != '']
+
         # Convert all list based options of length one to scalars
         for key, value in vars(self.options).items():
             if type(value) == list and len(value) == 1:
@@ -677,6 +736,9 @@ class TestHarness:
             sys.exit(1)
         if opts.queue_cleanup and opts.pbs:
             print('ERROR: --queue-cleanup and --pbs can not be used together')
+            sys.exit(1)
+        if opts.check_input and opts.no_check_input:
+            print('ERROR: --check-input and --no-check-input can not be used together')
             sys.exit(1)
 
         # Update any keys from the environment as necessary
@@ -731,15 +793,14 @@ CREATE_TABLE = """create table timing
 );"""
 
 class TestTimer(TestHarness):
-    def __init__(self, argv, app_name, moose_dir):
-        TestHarness.__init__(self, argv, app_name, moose_dir)
+    def __init__(self, argv, moose_dir, app_name=None):
+        TestHarness.__init__(self, argv, app_name=app_name)
         try:
             from sqlite3 import dbapi2 as sqlite
             assert sqlite # silence pyflakes warning
         except:
             print('Error: --store-timing requires the sqlite3 python module.')
             sys.exit(1)
-        self.app_name = app_name
         self.db_file = self.options.dbFile
         if not self.db_file:
             home = os.environ['HOME']

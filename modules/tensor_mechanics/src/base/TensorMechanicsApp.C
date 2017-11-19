@@ -118,6 +118,7 @@
 #include "GeneralizedKelvinVoigtModel.h"
 #include "LinearViscoelasticStressUpdate.h"
 #include "ComputeLinearViscoelasticStress.h"
+#include "ComputeEigenstrainFromInitialStress.h"
 
 #include "TensorMechanicsPlasticSimpleTester.h"
 #include "TensorMechanicsPlasticTensile.h"
@@ -173,6 +174,7 @@
 #include "DisplacementAboutAxis.h"
 #include "PresetDisplacement.h"
 #include "PresetAcceleration.h"
+#include "StickyBC.h"
 
 #include "CrystalPlasticitySlipRateGSS.h"
 #include "CrystalPlasticitySlipResistanceGSS.h"
@@ -201,6 +203,8 @@
 #include "InteractionIntegralBenchmarkBC.h"
 #include "MixedModeEquivalentK.h"
 #include "EshelbyTensor.h"
+#include "InteractionIntegral.h"
+#include "ThermalFractureIntegral.h"
 
 template <>
 InputParameters
@@ -344,6 +348,8 @@ TensorMechanicsApp::registerObjects(Factory & factory)
   registerMaterial(GeneralizedKelvinVoigtModel);
   registerMaterial(LinearViscoelasticStressUpdate);
   registerMaterial(ComputeLinearViscoelasticStress);
+  registerMaterial(ThermalFractureIntegral);
+  registerMaterial(ComputeEigenstrainFromInitialStress);
 
   registerUserObject(TensorMechanicsPlasticSimpleTester);
   registerUserObject(TensorMechanicsPlasticTensile);
@@ -403,6 +409,7 @@ TensorMechanicsApp::registerObjects(Factory & factory)
   registerBoundaryCondition(PresetDisplacement);
   registerBoundaryCondition(PresetAcceleration);
   registerBoundaryCondition(InteractionIntegralBenchmarkBC);
+  registerBoundaryCondition(StickyBC);
 
   registerPostprocessor(CavityPressurePostprocessor);
   registerPostprocessor(Mass);
@@ -410,6 +417,7 @@ TensorMechanicsApp::registerObjects(Factory & factory)
   registerPostprocessor(MaterialTensorIntegral);
   registerPostprocessor(MaterialTimeStepPostprocessor);
   registerPostprocessor(JIntegral);
+  registerPostprocessor(InteractionIntegral);
   registerPostprocessor(CrackFrontData);
   registerPostprocessor(MixedModeEquivalentK);
 
@@ -493,4 +501,5 @@ TensorMechanicsApp::associateSyntax(Syntax & syntax, ActionFactory & action_fact
   registerAction(DomainIntegralAction, "add_aux_variable");
   registerAction(DomainIntegralAction, "add_aux_kernel");
   registerAction(DomainIntegralAction, "add_postprocessor");
+  registerAction(DomainIntegralAction, "add_material");
 }

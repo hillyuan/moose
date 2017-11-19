@@ -35,7 +35,7 @@ pyhit_LIB       := $(hit_DIR)/hit.so
 
 $(pyhit_LIB): $(pyhit_srcfiles)
 	@echo "Linking Library "$@"..."
-	@bash -c '(cd "$(hit_DIR)" && $(libmesh_CXX) -std=c++11 -w -fPIC -lstdc++ -shared -L`python-config --prefix`/lib `python-config --cflags` `python-config --ldflags` $^ -o $@)'
+	@bash -c '(cd "$(hit_DIR)" && $(libmesh_CXX) -std=c++11 -w -fPIC -lstdc++ -shared -L`python-config --prefix`/lib `python-config --includes` `python-config --ldflags` $^ -o $@)'
 	@cp $@ $(FRAMEWORK_DIR)/../python/
 
 #

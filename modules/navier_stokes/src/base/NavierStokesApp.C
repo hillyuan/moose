@@ -103,6 +103,7 @@
 
 // Postprocessors
 #include "INSExplicitTimestepSelector.h"
+#include "VolumetricFlowRate.h"
 
 // Functions
 #include "WedgeFunction.h"
@@ -145,14 +146,6 @@
 #include "CNSFVIdealGasEntropyL2Error.h"
 #include "CNSFVIdealGasTotalEnthalpyL2Error.h"
 #include "CNSFVTimeStepLimit.h"
-
-//
-// Scalar Advection-diffusion-reaction
-//
-
-#include "AdvectionSUPG.h"
-#include "BodyForceSUPG.h"
-#include "Advection.h"
 
 template <>
 InputParameters
@@ -287,6 +280,7 @@ NavierStokesApp::registerObjects(Factory & factory)
 
   // Postprocessors
   registerPostprocessor(INSExplicitTimestepSelector);
+  registerPostprocessor(VolumetricFlowRate);
 
   // Materials
   registerMaterial(Air);
@@ -332,11 +326,6 @@ NavierStokesApp::registerObjects(Factory & factory)
   registerPostprocessor(CNSFVIdealGasEntropyL2Error);
   registerPostprocessor(CNSFVIdealGasTotalEnthalpyL2Error);
   registerPostprocessor(CNSFVTimeStepLimit);
-
-  // Scalar advection-diffusion-reaction
-  registerKernel(AdvectionSUPG);
-  registerKernel(BodyForceSUPG);
-  registerKernel(Advection);
 }
 
 void

@@ -45,6 +45,7 @@ initExecStoreType()
     execstore_type_to_enum["NONLINEAR"] = EXEC_NONLINEAR;
     execstore_type_to_enum["TIMESTEP_END"] = EXEC_TIMESTEP_END;
     execstore_type_to_enum["TIMESTEP_BEGIN"] = EXEC_TIMESTEP_BEGIN;
+    execstore_type_to_enum["FINAL"] = EXEC_FINAL;
     execstore_type_to_enum["CUSTOM"] = EXEC_CUSTOM;
   }
 }
@@ -428,11 +429,11 @@ stringifyExact(Real t)
   os << std::setprecision(max_digits10) << t;
   return os.str();
 }
-}
 
 Point
 toPoint(const std::vector<Real> & pos)
 {
   mooseAssert(pos.size() == LIBMESH_DIM, "Wrong array size while converting into a point");
   return Point(pos[0], pos[1], pos[2]);
+}
 }

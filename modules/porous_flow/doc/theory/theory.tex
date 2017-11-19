@@ -1524,6 +1524,14 @@ I encourage users to set $m>0.5$.
 \label{van_genuchten_pc.fig}
 \end{figure}
 
+A modification of Eqn~(\ref{vg.cap.eqn}) is available where
+$S_{\mathrm{eff}}$ is replaced by $S_{\mathrm{eff}}r$ and $P_{c}$ by
+$P_{c} - P_{c}(r)$.  Here $0<r\leq 1$ is a scale factor.  This means
+the derivative $\mathrm{d}S_{\mathrm{eff}}/\mathrm{d}P_{c}\neq 0$ as
+$S_{\mathrm{eff}}\rightarrow 1$.  Occasionally setting $r<1$ is
+advantageous in fully-saturated 2-phase simulations that have the two
+porepressures as their independent nonlinear variables.
+
 \subsection{Broadbridge-White}
 
 The Broadbridge-White\footnote{P Broadbridge, I White ``Constant rate rainfall
@@ -1672,11 +1680,11 @@ Here $K$ is the bulk modulus of the drained porous skeleton: $1/K
 = \delta_{ij}\delta_{kl}C_{ijkl}$.  This has solution
 \begin{equation}
 \phi = \alpha_{B} + (\phi_{0} - \alpha_{B})\times \exp \left( \frac{\alpha_{B}
-  - 1}{K}P_{f} - \epsilon^{\mathrm{total}}_{ii} + \alpha_{T}T \right) \ ,
+  - 1}{K}(P_{f}-P_{f}^{\mathrm{ref}}) - \epsilon^{\mathrm{total}}_{ii} + \alpha_{T}(T - T^{\mathrm{ref}}) \right) \ ,
 \label{poro.evolve.eqn}
 \end{equation}
-where $\phi_{0}$ is the porosity at zero porepressure, zero elastic
-strain and zero temperature. Note this porosity can become negative,
+where $\phi_{0}$ is the porosity at reference porepressure, zero elastic
+strain and reference temperature. Note this porosity can become negative,
 and an option for ensuring positivity is detailed below.
 
 The evolution of porosity is motivated further in the appendix
@@ -1686,7 +1694,7 @@ Without porepressure effects, the correct expression for porosity as a
 function of volumetric strain and temperature is
 \begin{equation}
 \phi = 1 + (\phi_{0} - 1)\times \exp \left(-
-\epsilon^{\mathrm{total}}_{ii} + \alpha_{T}T \right) \ .
+\epsilon^{\mathrm{total}}_{ii} + \alpha_{T}(T - T^{\mathrm{ref}}) \right) \ .
 \label{poroTM.evolve.eqn}
 \end{equation}
 

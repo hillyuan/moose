@@ -43,7 +43,6 @@ InputParameters validParams<DGKernel>();
 /**
  * The DGKernel class is responsible for calculating the residuals for various
  * physics on internal sides (edges/faces).
- *
  */
 class DGKernel : public MooseObject,
                  public BlockRestrictable,

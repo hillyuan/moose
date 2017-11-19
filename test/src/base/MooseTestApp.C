@@ -27,6 +27,7 @@
 #include "MatDiffusion.h"
 #include "DiffMKernel.h"
 #include "GaussContForcing.h"
+#include "Biharmonic.h"
 #include "CoefDiffusion.h"
 #include "RestartDiffusion.h"
 #include "MatCoefDiffusion.h"
@@ -123,6 +124,8 @@
 #include "MatTestNeumannBC.h"
 #include "MatDivergenceBC.h"
 #include "CoupledDirichletBC.h"
+#include "BiharmonicLapBC.h"
+#include "FunctionPenaltyFluxBC.h"
 #include "TestLapBC.h"
 #include "ExampleShapeSideIntegratedBC.h"
 
@@ -172,6 +175,7 @@
 #include "CoupledKernelGradBC.h"
 
 #include "InterfaceDiffusion.h"
+#include "OneSideDiffusion.h"
 
 #include "ExplicitODE.h"
 #include "ImplicitODEx.h"
@@ -347,6 +351,7 @@ MooseTestApp::registerObjects(Factory & factory)
   registerKernel(MatDiffusion);
   registerKernel(DiffMKernel);
   registerKernel(GaussContForcing);
+  registerKernel(Biharmonic);
   registerKernel(CoefDiffusion);
   registerKernel(RestartDiffusion);
   registerKernel(MatCoefDiffusion);
@@ -428,6 +433,7 @@ MooseTestApp::registerObjects(Factory & factory)
 
   // Interface kernels
   registerInterfaceKernel(InterfaceDiffusion);
+  registerInterfaceKernel(OneSideDiffusion);
 
   // Boundary Conditions
   registerBoundaryCondition(ChannelGradientBC);
@@ -454,6 +460,8 @@ MooseTestApp::registerObjects(Factory & factory)
   registerBoundaryCondition(DivergenceBC);
   registerBoundaryCondition(MatDivergenceBC);
   registerBoundaryCondition(CoupledDirichletBC);
+  registerBoundaryCondition(BiharmonicLapBC);
+  registerBoundaryCondition(FunctionPenaltyFluxBC);
   registerBoundaryCondition(TestLapBC);
 
   // dg kernels

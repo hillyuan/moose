@@ -1,11 +1,11 @@
 #
 # This test checks whether the ComputeReducedOrderEigenstrain is functioning properly.
 #
-# If instead of 'reduced_order_eigenstrain', 'thermal_eigenstrain' is given to
+# If instead of 'reduced_eigenstrain', 'thermal_eigenstrain' is given to
 # eigenstrain_names in the Modules/TensorMechanics/Master/all block, the output will be
 # quite different.
 #
-# Open the reducedOrderRZLinear_out_hydro_0001.csv file and blot the hydro variables as
+# Open the reducedOrderRZLinear_out_hydro_0001.csv file and plot the hydro variables as
 # a function of x.  For the reduced order case, the values are smooth across each of the
 # two elements with a jump upward from the left element to the right element.  However,
 # when not using 'reduced_order_eigenstrain', a jump downward appears from the left
@@ -108,7 +108,7 @@
         strain = SMALL
         incremental = true
         temperature = temp2
-        eigenstrain_names = 'reduced_order_eigenstrain' #'thermal_eigenstrain'
+        eigenstrain_names = 'reduced_eigenstrain' #'thermal_eigenstrain'
       [../]
     [../]
   [../]
@@ -239,7 +239,8 @@
   [./reduced_order_eigenstrain]
     type = ComputeReducedOrderEigenstrain
     input_eigenstrain_names = 'thermal_eigenstrain'
-    eigenstrain_name = 'reduced_order_eigenstrain'
+    eigenstrain_name = 'reduced_eigenstrain'
+    incremental_form = true
   [../]
 []
 
