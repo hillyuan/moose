@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // This only works with petsc-3.3 and above.
 #include "libmesh/petsc_macro.h"
@@ -622,14 +617,10 @@ DMMooseGetEmbedding_Private(DM dm, IS * embedding)
           for (const auto & bit : *(dmm->_block_ids))
           {
             subdomain_id_type b = bit.second;
-            MeshBase::const_element_iterator el =
-                dmm->_nl->system().get_mesh().active_local_subdomain_elements_begin(b);
-            MeshBase::const_element_iterator end_el =
-                dmm->_nl->system().get_mesh().active_local_subdomain_elements_end(b);
-            for (; el != end_el; ++el)
+            for (const auto & elem :
+                 as_range(dmm->_nl->system().get_mesh().active_local_subdomain_elements_begin(b),
+                          dmm->_nl->system().get_mesh().active_local_subdomain_elements_end(b)))
             {
-              const Elem * elem = *el;
-
               // Get the degree of freedom indices for the given variable off the current element.
               std::vector<dof_id_type> evindices;
               dofmap.dof_indices(elem, evindices, v);
@@ -642,14 +633,9 @@ DMMooseGetEmbedding_Private(DM dm, IS * embedding)
 
             // Sometime, we own nodes but do not own the elements the nodes connected to
             {
-              MeshBase::const_node_iterator node_it =
-                  dmm->_nl->system().get_mesh().local_nodes_begin();
-              const MeshBase::const_node_iterator node_end =
-                  dmm->_nl->system().get_mesh().local_nodes_end();
               bool is_on_current_block = false;
-              for (; node_it != node_end; ++node_it)
+              for (auto & node : dmm->_nl->system().get_mesh().local_node_ptr_range())
               {
-                Node * node = *node_it;
                 const unsigned int n_comp = node->n_comp(dmm->_nl->system().number(), v);
 
                 // skip it if no dof
@@ -854,7 +840,7 @@ DMMooseGetEmbedding_Private(DM dm, IS * embedding)
             if (bc_id_set.find(boundary_id) == bc_id_set.end())
               continue;
 
-            UniquePtr<const Elem> side_bdry = elem_bdry->build_side_ptr(side, false);
+            std::unique_ptr<const Elem> side_bdry = elem_bdry->build_side_ptr(side, false);
             evindices.clear();
             dofmap.dof_indices(side_bdry.get(), evindices, v);
             for (const auto & edof : evindices)

@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "MooseUtils.h"
@@ -326,17 +321,15 @@ Parser::walkRaw(std::string /*fullpath*/, std::string /*nodepath*/, hit::Node * 
   std::string registered_identifier = _syntax.isAssociated(section_name, &is_parent);
 
   // We need to retrieve a list of Actions associated with the current identifier
-  std::pair<std::multimap<std::string, Syntax::ActionInfo>::iterator,
-            std::multimap<std::string, Syntax::ActionInfo>::iterator>
-      iters = _syntax.getActions(registered_identifier);
-
+  auto iters = _syntax.getActions(registered_identifier);
   if (iters.first == iters.second)
   {
-    mooseError(errormsg(getFileName(),
+    _errmsg += errormsg(getFileName(),
                         n,
                         "section '",
                         curr_identifier,
-                        "' does not have an associated \"Action\".\nDid you misspell it?"));
+                        "' does not have an associated \"Action\".\nDid you misspell it?");
+    return;
   }
 
   for (auto it = iters.first; it != iters.second; ++it)
@@ -345,7 +338,7 @@ Parser::walkRaw(std::string /*fullpath*/, std::string /*nodepath*/, hit::Node * 
       continue;
     if (_syntax.isDeprecatedSyntax(registered_identifier))
       mooseDeprecated(
-          errormsg(getFileName(), n, "\"[", registered_identifier, "]\" is deprecated."));
+          errormsg(getFileName(), n, _syntax.deprecatedActionSyntaxMessage(registered_identifier)));
 
     params = _action_factory.getValidParams(it->second._action);
 
@@ -356,7 +349,8 @@ Parser::walkRaw(std::string /*fullpath*/, std::string /*nodepath*/, hit::Node * 
     // Add the parsed syntax to the parameters object for consumption by the Action
     params.set<std::string>("task") = it->second._task;
     params.set<std::string>("registered_identifier") = registered_identifier;
-    params.addPrivateParam<std::string>("parser_syntax", curr_identifier);
+    params.blockLocation() = _input_filename + ":" + std::to_string(n->line());
+    params.blockFullpath() = n->fullpath();
 
     // Create the Action
     std::shared_ptr<Action> action_obj =
@@ -367,6 +361,8 @@ Parser::walkRaw(std::string /*fullpath*/, std::string /*nodepath*/, hit::Node * 
         std::dynamic_pointer_cast<MooseObjectAction>(action_obj);
     if (object_action)
     {
+      object_action->getObjectParams().blockLocation() = params.blockLocation();
+      object_action->getObjectParams().blockFullpath() = params.blockFullpath();
       extractParams(curr_identifier, object_action->getObjectParams());
       object_action->getObjectParams()
           .set<std::vector<std::string>>("control_tags")
@@ -531,9 +527,6 @@ Parser::parse(const std::string & input_filename)
   for (auto & msg : bw.errors)
     _errmsg += msg + "\n";
 
-  if (_errmsg.size() > 0)
-    mooseError(_errmsg);
-
   // There are a few order dependent actions that have to be built first in
   // order for the parser and application to function properly:
   //
@@ -548,11 +541,14 @@ Parser::parse(const std::string & input_filename)
   //                            This is because we retrieve valid parameters from the Factory
   //                            during parse time. Objects must be registered before
   //                            validParameters can be retrieved.
-  _secs_need_first = {
-      _syntax.getSyntaxByAction("SetupDebugAction", "setup_debug"),
-      _syntax.getSyntaxByAction("GlobalParamsAction", "set_global_params"),
-      _syntax.getSyntaxByAction("DynamicObjectRegistrationAction", "dynamic_object_registration"),
-  };
+  auto syntax = _syntax.getSyntaxByAction("SetupDebugAction");
+  std::copy(syntax.begin(), syntax.end(), std::back_inserter(_secs_need_first));
+
+  syntax = _syntax.getSyntaxByAction("GlobalParamsAction");
+  std::copy(syntax.begin(), syntax.end(), std::back_inserter(_secs_need_first));
+
+  syntax = _syntax.getSyntaxByAction("DynamicObjectRegistrationAction");
+  std::copy(syntax.begin(), syntax.end(), std::back_inserter(_secs_need_first));
 
   // walk all the sections extracting paramters from each into InputParameters objects
   for (auto & sec : _secs_need_first)
@@ -562,6 +558,9 @@ Parser::parse(const std::string & input_filename)
       walkRaw(n->parent()->fullpath(), n->path(), n);
   }
   _root->walk(this, hit::NodeType::Section);
+
+  if (_errmsg.size() > 0)
+    mooseError(_errmsg);
 }
 
 // Checks the input and the way it has been used and emits any errors/warnings.
@@ -608,7 +607,7 @@ Parser::errorCheck(const Parallel::Communicator & comm, bool warn_unused, bool e
   }
 
   if (_warnmsg.size() > 0)
-    mooseWarning(_warnmsg);
+    mooseUnused(_warnmsg);
   if (_errmsg.size() > 0)
     mooseError(_errmsg);
 }
@@ -882,6 +881,14 @@ void Parser::setScalarParameter<MultiMooseEnum, MultiMooseEnum>(
     GlobalParamsAction * global_block);
 
 template <>
+void Parser::setScalarParameter<ExecFlagEnum, ExecFlagEnum>(
+    const std::string & full_name,
+    const std::string & short_name,
+    InputParameters::Parameter<ExecFlagEnum> * param,
+    bool in_global,
+    GlobalParamsAction * global_block);
+
+template <>
 void Parser::setScalarParameter<RealTensorValue, RealTensorValue>(
     const std::string & full_name,
     const std::string & short_name,
@@ -928,7 +935,7 @@ Parser::extractParams(const std::string & prefix, InputParameters & p)
   std::ostringstream error_stream;
   static const std::string global_params_task = "set_global_params";
   static const std::string global_params_block_name =
-      _syntax.getSyntaxByAction("GlobalParamsAction", global_params_task);
+      _syntax.getSyntaxByAction("GlobalParamsAction").front();
 
   ActionIterator act_iter = _action_wh.actionBlocksWithActionBegin(global_params_task);
   GlobalParamsAction * global_params_block = nullptr;
@@ -956,6 +963,9 @@ Parser::extractParams(const std::string & prefix, InputParameters & p)
       _extracted_vars.insert(
           full_name); // Keep track of all variables extracted from the input file
       found = true;
+      p.inputLocation(it.first) =
+          _input_filename + ":" + std::to_string(_root->find(full_name)->line());
+      p.paramFullpath(it.first) = full_name;
     }
     // Wait! Check the GlobalParams section
     else if (global_params_block)
@@ -968,6 +978,9 @@ Parser::extractParams(const std::string & prefix, InputParameters & p)
             full_name); // Keep track of all variables extracted from the input file
         found = true;
         in_global = true;
+        p.inputLocation(it.first) =
+            _input_filename + ":" + std::to_string(_root->find(full_name)->line());
+        p.paramFullpath(it.first) = full_name;
       }
     }
 
@@ -1063,8 +1076,11 @@ Parser::extractParams(const std::string & prefix, InputParameters & p)
         ;
       setscalarvaltype(Real, double, Real);
       setscalarvaltype(int, int, long);
+      setscalarvaltype(unsigned short, unsigned int, long);
       setscalarvaltype(long, int, long);
-      setscalarvaltype(unsigned int, int, long);
+      setscalarvaltype(unsigned int, unsigned int, long);
+      setscalarvaltype(unsigned long, unsigned int, long);
+      setscalarvaltype(long int, int64_t, long);
 
       setscalar(bool, bool);
       setscalar(SubdomainID, int);
@@ -1092,6 +1108,7 @@ Parser::extractParams(const std::string & prefix, InputParameters & p)
       setscalar(MaterialName, string);
       setscalar(DistributionName, string);
       setscalar(SamplerName, string);
+      setscalar(TagName, string);
 
       setscalar(PostprocessorName, PostprocessorName);
 
@@ -1101,6 +1118,7 @@ Parser::extractParams(const std::string & prefix, InputParameters & p)
       setscalar(MooseEnum, MooseEnum);
       setscalar(MultiMooseEnum, MultiMooseEnum);
       setscalar(RealTensorValue, RealTensorValue);
+      setscalar(ExecFlagEnum, ExecFlagEnum);
 
       // vector types
       setvector(Real, double);
@@ -1145,7 +1163,7 @@ Parser::extractParams(const std::string & prefix, InputParameters & p)
       setvector(MaterialName, string);
       setvector(DistributionName, string);
       setvector(SamplerName, string);
-
+      setvector(TagName, string);
       setvector(VariableName, VariableName);
 
       // Double indexed types
@@ -1200,7 +1218,7 @@ Parser::extractParams(const std::string & prefix, InputParameters & p)
     mooseError(error_stream.str());
 
   // Here we will see if there are any auto build vectors that need to be created
-  const std::map<std::string, std::pair<std::string, std::string>> & auto_build_vectors =
+  std::map<std::string, std::pair<std::string, std::string>> auto_build_vectors =
       p.getAutoBuildVectors();
   for (const auto & it : auto_build_vectors)
   {
@@ -1229,6 +1247,20 @@ Parser::extractParams(const std::string & prefix, InputParameters & p)
   }
 }
 
+template <typename T>
+bool
+toBool(const std::string & /*s*/, T & /*val*/)
+{
+  return false;
+}
+
+template <>
+bool
+toBool<bool>(const std::string & s, bool & val)
+{
+  return hit::toBool(s, &val);
+}
+
 template <typename T, typename Base>
 void
 Parser::setScalarParameter(const std::string & full_name,
@@ -1244,43 +1276,42 @@ Parser::setScalarParameter(const std::string & full_name,
   }
   catch (hit::Error & err)
   {
-    // handle the case where the user put a number inside quotes - we really shouldn't allow this,
-    // but "backwards compatibility" :-(
+    auto strval = _root->param<std::string>(full_name);
+
+    // handle the case where the user put a number inside quotes
     auto & t = typeid(T);
     if (t == typeid(int) || t == typeid(unsigned int) || t == typeid(SubdomainID) ||
-        t == typeid(BoundaryID))
+        t == typeid(BoundaryID) || t == typeid(double))
     {
       try
       {
-        auto v = std::stoi(_root->param<std::string>(full_name));
-        param->set() = *reinterpret_cast<T *>(&v);
+        param->set() = MooseUtils::convert<T>(strval, true);
       }
-      catch (...)
+      catch (std::invalid_argument & /*e*/)
       {
-        mooseError(errormsg(_input_filename,
+        const std::string format_type = (t == typeid(double)) ? "float" : "integer";
+        _errmsg += errormsg(_input_filename,
                             _root->find(full_name),
-                            "invalid integer syntax for parameter: ",
+                            "invalid ",
+                            format_type,
+                            " syntax for parameter: ",
                             full_name,
                             "=",
-                            _root->param<std::string>(full_name)));
+                            strval) +
+                   "\n";
       }
     }
-    else if (t == typeid(double))
+    else if (t == typeid(bool))
     {
-      try
-      {
-        auto v = std::stod(_root->param<std::string>(full_name));
-        param->set() = *reinterpret_cast<T *>(&v);
-      }
-      catch (...)
-      {
-        mooseError(errormsg(_input_filename,
+      bool isbool = toBool(strval, param->set());
+      if (!isbool)
+        _errmsg += errormsg(_input_filename,
                             _root->find(full_name),
-                            "invalid float syntax for parameter: ",
+                            "invalid boolean syntax for parameter: ",
                             full_name,
                             "=",
-                            _root->param<std::string>(full_name)));
-      }
+                            strval) +
+                   "\n";
     }
     else
       throw;
@@ -1308,7 +1339,7 @@ Parser::setFilePathParam(const std::string & full_name,
   if (pos != std::string::npos && postfix[0] != '/' && !postfix.empty())
     prefix = _input_filename.substr(0, pos + 1);
 
-  params.set<std::string>("_raw_" + short_name) = postfix;
+  params.rawParamVal(short_name) = postfix;
   param->set() = prefix + postfix;
 
   if (in_global)
@@ -1346,9 +1377,17 @@ Parser::setVectorParameter(const std::string & full_name,
   std::vector<T> vec;
   if (_root->find(full_name))
   {
-    auto tmp = _root->param<std::vector<Base>>(full_name);
-    for (auto val : tmp)
-      vec.push_back(val);
+    try
+    {
+      auto tmp = _root->param<std::vector<Base>>(full_name);
+      for (auto val : tmp)
+        vec.push_back(val);
+    }
+    catch (hit::Error & err)
+    {
+      _errmsg += errormsg(_input_filename, _root->find(full_name), err.what());
+      return;
+    }
   }
 
   param->set() = vec;
@@ -1376,6 +1415,7 @@ Parser::setVectorFilePathParam(const std::string & full_name,
   if (_root->find(full_name))
   {
     auto tmp = _root->param<std::vector<std::string>>(full_name);
+    params.rawParamVal(short_name) = _root->param<std::string>(full_name);
     for (auto val : tmp)
     {
       std::string prefix;
@@ -1388,7 +1428,6 @@ Parser::setVectorFilePathParam(const std::string & full_name,
     }
   }
 
-  params.set<std::vector<std::string>>("_raw_" + short_name) = rawvec;
   param->set() = vec;
 
   if (in_global)
@@ -1419,7 +1458,11 @@ Parser::setDoubleIndexParameter(const std::string & full_name,
 
   for (unsigned j = 0; j < first_tokenized_vector.size(); ++j)
     if (!MooseUtils::tokenizeAndConvert<T>(first_tokenized_vector[j], param->set()[j]))
-      mooseError("Reading parameter ", short_name, " failed.");
+    {
+      _errmsg += errormsg(
+          _input_filename, _root->find(full_name), "invalid format for parameter ", full_name);
+      return;
+    }
 
   if (in_global)
   {
@@ -1442,13 +1485,29 @@ Parser::setScalarComponentParameter(const std::string & full_name,
                                     bool in_global,
                                     GlobalParamsAction * global_block)
 {
-  auto vec = _root->param<std::vector<double>>(full_name);
+  std::vector<double> vec;
+  try
+  {
+    vec = _root->param<std::vector<double>>(full_name);
+  }
+  catch (hit::Error & err)
+  {
+    _errmsg += errormsg(_input_filename, _root->find(full_name), err.what());
+    return;
+  }
 
   if (vec.size() != LIBMESH_DIM)
-    mooseError(std::string("Error in Scalar Component parameter ") + full_name + ": size is ",
-               vec.size(),
-               ", should be ",
-               LIBMESH_DIM);
+  {
+    _errmsg += errormsg(_input_filename,
+                        _root->find(full_name),
+                        "wrong number of values in scalar component parameter ",
+                        full_name,
+                        ": size ",
+                        vec.size(),
+                        " is not a multiple of ",
+                        LIBMESH_DIM);
+    return;
+  }
 
   T value;
   for (unsigned int i = 0; i < vec.size(); ++i)
@@ -1470,13 +1529,29 @@ Parser::setVectorComponentParameter(const std::string & full_name,
                                     bool in_global,
                                     GlobalParamsAction * global_block)
 {
-  auto vec = _root->param<std::vector<double>>(full_name);
+  std::vector<double> vec;
+  try
+  {
+    vec = _root->param<std::vector<double>>(full_name);
+  }
+  catch (hit::Error & err)
+  {
+    _errmsg += errormsg(_input_filename, _root->find(full_name), err.what());
+    return;
+  }
 
   if (vec.size() % LIBMESH_DIM)
-    mooseError(std::string("Error in Vector Component parameter ") + full_name + ": size is ",
-               vec.size(),
-               ", should be a multiple of ",
-               LIBMESH_DIM);
+  {
+    _errmsg += errormsg(_input_filename,
+                        _root->find(full_name),
+                        "wrong number of values in vector component parameter ",
+                        full_name,
+                        ": size ",
+                        vec.size(),
+                        " is not a multiple of ",
+                        LIBMESH_DIM);
+    return;
+  }
 
   std::vector<T> values;
   for (unsigned int i = 0; i < vec.size() / LIBMESH_DIM; ++i)
@@ -1569,6 +1644,31 @@ Parser::setScalarParameter<MultiMooseEnum, MultiMooseEnum>(
 
 template <>
 void
+Parser::setScalarParameter<ExecFlagEnum, ExecFlagEnum>(
+    const std::string & full_name,
+    const std::string & short_name,
+    InputParameters::Parameter<ExecFlagEnum> * param,
+    bool in_global,
+    GlobalParamsAction * global_block)
+{
+  ExecFlagEnum current_param = param->get();
+  auto vec = _root->param<std::vector<std::string>>(full_name);
+
+  std::string raw_values;
+  for (unsigned int i = 0; i < vec.size(); ++i)
+    raw_values += ' ' + vec[i];
+
+  param->set() = raw_values;
+
+  if (in_global)
+  {
+    global_block->remove(short_name);
+    global_block->setScalarParam<ExecFlagEnum>(short_name) = current_param;
+  }
+}
+
+template <>
+void
 Parser::setScalarParameter<RealTensorValue, RealTensorValue>(
     const std::string & full_name,
     const std::string & short_name,
@@ -1578,10 +1678,17 @@ Parser::setScalarParameter<RealTensorValue, RealTensorValue>(
 {
   auto vec = _root->param<std::vector<double>>(full_name);
   if (vec.size() != LIBMESH_DIM * LIBMESH_DIM)
-    mooseError(std::string("Error in RealTensorValue parameter ") + full_name + ": size is ",
-               vec.size(),
-               ", should be ",
-               LIBMESH_DIM * LIBMESH_DIM);
+  {
+    _errmsg += errormsg(_input_filename,
+                        _root->find(full_name),
+                        "invalid RealTensorValue parameter ",
+                        full_name,
+                        ": size is ",
+                        vec.size(),
+                        " but should be ",
+                        LIBMESH_DIM * LIBMESH_DIM);
+    return;
+  }
 
   RealTensorValue value;
   for (int i = 0; i < LIBMESH_DIM; ++i)
@@ -1696,6 +1803,7 @@ Parser::setVectorParameter<VariableName, VariableName>(
     GlobalParamsAction * /*global_block*/)
 {
   auto vec = _root->param<std::vector<std::string>>(full_name);
+  auto strval = _root->param<std::string>(full_name);
   std::vector<VariableName> var_names(vec.size());
 
   bool has_var_names = false;
@@ -1707,11 +1815,9 @@ Parser::setVectorParameter<VariableName, VariableName>(
     std::istringstream ss(var_name);
 
     // If we are able to convert this value into a Real, then set a default coupled value
+    // NOTE: parameter must be either all default or no defaults
     if (ss >> real_value && ss.eof())
-      /* FIXME: the real_value is assigned to defaultCoupledValue overriding the value assigned
-       * before. Currently there is no functionality to separately assign the correct
-       * "real_value[i]" in InputParameters.*/
-      _current_params->defaultCoupledValue(short_name, real_value);
+      _current_params->defaultCoupledValue(short_name, real_value, i);
     else
     {
       var_names[i] = var_name;
@@ -1725,8 +1831,17 @@ Parser::setVectorParameter<VariableName, VariableName>(
 
     for (unsigned int i = 0; i < vec.size(); ++i)
       if (var_names[i] == "")
-        mooseError("MOOSE does not currently support a coupled vector where some parameters are "
-                   "reals and others are variables");
+      {
+        _errmsg += errormsg(
+            _input_filename,
+            _root->find(full_name),
+            "invalid value for ",
+            full_name,
+            ":\n"
+            "    MOOSE does not currently support a coupled vector where some parameters are ",
+            "reals and others are variables");
+        return;
+      }
       else
         param->set()[i] = var_names[i];
   }

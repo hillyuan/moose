@@ -1,15 +1,28 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "ContactAction.h"
 
 #include "Factory.h"
 #include "FEProblem.h"
 #include "Conversion.h"
 #include "AddVariableAction.h"
+#include "NonlinearSystemBase.h"
+#include "libmesh/petsc_nonlinear_solver.h"
+
+registerMooseAction("ContactApp", ContactAction, "add_aux_kernel");
+
+registerMooseAction("ContactApp", ContactAction, "add_aux_variable");
+
+registerMooseAction("ContactApp", ContactAction, "add_dirac_kernel");
+
+registerMooseAction("ContactApp", ContactAction, "output_penetration_info_vars");
 
 template <>
 InputParameters
@@ -155,7 +168,6 @@ ContactAction::act()
         params.set<unsigned int>("component") = i;
         params.set<NonlinearVariableName>("variable") = displacements[i];
         params.set<std::vector<VariableName>>("master_variable") = {coupled_displacements[i]};
-
         _problem->addConstraint("MechanicalContactConstraint", name, params);
       }
     }

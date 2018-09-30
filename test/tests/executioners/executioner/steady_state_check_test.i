@@ -84,7 +84,6 @@
   type = Transient
   scheme = 'implicit-euler'
 
-  # Preconditioned JFNK (default)
   solve_type = 'PJFNK'
 
   nl_abs_tol = 1e-14
@@ -93,7 +92,7 @@
   num_steps = 12
   dt = 1
 
-  trans_ss_check = true
+  steady_state_detection = true
 []
 
 [Outputs]

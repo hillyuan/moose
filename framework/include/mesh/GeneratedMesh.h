@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef GENERATEDMESH_H
 #define GENERATEDMESH_H
@@ -29,12 +24,13 @@ class GeneratedMesh : public MooseMesh
 {
 public:
   GeneratedMesh(const InputParameters & parameters);
-  GeneratedMesh(const GeneratedMesh & other_mesh) = default;
+  GeneratedMesh(const GeneratedMesh & /* other_mesh */) = default;
 
   // No copy
   GeneratedMesh & operator=(const GeneratedMesh & other_mesh) = delete;
 
-  virtual MooseMesh & clone() const override;
+  virtual std::unique_ptr<MooseMesh> safeClone() const override;
+
   virtual void buildMesh() override;
   virtual Real getMinInDimension(unsigned int component) const override;
   virtual Real getMaxInDimension(unsigned int component) const override;

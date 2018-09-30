@@ -1,4 +1,14 @@
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 #include "PFParamsPolyFreeEnergy.h"
+
+registerMooseObject("PhaseFieldApp", PFParamsPolyFreeEnergy);
 
 template <>
 InputParameters
@@ -69,15 +79,15 @@ PFParamsPolyFreeEnergy::computeQpProperties()
       KN = 2.0 / 3.0;
       break;
     case 1: // Sixth order
-      KN = 3.0 / 16.0 * std::sqrt(3.0) +
-           9.0 / 64.0 * std::sqrt(2.0) * (std::log(-std::sqrt(2.0) + std::sqrt(3.0)) +
-                                          std::log(std::sqrt(2.0) + std::sqrt(3.0)));
+      KN = 3.0 / 16.0 * std::sqrt(3.0) + 9.0 / 64.0 * std::sqrt(2.0) *
+                                             (std::log(-std::sqrt(2.0) + std::sqrt(3.0)) +
+                                              std::log(std::sqrt(2.0) + std::sqrt(3.0)));
       break;
     case 2: // Eigth order
       KN = 0.835510425;
       break;
     default:
-      mooseError("Error in PFParamsPolyFreeEnergy: incorrect polynomial order");
+      paramError("polynomial_order", "Incorrect polynomial order");
   }
 
   // Convert surface energy from J/m2 to eV/length_scale

@@ -7,7 +7,6 @@
     max_time = 20
     compiler = 'GCC CLANG'
     method = '!DBG'
-    valgrind = 'HEAVY'
-    min_reported_time = 20
+    valgrind = 'NONE'
   [../]
 []

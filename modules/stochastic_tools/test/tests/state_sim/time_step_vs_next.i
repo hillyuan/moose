@@ -12,7 +12,6 @@
 []
 
 [Executioner]
-  # Preconditioned JFNK (default)
   type = Transient
   num_steps = 100
   dt = 1
@@ -22,7 +21,7 @@
   [./cur_Sim]
     type = StateSimRunner
     model_path = 'path/to/model'
-    seed = 7;
+    seed = 7
   [../]
 []
 

@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "Q2PSaturationFlux.h"
 
@@ -16,6 +18,8 @@
 
 // C++ includes
 #include <iostream>
+
+registerMooseObject("RichardsApp", Q2PSaturationFlux);
 
 template <>
 InputParameters
@@ -74,8 +78,8 @@ Q2PSaturationFlux::prepareNodalValues()
     density = _density.density(_pp_nodal[nodenum]);      // fluid density at the node
     ddensity_dp = _density.ddensity(_pp_nodal[nodenum]); // d(fluid density)/dP at the node
     relperm = _relperm.relperm(
-        _var.nodalSln()[nodenum]); // relative permeability of the fluid at node nodenum
-    drelperm_ds = _relperm.drelperm(_var.nodalSln()[nodenum]); // d(relperm)/dsat
+        _var.dofValues()[nodenum]); // relative permeability of the fluid at node nodenum
+    drelperm_ds = _relperm.drelperm(_var.dofValues()[nodenum]); // d(relperm)/dsat
 
     // calculate the mobility and its derivatives wrt P and S
     _mobility[nodenum] = density * relperm / _viscosity;
@@ -106,9 +110,9 @@ Q2PSaturationFlux::computeJacobian()
 }
 
 void
-Q2PSaturationFlux::computeOffDiagJacobian(unsigned int jvar)
+Q2PSaturationFlux::computeOffDiagJacobian(MooseVariableFEBase & jvar)
 {
-  upwind(false, true, jvar);
+  upwind(false, true, jvar.number());
 }
 
 Real

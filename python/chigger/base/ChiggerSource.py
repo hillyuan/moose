@@ -1,17 +1,13 @@
 #pylint: disable=missing-docstring
-#################################################################
-#                   DO NOT MODIFY THIS HEADER                   #
-#  MOOSE - Multiphysics Object Oriented Simulation Environment  #
-#                                                               #
-#            (c) 2010 Battelle Energy Alliance, LLC             #
-#                      ALL RIGHTS RESERVED                      #
-#                                                               #
-#           Prepared by Battelle Energy Alliance, LLC           #
-#             Under Contract No. DE-AC07-05ID14517              #
-#              With the U. S. Department of Energy              #
-#                                                               #
-#              See COPYRIGHT for full restrictions              #
-#################################################################
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import vtk
 from ChiggerFilterSourceBase import ChiggerFilterSourceBase
 
@@ -36,7 +32,7 @@ class ChiggerSource(ChiggerFilterSourceBase):
         opt.add('orientation', None, "The orientation of the object.", vtype=list)
         opt.add('rotation', [0, 0, 0], "The rotation of the object about x, y, z axes.", vtype=list)
         opt.add('edges', False, "Enable/disable display of object edges.")
-        opt.add('edge_color', [1, 1, 1], "Set the edge color.")
+        opt.add('edge_color', [0, 0, 1], "Set the edge color.")
         opt.add('edge_width', "The edge width.", vtype=int)
         opt.add('point_size', "The point size.", vtype=float)
         opt.add('opacity', 1, "The object opacity.", vtype=float)

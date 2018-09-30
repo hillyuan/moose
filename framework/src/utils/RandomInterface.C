@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "Moose.h"
 #include "RandomInterface.h"
@@ -34,8 +29,8 @@ RandomInterface::RandomInterface(const InputParameters & parameters,
                                  FEProblemBase & problem,
                                  THREAD_ID tid,
                                  bool is_nodal)
-  : _random_data(NULL),
-    _generator(NULL),
+  : _random_data(nullptr),
+    _generator(nullptr),
     _ri_problem(problem),
     _ri_name(parameters.get<std::string>("_object_name")),
     _master_seed(parameters.get<unsigned int>("seed")),
@@ -63,7 +58,7 @@ RandomInterface::setRandomDataPointer(RandomData * random_data)
 }
 
 unsigned int
-RandomInterface::getSeed(unsigned int id)
+RandomInterface::getSeed(std::size_t id)
 {
   mooseAssert(_random_data, "RandomData object is NULL!");
 
@@ -81,7 +76,7 @@ RandomInterface::getRandomLong() const
   else
     id = _curr_element->id();
 
-  return _generator->randl(static_cast<unsigned int>(id));
+  return _generator->randl(id);
 }
 
 Real
@@ -95,5 +90,5 @@ RandomInterface::getRandomReal() const
   else
     id = _curr_element->id();
 
-  return _generator->rand(static_cast<unsigned int>(id));
+  return _generator->rand(id);
 }

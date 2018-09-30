@@ -41,6 +41,7 @@
   [../]
   [./h+]
     initial_condition = 1.0e-7
+    scaling = 1e6
   [../]
   [./hco3-]
   [../]
@@ -99,7 +100,6 @@
 []
 
 [ReactionNetwork]
-  primary_species = 'ca2+ hco3- h+'
   [./AqueousEquilibriumReactions]
     primary_species = 'ca2+ hco3- h+'
     secondary_species = 'co2_aq co32- caco3_aq cahco3+ caoh+ oh-'
@@ -261,6 +261,6 @@
 []
 
 [Outputs]
-  print_perf_log = true
+  perf_graph = true
   exodus = true
 []

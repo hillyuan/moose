@@ -1,12 +1,16 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "INSChorinPredictor.h"
 #include "MooseMesh.h"
+
+registerMooseObject("NavierStokesApp", INSChorinPredictor);
 
 template <>
 InputParameters
@@ -27,11 +31,14 @@ validParams<INSChorinPredictor>()
   params.addCoupledVar("w_star", "star z-velocity"); // only required in 3D
 
   // Required parameters
-  params.addRequiredParam<unsigned>(
+  params.addRequiredRangeCheckedParam<unsigned>(
       "component",
+      "component>=0 & component<=2",
       "0,1,2 depending on if we are solving the x,y,z component of the Predictor equation");
-  params.addRequiredParam<std::string>(
+  MooseEnum predictor_type("OLD NEW STAR");
+  params.addRequiredParam<MooseEnum>(
       "predictor_type",
+      predictor_type,
       "One of: OLD, NEW, STAR.  Indicates which velocity to use in the predictor.");
 
   // Optional parameters
@@ -86,8 +93,7 @@ INSChorinPredictor::INSChorinPredictor(const InputParameters & parameters)
 
     // Required parameters
     _component(getParam<unsigned>("component")),
-    _predictor_type(getParam<std::string>("predictor_type")),
-    _predictor_enum("OLD, NEW, STAR, INVALID", _predictor_type),
+    _predictor_enum(getParam<MooseEnum>("predictor_type")),
 
     // Material properties
     _mu(getMaterialProperty<Real>("mu_name")),

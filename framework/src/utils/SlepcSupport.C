@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef SLEPCSUPPORT_H
 #define SLEPCSUPPORT_H
@@ -23,10 +18,10 @@
 // MOOSE includes
 #include "MultiMooseEnum.h"
 #include "InputParameters.h"
-#include "EigenProblem.h"
 #include "Conversion.h"
 #include "EigenProblem.h"
-#include "NonlinearSystemBase.h"
+#include "FEProblemBase.h"
+#include "NonlinearEigenSystem.h"
 
 #include "libmesh/petsc_vector.h"
 #include "libmesh/petsc_matrix.h"
@@ -74,8 +69,7 @@ getSlepcEigenProblemValidParams()
 
   // We are solving a Non-Hermitian eigenvalue problem by default
   MooseEnum eigen_problem_type("HERMITIAN NON_HERMITIAN GEN_HERMITIAN GEN_NON_HERMITIAN "
-                               "GEN_INDEFINITE POS_GEN_NON_HERMITIAN "
-                               "NON_HERMITIAN SLEPC_DEFAULT");
+                               "GEN_INDEFINITE POS_GEN_NON_HERMITIAN SLEPC_DEFAULT");
   params.addParam<MooseEnum>(
       "eigen_problem_type",
       eigen_problem_type,
@@ -91,8 +85,7 @@ getSlepcEigenProblemValidParams()
   // Which eigenvalues are we interested in
   MooseEnum which_eigen_pairs("LARGEST_MAGNITUDE SMALLEST_MAGNITUDE LARGEST_REAL SMALLEST_REAL "
                               "LARGEST_IMAGINARY SMALLEST_IMAGINARY TARGET_MAGNITUDE TARGET_REAL "
-                              "TARGET_IMAGINARY ALL_EIGENVALUES "
-                              "SMALLEST_MAGNITUDE SLEPC_DEFAULT");
+                              "TARGET_IMAGINARY ALL_EIGENVALUES SLEPC_DEFAULT");
   params.addParam<MooseEnum>("which_eigen_pairs",
                              which_eigen_pairs,
                              "Which eigenvalue pairs to obtain from the solution "
@@ -373,7 +366,7 @@ setEigenSolverOptions(SolverParams & solver_params, const InputParameters & para
       break;
 
     case Moose::EST_NONLINEAR_POWER:
-#if !SLEPC_VERSION_LESS_THAN(3, 7, 3) && !PETSC_VERSION_RELEASE
+#if !SLEPC_VERSION_LESS_THAN(3, 8, 0) || !PETSC_VERSION_RELEASE
       Moose::PetscSupport::setSinglePetscOption("-eps_type", "power");
       Moose::PetscSupport::setSinglePetscOption("-eps_power_nonlinear", "1");
       Moose::PetscSupport::setSinglePetscOption("-eps_target_magnitude", "");
@@ -384,7 +377,7 @@ setEigenSolverOptions(SolverParams & solver_params, const InputParameters & para
       break;
 
     case Moose::EST_MF_NONLINEAR_POWER:
-#if !SLEPC_VERSION_LESS_THAN(3, 7, 3) && !PETSC_VERSION_RELEASE
+#if !SLEPC_VERSION_LESS_THAN(3, 8, 0) || !PETSC_VERSION_RELEASE
       Moose::PetscSupport::setSinglePetscOption("-eps_type", "power");
       Moose::PetscSupport::setSinglePetscOption("-eps_power_nonlinear", "1");
       Moose::PetscSupport::setSinglePetscOption("-eps_power_snes_mf_operator", "1");
@@ -396,7 +389,7 @@ setEigenSolverOptions(SolverParams & solver_params, const InputParameters & para
       break;
 
     case Moose::EST_MONOLITH_NEWTON:
-#if !SLEPC_VERSION_LESS_THAN(3, 7, 3) && !PETSC_VERSION_RELEASE
+#if !SLEPC_VERSION_LESS_THAN(3, 8, 0) || !PETSC_VERSION_RELEASE
       Moose::PetscSupport::setSinglePetscOption("-eps_type", "power");
       Moose::PetscSupport::setSinglePetscOption("-eps_power_nonlinear", "1");
       Moose::PetscSupport::setSinglePetscOption("-eps_power_update", "1");
@@ -412,7 +405,7 @@ setEigenSolverOptions(SolverParams & solver_params, const InputParameters & para
       break;
 
     case Moose::EST_MF_MONOLITH_NEWTON:
-#if !SLEPC_VERSION_LESS_THAN(3, 7, 3) && !PETSC_VERSION_RELEASE
+#if !SLEPC_VERSION_LESS_THAN(3, 8, 0) || !PETSC_VERSION_RELEASE
       Moose::PetscSupport::setSinglePetscOption("-eps_type", "power");
       Moose::PetscSupport::setSinglePetscOption("-eps_power_nonlinear", "1");
       Moose::PetscSupport::setSinglePetscOption("-eps_power_update", "1");
@@ -447,8 +440,7 @@ slepcSetOptions(EigenProblem & eigen_problem, const InputParameters & params)
 }
 
 void
-moosePetscSNESFormJacobian(
-    SNES /*snes*/, Vec x, Mat jac, Mat pc, void * ctx, Moose::KernelType type)
+moosePetscSNESFormJacobian(SNES /*snes*/, Vec x, Mat jac, Mat pc, void * ctx, TagID tag)
 {
   EigenProblem * eigen_problem = static_cast<EigenProblem *>(ctx);
   NonlinearSystemBase & nl = eigen_problem->getNonlinearSystemBase();
@@ -468,7 +460,7 @@ moosePetscSNESFormJacobian(
 
   PC.zero();
 
-  eigen_problem->computeJacobian(*sys.current_local_solution.get(), PC, type);
+  eigen_problem->computeJacobianTag(*sys.current_local_solution.get(), PC, tag);
 
   PC.close();
   if (jac != pc)
@@ -480,7 +472,10 @@ mooseSlepcEigenFormJacobianA(SNES snes, Vec x, Mat jac, Mat pc, void * ctx)
 {
   PetscFunctionBegin;
 
-  moosePetscSNESFormJacobian(snes, x, jac, pc, ctx, Moose::KT_NONEIGEN);
+  EigenProblem * eigen_problem = static_cast<EigenProblem *>(ctx);
+  NonlinearEigenSystem & eigen_nl = eigen_problem->getNonlinearEigenSystem();
+
+  moosePetscSNESFormJacobian(snes, x, jac, pc, ctx, eigen_nl.nonEigenMatrixTag());
   PetscFunctionReturn(0);
 }
 
@@ -489,12 +484,15 @@ mooseSlepcEigenFormJacobianB(SNES snes, Vec x, Mat jac, Mat pc, void * ctx)
 {
   PetscFunctionBegin;
 
-  moosePetscSNESFormJacobian(snes, x, jac, pc, ctx, Moose::KT_EIGEN);
+  EigenProblem * eigen_problem = static_cast<EigenProblem *>(ctx);
+  NonlinearEigenSystem & eigen_nl = eigen_problem->getNonlinearEigenSystem();
+
+  moosePetscSNESFormJacobian(snes, x, jac, pc, ctx, eigen_nl.eigenMatrixTag());
   PetscFunctionReturn(0);
 }
 
 void
-moosePetscSNESFormFunction(SNES /*snes*/, Vec x, Vec r, void * ctx, Moose::KernelType type)
+moosePetscSNESFormFunction(SNES /*snes*/, Vec x, Vec r, void * ctx, TagID tag)
 {
   EigenProblem * eigen_problem = static_cast<EigenProblem *>(ctx);
   NonlinearSystemBase & nl = eigen_problem->getNonlinearSystemBase();
@@ -507,7 +505,7 @@ moosePetscSNESFormFunction(SNES /*snes*/, Vec x, Vec r, void * ctx, Moose::Kerne
 
   R.zero();
 
-  eigen_problem->computeResidualType(*sys.current_local_solution.get(), R, type);
+  eigen_problem->computeResidualTag(*sys.current_local_solution.get(), R, tag);
 
   R.close();
 }
@@ -517,7 +515,10 @@ mooseSlepcEigenFormFunctionA(SNES snes, Vec x, Vec r, void * ctx)
 {
   PetscFunctionBegin;
 
-  moosePetscSNESFormFunction(snes, x, r, ctx, Moose::KT_NONEIGEN);
+  EigenProblem * eigen_problem = static_cast<EigenProblem *>(ctx);
+  NonlinearEigenSystem & eigen_nl = eigen_problem->getNonlinearEigenSystem();
+
+  moosePetscSNESFormFunction(snes, x, r, ctx, eigen_nl.nonEigenVectorTag());
   PetscFunctionReturn(0);
 }
 
@@ -526,9 +527,39 @@ mooseSlepcEigenFormFunctionB(SNES snes, Vec x, Vec r, void * ctx)
 {
   PetscFunctionBegin;
 
-  moosePetscSNESFormFunction(snes, x, r, ctx, Moose::KT_EIGEN);
+  EigenProblem * eigen_problem = static_cast<EigenProblem *>(ctx);
+  NonlinearEigenSystem & eigen_nl = eigen_problem->getNonlinearEigenSystem();
+
+  moosePetscSNESFormFunction(snes, x, r, ctx, eigen_nl.eigenVectorTag());
   PetscFunctionReturn(0);
 }
+
+PetscErrorCode
+mooseSlepcEigenFormFunctionAB(SNES /*snes*/, Vec x, Vec Ax, Vec Bx, void * ctx)
+{
+  PetscFunctionBegin;
+
+  EigenProblem * eigen_problem = static_cast<EigenProblem *>(ctx);
+  NonlinearEigenSystem & nl = eigen_problem->getNonlinearEigenSystem();
+  System & sys = nl.system();
+
+  PetscVector<Number> X_global(x, sys.comm()), AX(Ax, sys.comm()), BX(Bx, sys.comm());
+
+  // update local solution
+  X_global.localize(*sys.current_local_solution.get());
+
+  AX.zero();
+  BX.zero();
+
+  eigen_problem->computeResidualAB(
+      *sys.current_local_solution.get(), AX, BX, nl.nonEigenVectorTag(), nl.eigenVectorTag());
+
+  AX.close();
+  BX.close();
+
+  PetscFunctionReturn(0);
+}
+
 } // namespace SlepcSupport
 } // namespace moose
 

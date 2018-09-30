@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import sys
 import os
 import unittest
@@ -37,12 +46,15 @@ class TestOutputPlugin(Testing.PeacockImageTestCase):
         """
         Loads an Exodus file in the VTKWindowWidget object using a structure similar to the ExodusViewer widget.
         """
-        self._widget, self._window = main(size=[600,600])
-        self._window.onFileChanged(self._filename)
+        self._filename = Testing.get_chigger_input('mug_blocks_out.e')
+        self._widget, self._window, self._main = main(size=[600,600])
+        self._window.onSetFilename(self._filename)
+        self._window.onSetVariable('diffused')
+        self._window.onWindowRequiresUpdate()
 
     def testPython(self):
         """
-        Tesgit t script writer.
+        Test script writer.
         """
 
         # Test that the script is created
@@ -81,13 +93,11 @@ class TestOutputPlugin(Testing.PeacockImageTestCase):
         """
         Tests that live script widget.
         """
-        self._widget.OutputPlugin.LiveScriptButton.clicked.emit()
-        self.assertTrue(self._widget.OutputPlugin.LiveScript.isVisible())
-        self.assertIn("chigger.exodus.ExodusReader", self._widget.OutputPlugin.LiveScript.toPlainText())
-        self._widget.OutputPlugin._result.setOption('variable', 'convected')
-        self._window.onWindowRequiresUpdate()
-        self._widget.OutputPlugin.onWindowUpdated()
-        self.assertIn("variable='convected'", self._widget.OutputPlugin.LiveScript.toPlainText())
+        self._widget.OutputPlugin.LiveScript.setChecked(True)
+        self._widget.OutputPlugin.LiveScript.toggled.emit(True)
+        self.assertTrue(self._widget.OutputPlugin.LiveScriptWindow.isVisible())
+        self.assertIn("chigger.exodus.ExodusReader", self._widget.OutputPlugin.LiveScriptWindow.toPlainText())
+        self.assertIn("variable='diffused'", self._widget.OutputPlugin.LiveScriptWindow.toPlainText())
 
 
 if __name__ == '__main__':

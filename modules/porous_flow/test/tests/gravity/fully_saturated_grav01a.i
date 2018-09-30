@@ -76,7 +76,7 @@
   [./temperature]
     type = PorousFlowTemperature
   [../]
-  [./ppss_qp]
+  [./ppss]
     type = PorousFlow1PhaseFullySaturated
     porepressure = pp
   [../]
@@ -87,14 +87,6 @@
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid
     phase = 0
-  [../]
-  [./dens_qp_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_viscosity_qp
   [../]
   [./permeability]
     type = PorousFlowPermeabilityConst

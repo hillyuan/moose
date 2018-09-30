@@ -1,21 +1,17 @@
-/****************************************************************/
-/*               Do NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "InitialConditionWarehouse.h"
 
 // MOOSE includes
 #include "InitialCondition.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 
 InitialConditionWarehouse::InitialConditionWarehouse()
   : MooseObjectWarehouseBase<InitialCondition>(),
@@ -33,10 +29,12 @@ InitialConditionWarehouse::initialSetup(THREAD_ID tid)
 }
 
 void
-InitialConditionWarehouse::addObject(std::shared_ptr<InitialCondition> object, THREAD_ID tid)
+InitialConditionWarehouse::addObject(std::shared_ptr<InitialCondition> object,
+                                     THREAD_ID tid,
+                                     bool recurse)
 {
   // Check that when object is boundary restricted that the variable is nodal
-  const MooseVariable & var = object->variable();
+  const MooseVariableFEBase & var = object->variable();
 
   // Boundary Restricted
   if (object->boundaryRestricted())
@@ -85,7 +83,7 @@ InitialConditionWarehouse::addObject(std::shared_ptr<InitialCondition> object, T
   }
 
   // Add the IC to the storage
-  MooseObjectWarehouseBase<InitialCondition>::addObject(object, tid);
+  MooseObjectWarehouseBase<InitialCondition>::addObject(object, tid, recurse);
 }
 
 std::set<std::string>

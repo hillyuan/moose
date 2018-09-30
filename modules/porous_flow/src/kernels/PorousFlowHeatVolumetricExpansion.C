@@ -1,14 +1,17 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowHeatVolumetricExpansion.h"
 
-// MOOSE includes
 #include "MooseVariable.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowHeatVolumetricExpansion);
 
 template <>
 InputParameters
@@ -23,7 +26,7 @@ validParams<PorousFlowHeatVolumetricExpansion>()
                         " If you set this to true, you will also want to set the same parameter to "
                         "true for related Kernels and Materials");
   params.addRequiredParam<UserObjectName>(
-      "PorousFlowDictator", "The UserObject that holds the list of Porous-Flow variable names.");
+      "PorousFlowDictator", "The UserObject that holds the list of PorousFlow variable names.");
   params.addClassDescription("Energy-density*rate_of_solid_volumetric_expansion");
   return params;
 }
@@ -46,14 +49,12 @@ PorousFlowHeatVolumetricExpansion::PorousFlowHeatVolumetricExpansion(
     _rock_energy_nodal(getMaterialProperty<Real>("PorousFlow_matrix_internal_energy_nodal")),
     _drock_energy_nodal_dvar(
         getMaterialProperty<std::vector<Real>>("dPorousFlow_matrix_internal_energy_nodal_dvar")),
-    _fluid_density(
-        _fluid_present
-            ? &getMaterialProperty<std::vector<Real>>("PorousFlow_fluid_phase_density_nodal")
-            : nullptr),
-    _dfluid_density_dvar(_fluid_present
-                             ? &getMaterialProperty<std::vector<std::vector<Real>>>(
-                                   "dPorousFlow_fluid_phase_density_nodal_dvar")
-                             : nullptr),
+    _fluid_density(_fluid_present ? &getMaterialProperty<std::vector<Real>>(
+                                        "PorousFlow_fluid_phase_density_nodal")
+                                  : nullptr),
+    _dfluid_density_dvar(_fluid_present ? &getMaterialProperty<std::vector<std::vector<Real>>>(
+                                              "dPorousFlow_fluid_phase_density_nodal_dvar")
+                                        : nullptr),
     _fluid_saturation_nodal(
         _fluid_present ? &getMaterialProperty<std::vector<Real>>("PorousFlow_saturation_nodal")
                        : nullptr),
@@ -61,14 +62,12 @@ PorousFlowHeatVolumetricExpansion::PorousFlowHeatVolumetricExpansion(
                                       ? &getMaterialProperty<std::vector<std::vector<Real>>>(
                                             "dPorousFlow_saturation_nodal_dvar")
                                       : nullptr),
-    _energy_nodal(_fluid_present
-                      ? &getMaterialProperty<std::vector<Real>>(
-                            "PorousFlow_fluid_phase_internal_energy_nodal")
-                      : nullptr),
-    _denergy_nodal_dvar(_fluid_present
-                            ? &getMaterialProperty<std::vector<std::vector<Real>>>(
-                                  "dPorousFlow_fluid_phase_internal_energy_nodal_dvar")
-                            : nullptr),
+    _energy_nodal(_fluid_present ? &getMaterialProperty<std::vector<Real>>(
+                                       "PorousFlow_fluid_phase_internal_energy_nodal")
+                                 : nullptr),
+    _denergy_nodal_dvar(_fluid_present ? &getMaterialProperty<std::vector<std::vector<Real>>>(
+                                             "dPorousFlow_fluid_phase_internal_energy_nodal_dvar")
+                                       : nullptr),
     _strain_rate_qp(getMaterialProperty<Real>("PorousFlow_volumetric_strain_rate_qp")),
     _dstrain_rate_qp_dvar(getMaterialProperty<std::vector<RealGradient>>(
         "dPorousFlow_volumetric_strain_rate_qp_dvar"))

@@ -1,3 +1,12 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import os, sys
 import inspect
 
@@ -51,12 +60,12 @@ class Factory:
     def printDump(self, root_node_name):
         print "[" + root_node_name + "]"
 
-        for name, object in self.objects.iteritems():
+        for name, object in sorted(self.objects.iteritems()):
             print "  [./" + name + "]"
 
             params = self.validParams(name)
 
-            for key in params.desc:
+            for key in sorted(params.desc):
                 default = ''
                 if params.isValid(key):
                     the_param = params[key]

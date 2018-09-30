@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "AddCoupledEqSpeciesAction.h"
 #include "Parser.h"
 #include "FEProblem.h"
@@ -14,6 +17,10 @@
 
 // Regular expression includes
 #include "pcrecpp.h"
+
+registerMooseAction("ChemicalReactionsApp", AddCoupledEqSpeciesAction, "add_kernel");
+
+registerMooseAction("ChemicalReactionsApp", AddCoupledEqSpeciesAction, "add_aux_kernel");
 
 template <>
 InputParameters
@@ -201,7 +208,7 @@ AddCoupledEqSpeciesAction::act()
           InputParameters params_sub = _factory.getValidParams("CoupledBEEquilibriumSub");
           params_sub.set<NonlinearVariableName>("variable") = _primary_species[i];
           params_sub.set<Real>("weight") = _weights[i][j];
-          params_sub.set<Real>("log_k") = _eq_const[j];
+          params_sub.defaultCoupledValue("log_k", _eq_const[j]);
           params_sub.set<Real>("sto_u") = _sto_u[i][j];
           params_sub.set<std::vector<Real>>("sto_v") = _sto_v[i][j];
           params_sub.set<std::vector<VariableName>>("v") = _coupled_v[i][j];
@@ -212,7 +219,7 @@ AddCoupledEqSpeciesAction::act()
           InputParameters params_cd = _factory.getValidParams("CoupledDiffusionReactionSub");
           params_cd.set<NonlinearVariableName>("variable") = _primary_species[i];
           params_cd.set<Real>("weight") = _weights[i][j];
-          params_cd.set<Real>("log_k") = _eq_const[j];
+          params_cd.defaultCoupledValue("log_k", _eq_const[j]);
           params_cd.set<Real>("sto_u") = _sto_u[i][j];
           params_cd.set<std::vector<Real>>("sto_v") = _sto_v[i][j];
           params_cd.set<std::vector<VariableName>>("v") = _coupled_v[i][j];
@@ -226,7 +233,7 @@ AddCoupledEqSpeciesAction::act()
             InputParameters params_conv = _factory.getValidParams("CoupledConvectionReactionSub");
             params_conv.set<NonlinearVariableName>("variable") = _primary_species[i];
             params_conv.set<Real>("weight") = _weights[i][j];
-            params_conv.set<Real>("log_k") = _eq_const[j];
+            params_conv.defaultCoupledValue("log_k", _eq_const[j]);
             params_conv.set<Real>("sto_u") = _sto_u[i][j];
             params_conv.set<std::vector<Real>>("sto_v") = _sto_v[i][j];
             params_conv.set<std::vector<VariableName>>("v") = _coupled_v[i][j];
@@ -250,7 +257,7 @@ AddCoupledEqSpeciesAction::act()
       {
         InputParameters params_eq = _factory.getValidParams("AqueousEquilibriumRxnAux");
         params_eq.set<AuxVariableName>("variable") = _eq_species[j];
-        params_eq.set<Real>("log_k") = _eq_const[j];
+        params_eq.defaultCoupledValue("log_k", _eq_const[j]);
         params_eq.set<std::vector<Real>>("sto_v") = _stos[j];
         params_eq.set<std::vector<VariableName>>("v") = _primary_species_involved[j];
         _problem->addAuxKernel("AqueousEquilibriumRxnAux", "aux_" + _eq_species[j], params_eq);

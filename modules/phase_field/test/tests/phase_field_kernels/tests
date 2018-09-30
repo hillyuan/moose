@@ -1,10 +1,4 @@
 [Tests]
-  [./matproptest]
-    type = CSVDiff
-    input = 'matproptest.i'
-    csvdiff = 'matproptest_out.csv'
-  [../]
-
   [./CahnHilliard]
     type = 'Exodiff'
     input = 'CahnHilliard.i'
@@ -40,6 +34,12 @@
     exodiff = 'CoupledCoefAllenCahn_out.e'
   [../]
 
+  [./MatGradSquareCoupled]
+    type = 'Exodiff'
+    input = 'MatGradSquareCoupled.i'
+    exodiff = 'MatGradSquareCoupled_out.e'
+  [../]
+
   [./analyzejacobian_AllenCahn]
     type = 'AnalyzeJacobian'
     input = 'AllenCahn.i'
@@ -48,17 +48,6 @@
     resize_mesh = true
     recover = false
     #skip = 'see #3847'
-  [../]
-
-  [./ParsedMaterial]
-    type = 'Exodiff'
-    input = 'ParsedMaterial.i'
-    exodiff = 'ParsedMaterial_out.e'
-  [../]
-  [./ConstructionOrder]
-    type = 'Exodiff'
-    input = 'ConstructionOrder.i'
-    exodiff = 'ConstructionOrder_out.e'
   [../]
 
   [./SimpleSplitCHWRes]
@@ -86,5 +75,11 @@
     expect_out = '\nNo errors detected. :-\)\n'
     recover = false
     heavy = true
+  [../]
+
+  [./nonuniform_barrier_coefficient]
+    type = 'Exodiff'
+    input = 'nonuniform_barrier_coefficient.i'
+    exodiff = 'nonuniform_barrier_coefficient_out.e'
   [../]
 []

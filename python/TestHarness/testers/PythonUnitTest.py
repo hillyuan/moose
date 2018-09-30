@@ -1,3 +1,12 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from RunApp import RunApp
 import os
 
@@ -31,6 +40,6 @@ class PythonUnitTest(RunApp):
         if self.specs["separate"]:
             cmd = os.path.join(self.specs['moose_dir'], 'scripts', 'separate_unittests.py') + ' -f ' + module_name + use_buffer
         else:
-            cmd = "python -m unittest" + use_buffer + "-v " + module_name
+            cmd = "python2.7 -m unittest" + use_buffer + "-v " + module_name
 
         return cmd  + ' '.join(self.specs['cli_args'])

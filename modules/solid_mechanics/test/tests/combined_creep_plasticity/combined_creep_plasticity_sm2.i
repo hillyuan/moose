@@ -106,6 +106,12 @@
     x = '  0   1   1.5'
     y = '-20 -40   -20'
   [../]
+
+  [./dts]
+    type = PiecewiseLinear
+    x = '0        0.5    1.0    1.5'
+    y = '0.015  0.015  0.005  0.005'
+  [../]
 []
 
 [SolidMechanics]
@@ -201,20 +207,12 @@
     n_exponent = 5
     m_exponent = -0.5
     activation_energy = 0
-    relative_tolerance = 1e-5
-    absolute_tolerance = 1e-20
-    max_its = 30
-    legacy_return_mapping = true
   [../]
   [./plas]
     type = IsotropicPlasticity
     block = 0
     hardening_constant = 100
     yield_stress = 20
-    max_its = 30
-    relative_tolerance = 1e-5
-    absolute_tolerance = 1e-20
-    legacy_return_mapping = true
   [../]
 []
 
@@ -240,8 +238,7 @@
 
   [./TimeStepper]
     type = FunctionDT
-    time_t  = '0        0.5    1.0    1.5'
-    time_dt = '0.015  0.015  0.005  0.005'
+    function = dts
   [../]
 []
 

@@ -1,14 +1,17 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowDispersiveFlux.h"
 
-// MOOSE includes
 #include "MooseVariable.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowDispersiveFlux);
 
 template <>
 InputParameters
@@ -76,14 +79,14 @@ PorousFlowDispersiveFlux::PorousFlowDispersiveFlux(const InputParameters & param
 {
   // Check that sufficient values of the dispersion coefficients have been entered
   if (_disp_long.size() != _num_phases)
-    mooseError("The number of longitudinal dispersion coefficients disp_long in ",
-               _name,
-               " is not equal to the number of phases");
+    paramError(
+        "disp_long",
+        "The number of longitudinal dispersion coefficients is not equal to the number of phases");
 
   if (_disp_trans.size() != _num_phases)
-    mooseError("The number of transverse dispersion coefficients disp_trans in ",
-               _name,
-               " is not equal to the number of phases");
+    paramError("disp_trans",
+               "The number of transverse dispersion coefficients disp_trans in is not equal to the "
+               "number of phases");
 }
 
 Real
@@ -183,6 +186,12 @@ PorousFlowDispersiveFlux::computeQpJac(unsigned int jvar) const
         _permeability[_qp] * (_grad_phi[_j][_qp] * _dgrad_p_dgrad_var[_qp][ph][pvar] -
                               _phi[_j][_qp] * _dfluid_density_qp_dvar[_qp][ph][pvar] * _gravity);
     dvelocity += _permeability[_qp] * (_dgrad_p_dvar[_qp][ph][pvar] * _phi[_j][_qp]);
+    dvelocity = dvelocity * _relative_permeability[_qp][ph] / _fluid_viscosity[_qp][ph] +
+                (_permeability[_qp] * (_grad_p[_qp][ph] - _fluid_density_qp[_qp][ph] * _gravity)) *
+                    (_drelative_permeability_dvar[_qp][ph][pvar] / _fluid_viscosity[_qp][ph] -
+                     _relative_permeability[_qp][ph] * _dfluid_viscosity_dvar[_qp][ph][pvar] /
+                         std::pow(_fluid_viscosity[_qp][ph], 2)) *
+                    _phi[_j][_qp];
 
     Real dvelocity_abs = 0.0;
     if (velocity_abs > 0.0)
@@ -215,6 +224,10 @@ PorousFlowDispersiveFlux::computeQpJac(unsigned int jvar) const
              _grad_mass_frac[_qp][ph][_fluid_component];
     dflux += _fluid_density_qp[_qp][ph] * (ddiffusion * _identity_tensor + ddispersion) *
              _grad_mass_frac[_qp][ph][_fluid_component];
+
+    // NOTE: Here we assume that d(grad_mass_frac)/d(var) = d(mass_frac)/d(var) * grad_phi
+    //       This is true for most PorousFlow scenarios, but not for chemical reactions
+    //       where mass_frac is a nonlinear function of the primary MOOSE Variables
     dflux += _fluid_density_qp[_qp][ph] * (diffusion * _identity_tensor + dispersion) *
              _dmass_frac_dvar[_qp][ph][_fluid_component][pvar] * _grad_phi[_j][_qp];
   }

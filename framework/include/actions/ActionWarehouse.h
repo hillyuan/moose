@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef ACTIONWAREHOUSE_H
 #define ACTIONWAREHOUSE_H
@@ -86,6 +81,7 @@ public:
    */
   void printInputFile(std::ostream & out);
 
+  ///@{
   /**
    * Iterators to the Actions in the warehouse.  Iterators should always be used when executing
    * Actions to capture dynamically added Actions (meta-Actions).  Meta-Actions are allowed to
@@ -94,6 +90,12 @@ public:
    */
   ActionIterator actionBlocksWithActionBegin(const std::string & task);
   ActionIterator actionBlocksWithActionEnd(const std::string & task);
+  ///@}
+
+  /**
+   * Returns a reference to all of the actions.
+   */
+  const std::vector<std::shared_ptr<Action>> & allActionBlocks() const;
 
   /**
    * Retrieve a constant list of \p Action pointers associated with the passed in task.
@@ -147,6 +149,36 @@ public:
   }
 
   /**
+   * Retrieve the action on a specific task with its type.
+   * Error will be thrown if more than one actions are found.
+   * @param task The task name.
+   * @return The action pointer. Null means that such an action does not exist.
+   */
+  template <class T>
+  const T * getActionByTask(const std::string & task)
+  {
+    const auto it = _action_blocks.find(task);
+    if (it == _action_blocks.end())
+      return nullptr;
+
+    T * p = nullptr;
+    for (const auto & action : it->second)
+    {
+      T * tp = dynamic_cast<T *>(action);
+      if (tp)
+      {
+        if (p)
+          mooseError("More than one actions have been detected in getActionByTask");
+        else
+          p = tp;
+      }
+    }
+    return p;
+  }
+
+  void setFinalTask(const std::string & task);
+
+  /**
    * Check if Actions associated with passed in task exist.
    */
   bool hasActions(const std::string & task) const;
@@ -187,6 +219,8 @@ public:
   std::shared_ptr<FEProblem> problem();
   MooseApp & mooseApp() { return _app; }
   const std::string & getCurrentTaskName() const { return _current_task; }
+
+  std::string getCurrentActionName() const;
 
 protected:
   /**
@@ -242,6 +276,12 @@ protected:
 
   /// Problem class
   std::shared_ptr<FEProblemBase> _problem;
+
+private:
+  /// Last task to run before (optional) early termination - blank means no early termination.
+  std::string _final_task;
+
+  ActionIterator _act_iter;
 };
 
 #endif // ACTIONWAREHOUSE_H

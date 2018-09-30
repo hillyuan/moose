@@ -1,14 +1,20 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "FiniteStrainCrystalPlasticity.h"
 #include "petscblaslapack.h"
 #include "libmesh/utility.h"
 
 #include <fstream>
+#include <cmath>
+
+registerMooseObject("TensorMechanicsApp", FiniteStrainCrystalPlasticity);
 
 template <>
 InputParameters
@@ -844,7 +850,7 @@ FiniteStrainCrystalPlasticity::updateGss()
   for (unsigned int i = 0; i < _nss; ++i)
     // hb(i)=val;
     hb(i) = _h0 * std::pow(std::abs(1.0 - _gss_tmp[i] / _tau_sat), a) *
-            copysign(1.0, 1.0 - _gss_tmp[i] / _tau_sat);
+            std::copysign(1.0, 1.0 - _gss_tmp[i] / _tau_sat);
 
   for (unsigned int i = 0; i < _nss; ++i)
   {
@@ -865,7 +871,7 @@ FiniteStrainCrystalPlasticity::updateGss()
         qab = _r;
 
       _gss_tmp[i] += qab * hb(j) * std::abs(_slip_incr(j));
-      _dgss_dsliprate(i, j) = qab * hb(j) * copysign(1.0, _slip_incr(j)) * _dt;
+      _dgss_dsliprate(i, j) = qab * hb(j) * std::copysign(1.0, _slip_incr(j)) * _dt;
     }
   }
 }
@@ -960,7 +966,7 @@ FiniteStrainCrystalPlasticity::getSlipIncrements()
   for (unsigned int i = 0; i < _nss; ++i)
   {
     _slip_incr(i) = _a0(i) * std::pow(std::abs(_tau(i) / _gss_tmp[i]), 1.0 / _xm(i)) *
-                    copysign(1.0, _tau(i)) * _dt;
+                    std::copysign(1.0, _tau(i)) * _dt;
     if (std::abs(_slip_incr(i)) > _slip_incr_tol)
     {
       _err_tol = true;

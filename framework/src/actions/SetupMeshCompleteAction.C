@@ -1,22 +1,25 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "SetupMeshCompleteAction.h"
 #include "MooseMesh.h"
 #include "Moose.h"
 #include "Adaptivity.h"
 #include "MooseApp.h"
+
+registerMooseAction("MooseApp", SetupMeshCompleteAction, "prepare_mesh");
+
+registerMooseAction("MooseApp", SetupMeshCompleteAction, "execute_mesh_modifiers");
+
+registerMooseAction("MooseApp", SetupMeshCompleteAction, "uniform_refine_mesh");
+
+registerMooseAction("MooseApp", SetupMeshCompleteAction, "setup_mesh_complete");
 
 template <>
 InputParameters
@@ -26,7 +29,10 @@ validParams<SetupMeshCompleteAction>()
   return params;
 }
 
-SetupMeshCompleteAction::SetupMeshCompleteAction(InputParameters params) : Action(params) {}
+SetupMeshCompleteAction::SetupMeshCompleteAction(InputParameters params)
+  : Action(params), _uniform_refine_timer(registerTimedSection("uniformRefine", 2))
+{
+}
 
 bool
 SetupMeshCompleteAction::completeSetup(MooseMesh * mesh)
@@ -63,10 +69,15 @@ SetupMeshCompleteAction::act()
      */
     if (_app.setFileRestart() == false && _app.isRecovering() == false)
     {
-      Adaptivity::uniformRefine(_mesh.get());
+      if (_mesh->uniformRefineLevel())
+      {
+        TIME_SECTION(_uniform_refine_timer);
 
-      if (_displaced_mesh)
-        Adaptivity::uniformRefine(_displaced_mesh.get());
+        Adaptivity::uniformRefine(_mesh.get());
+
+        if (_displaced_mesh)
+          Adaptivity::uniformRefine(_displaced_mesh.get());
+      }
     }
   }
   else

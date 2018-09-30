@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "MultiAppProjectionTransfer.h"
 
@@ -18,7 +13,7 @@
 #include "AddVariableAction.h"
 #include "FEProblem.h"
 #include "MooseMesh.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 #include "SystemBase.h"
 
 #include "libmesh/dof_map.h"
@@ -38,6 +33,8 @@ assemble_l2(EquationSystems & es, const std::string & system_name)
       es.parameters.get<MultiAppProjectionTransfer *>("transfer");
   transfer->assembleL2(es, system_name);
 }
+
+registerMooseObject("MooseApp", MultiAppProjectionTransfer);
 
 template <>
 InputParameters
@@ -84,7 +81,12 @@ MultiAppProjectionTransfer::initialSetup()
     EquationSystems & to_es = to_problem.es();
 
     // Add the projection system.
-    FEType fe_type = to_problem.getVariable(0, _to_var_name).feType();
+    FEType fe_type = to_problem
+                         .getVariable(0,
+                                      _to_var_name,
+                                      Moose::VarKindType::VAR_ANY,
+                                      Moose::VarFieldType::VAR_FIELD_STANDARD)
+                         .feType();
     LinearImplicitSystem & proj_sys = to_es.add_system<LinearImplicitSystem>("proj-sys-" + name());
     _proj_var_num = proj_sys.add_variable("var", fe_type);
     proj_sys.attach_assemble_function(assemble_l2);
@@ -240,16 +242,13 @@ MultiAppProjectionTransfer::execute()
       fe->attach_quadrature_rule(&qrule);
       const std::vector<Point> & xyz = fe->get_xyz();
 
-      MeshBase::const_element_iterator el = to_mesh.local_elements_begin();
-      const MeshBase::const_element_iterator end_el = to_mesh.local_elements_end();
-
       unsigned int from0 = 0;
       for (processor_id_type i_proc = 0; i_proc < n_processors();
            from0 += froms_per_proc[i_proc], i_proc++)
       {
-        for (el = to_mesh.local_elements_begin(); el != end_el; el++)
+        for (const auto & elem :
+             as_range(to_mesh.local_elements_begin(), to_mesh.local_elements_end()))
         {
-          const Elem * elem = *el;
           fe->reinit(elem);
 
           bool qp_hit = false;
@@ -319,7 +318,8 @@ MultiAppProjectionTransfer::execute()
   for (unsigned int i_from = 0; i_from < _from_problems.size(); i_from++)
   {
     FEProblemBase & from_problem = *_from_problems[i_from];
-    MooseVariable & from_var = from_problem.getVariable(0, _from_var_name);
+    MooseVariableFEBase & from_var = from_problem.getVariable(
+        0, _from_var_name, Moose::VarKindType::VAR_ANY, Moose::VarFieldType::VAR_FIELD_STANDARD);
     System & from_sys = from_var.sys().system();
     unsigned int from_var_num = from_sys.variable_number(from_var.name());
 
@@ -525,22 +525,18 @@ MultiAppProjectionTransfer::projectSolution(unsigned int i_to)
   // copy projected solution into target es
   MeshBase & to_mesh = proj_es.get_mesh();
 
-  MooseVariable & to_var = to_problem.getVariable(0, _to_var_name);
+  MooseVariableFEBase & to_var = to_problem.getVariable(
+      0, _to_var_name, Moose::VarKindType::VAR_ANY, Moose::VarFieldType::VAR_FIELD_STANDARD);
   System & to_sys = to_var.sys().system();
   NumericVector<Number> * to_solution = to_sys.solution.get();
 
+  for (const auto & node : to_mesh.local_node_ptr_range())
   {
-    MeshBase::const_node_iterator it = to_mesh.local_nodes_begin();
-    const MeshBase::const_node_iterator end_it = to_mesh.local_nodes_end();
-    for (; it != end_it; ++it)
+    for (unsigned int comp = 0; comp < node->n_comp(to_sys.number(), to_var.number()); comp++)
     {
-      const Node * node = *it;
-      for (unsigned int comp = 0; comp < node->n_comp(to_sys.number(), to_var.number()); comp++)
-      {
-        const dof_id_type proj_index = node->dof_number(ls.number(), _proj_var_num, comp);
-        const dof_id_type to_index = node->dof_number(to_sys.number(), to_var.number(), comp);
-        to_solution->set(to_index, (*ls.solution)(proj_index));
-      }
+      const dof_id_type proj_index = node->dof_number(ls.number(), _proj_var_num, comp);
+      const dof_id_type to_index = node->dof_number(to_sys.number(), to_var.number(), comp);
+      to_solution->set(to_index, (*ls.solution)(proj_index));
     }
   }
   for (const auto & elem : to_mesh.active_local_element_ptr_range())

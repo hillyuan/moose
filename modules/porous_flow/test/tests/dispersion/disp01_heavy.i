@@ -147,25 +147,11 @@
   [./temperature]
     type = PorousFlowTemperature
   [../]
-  [./temperature_nodal]
-    type = PorousFlowTemperature
-    at_nodes = true
-  [../]
   [./ppss]
     type = PorousFlow1PhaseFullySaturated
     porepressure = pp
   [../]
-  [./ppss_nodal]
-    type = PorousFlow1PhaseFullySaturated
-    at_nodes = true
-    porepressure = pp
-  [../]
   [./massfrac]
-    type = PorousFlowMassFraction
-    at_nodes = true
-    mass_fraction_vars = massfrac0
-  [../]
-  [./massfrac_qp]
     type = PorousFlowMassFraction
     mass_fraction_vars = massfrac0
   [../]
@@ -173,39 +159,8 @@
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid
     phase = 0
-    at_nodes = true
-  [../]
-  [./simple_fluid_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid
-    phase = 0
-  [../]
-  [./dens_qp_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-    at_nodes = false
-  [../]
-  [./dens_nodal_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_nodal
-    at_nodes = true
-    include_old = true
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
-  [../]
-  [./visc_all_qp]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_viscosity_qp
   [../]
   [./poro]
-    type = PorousFlowPorosityConst
-    at_nodes = true
-    porosity = 0.3
-  [../]
-  [./poro_qp]
     type = PorousFlowPorosityConst
     porosity = 0.3
   [../]
@@ -216,21 +171,7 @@
   [../]
   [./relp]
     type = PorousFlowRelativePermeabilityConst
-    at_nodes = true
     phase = 0
-  [../]
-  [./relp_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
-  [../]
-  [./relp_qp]
-    type = PorousFlowRelativePermeabilityConst
-    phase = 0
-  [../]
-  [./relp_all_qp]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_relative_permeability_qp
   [../]
   [./permeability]
     type = PorousFlowPermeabilityConst
@@ -271,5 +212,5 @@
 [Outputs]
   csv = true
   execute_on = 'final'
-  print_perf_log = true
+  perf_graph = true
 []

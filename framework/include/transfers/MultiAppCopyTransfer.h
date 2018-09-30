@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef MULTIAPPCOPYTRANSFER_H
 #define MULTIAPPCOPYTRANSFER_H
@@ -19,7 +14,7 @@
 
 // Forward declarations
 class MultiAppCopyTransfer;
-class MooseVariable;
+class MooseVariableFEBase;
 
 template <>
 InputParameters validParams<MultiAppCopyTransfer>();
@@ -53,8 +48,8 @@ protected:
    */
   void transferDofObject(libMesh::DofObject * to_object,
                          libMesh::DofObject * from_object,
-                         MooseVariable & to_var,
-                         MooseVariable & from_var);
+                         MooseVariableFEBase & to_var,
+                         MooseVariableFEBase & from_var);
 
   /// The name of the variable to transfer to
   const VariableName & _to_var_name;

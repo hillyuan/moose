@@ -1,17 +1,15 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "PorousFlowDarcyVelocityComponent.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowDarcyVelocityComponent);
 
 template <>
 InputParameters
@@ -48,19 +46,18 @@ PorousFlowDarcyVelocityComponent::PorousFlowDarcyVelocityComponent(
     _gravity(getParam<RealVectorValue>("gravity"))
 {
   if (_ph >= _dictator.numPhases())
-    mooseError(
-        "The Dictator proclaims that the number of phases in this simulation is ",
-        _dictator.numPhases(),
-        " whereas you have used the AuxKernel PorousFlowDarcyVelocityComponent with fluid_phase = ",
-        _ph,
-        ".  The Dictator is watching you, to ensure your wellbeing.");
+    paramError("fluid_phase",
+               "The Dictator proclaims that the maximum phase index in this simulation is ",
+               _dictator.numPhases() - 1,
+               " whereas you have used ",
+               _ph,
+               ". Remember that indexing starts at 0. The Dictator is watching you, to "
+               "ensure your wellbeing.");
 }
 
 Real
 PorousFlowDarcyVelocityComponent::computeValue()
 {
-  // note that in the following, _relative_permeaility and _fluid_viscosity are upwinded (nodal)
-  // values
   return -(_permeability[_qp] * (_grad_p[_qp][_ph] - _fluid_density_qp[_qp][_ph] * _gravity) *
            _relative_permeability[_qp][_ph] / _fluid_viscosity[_qp][_ph])(_component);
 }

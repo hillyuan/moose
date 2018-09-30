@@ -1,17 +1,11 @@
-/*************************************************/
-/*           DO NOT MODIFY THIS HEADER           */
-/*                                               */
-/*                     BISON                     */
-/*                                               */
-/*    (c) 2015 Battelle Energy Alliance, LLC     */
-/*            ALL RIGHTS RESERVED                */
-/*                                               */
-/*   Prepared by Battelle Energy Alliance, LLC   */
-/*     Under Contract No. DE-AC07-05ID14517      */
-/*     With the U. S. Department of Energy       */
-/*                                               */
-/*     See COPYRIGHT for full restrictions       */
-/*************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef MATERIALTIMESTEPPOSTPROCESSOR_H
 #define MATERIALTIMESTEPPOSTPROCESSOR_H
@@ -37,9 +31,33 @@ public:
   virtual void threadJoin(const UserObject & y);
 
 protected:
-  const MaterialProperty<Real> & _matl_time_step;
+  /// Flag to find the time step limit from material properties
+  const bool _use_material_timestep_limit;
 
-  Real _value;
+  /// Pointer to the material property containing the time step limit
+  const MaterialProperty<Real> * _matl_time_step;
+
+  /// Current time step limit from the material properties
+  Real _matl_value;
+
+  /// Flag to limit the time step based on the number of elements changed
+  const bool _use_elements_changed;
+
+  ///@{ Material property used to determine if elements have changed
+  const MaterialProperty<Real> * _changed_property;
+  const MaterialProperty<Real> * _changed_property_old;
+  ///@}
+
+  /// Target number of changed elements used to determine if we need to change the time step
+  const int _elements_changed;
+
+  /// Current number of elements changed
+  int _count;
+
+  /// Tolerance to determine if elements have changed
+  const Real _elements_changed_threshold;
+
+  /// Current quadrature point
   unsigned int _qp;
 };
 

@@ -1,21 +1,18 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "BreakBoundaryOnSubdomain.h"
 
 #include "MooseMesh.h"
 #include "MooseUtils.h"
+
+registerMooseObject("MooseApp", BreakBoundaryOnSubdomain);
 
 template <>
 InputParameters
@@ -61,6 +58,7 @@ BreakBoundaryOnSubdomain::modify()
 
   // create a list of new boundary names
   std::set<std::string> new_boundary_name_set;
+  std::vector<boundary_id_type> side_boundary_ids;
   for (const auto & elem : mesh.active_element_ptr_range())
   {
     auto subdomain_id = elem->subdomain_id();
@@ -69,7 +67,7 @@ BreakBoundaryOnSubdomain::modify()
       subdomain_name = std::to_string(subdomain_id);
     for (unsigned int side = 0; side < elem->n_sides(); ++side)
     {
-      auto side_boundary_ids = boundary_info.boundary_ids(elem, side);
+      boundary_info.boundary_ids(elem, side, side_boundary_ids);
       for (auto i = beginIndex(side_boundary_ids); i < side_boundary_ids.size(); ++i)
         if (breaking_boundary_ids.count(side_boundary_ids[i]) > 0)
           new_boundary_name_set.emplace(boundary_info.sideset_name(side_boundary_ids[i]) + "_to_" +
@@ -105,7 +103,8 @@ BreakBoundaryOnSubdomain::modify()
       subdomain_name = std::to_string(subdomain_id);
     for (unsigned int side = 0; side < elem->n_sides(); ++side)
     {
-      auto side_boundary_ids = boundary_info.boundary_ids(elem, side);
+      std::vector<boundary_id_type> side_boundary_ids;
+      boundary_info.boundary_ids(elem, side, side_boundary_ids);
       for (auto i = beginIndex(side_boundary_ids); i < side_boundary_ids.size(); ++i)
       {
         if (breaking_boundary_ids.count(side_boundary_ids[i]) > 0)

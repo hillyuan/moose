@@ -1,13 +1,20 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
-#include "MultiParameterPlasticityStressUpdate.h"
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
+#include "MultiParameterPlasticityStressUpdate.h"
 #include "Conversion.h"      // for stringify
+
+// libMesh includes
 #include "libmesh/utility.h" // for Utility::pow
+
+// PETSc includes
+#include <petscblaslapack.h> // LAPACKgesv_
 
 template <>
 InputParameters
@@ -17,12 +24,6 @@ validParams<MultiParameterPlasticityStressUpdate>()
   params.addClassDescription("Return-map and Jacobian algorithms for plastic models where the "
                              "yield function and flow directions depend on multiple functions of "
                              "stress");
-  params.addParam<std::string>("base_name",
-                               "Optional parameter that allows the user to define "
-                               "multiple plastic models on the same block, and the "
-                               "plastic_internal_parameter, plastic_yield_function, "
-                               "plastic_NR_iterations and plastic_linesearch_needed Material "
-                               "Properties will be prepended by this string");
   params.addRangeCheckedParam<unsigned int>(
       "max_NR_iterations",
       20,
@@ -82,7 +83,6 @@ MultiParameterPlasticityStressUpdate::MultiParameterPlasticityStressUpdate(
     _Cij(num_sp, std::vector<Real>(num_sp)),
     _num_yf(num_yf),
     _num_intnl(num_intnl),
-    _base_name(isParamValid("base_name") ? getParam<std::string>("base_name") + "_" : ""),
     _max_nr_its(getParam<unsigned>("max_NR_iterations")),
     _perform_finite_strain_rotations(getParam<bool>("perform_finite_strain_rotations")),
     _smoothing_tol(getParam<Real>("smoothing_tol")),

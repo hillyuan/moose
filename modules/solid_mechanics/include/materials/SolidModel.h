@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef SOLIDMODEL_H
 #define SOLIDMODEL_H
 
@@ -139,7 +142,13 @@ protected:
   // The derivative of the stress with respect to Temperature
   MaterialProperty<SymmTensor> & _d_stress_dT;
 
+  /// Total strain increment, including mechanical strains and eigenstrains
   SymmTensor _total_strain_increment;
+  /// Mechanical strain increment, which is the total strain increment minus eigenstrains
+  SymmTensor _mechanical_strain_increment;
+  /// In most models, this is the mechanical strain increment, but for
+  /// inelastic models, it has the inelastic component subtracted from it, so it
+  /// is the elastic strain increment
   SymmTensor _strain_increment;
 
   const bool _compute_JIntegral;

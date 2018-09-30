@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef RANKFOURTENSOR_H
 #define RANKFOURTENSOR_H
 
@@ -110,9 +113,6 @@ public:
   /// C_ijkl*a_kl
   RankTwoTensor operator*(const RankTwoTensor & a) const;
 
-  /// C_ijkl*a_kl
-  RealTensorValue operator*(const RealTensorValue & a) const;
-
   /// C_ijkl*a
   RankFourTensor operator*(const Real a) const;
 
@@ -161,15 +161,9 @@ public:
 
   /**
    * Rotate the tensor using
-   * C_ijkl = R_im R_in R_ko R_lp C_mnop
+   * C_ijkl = R_im R_jn R_ko R_lp C_mnop
    */
   void rotate(const RealTensorValue & R);
-
-  /**
-   * Rotate the tensor using
-   * C_ijkl = R_im R_in R_ko R_lp C_mnop
-   */
-  void rotate(const RankTwoTensor & R);
 
   /**
    * Transpose the tensor by swapping the first pair with the second pair of indices

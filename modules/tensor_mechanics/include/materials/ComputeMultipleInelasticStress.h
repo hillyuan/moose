@@ -1,15 +1,23 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef COMPUTEMULTIPLEINELASTICSTRESS_H
 #define COMPUTEMULTIPLEINELASTICSTRESS_H
 
 #include "ComputeFiniteStrainElasticStress.h"
 
-class StressUpdateBase;
+#include "StressUpdateBase.h"
+
+class ComputeMultipleInelasticStress;
+
+template <>
+InputParameters validParams<ComputeMultipleInelasticStress>();
 
 /**
  * ComputeMultipleInelasticStress computes the stress, the consistent tangent
@@ -83,24 +91,23 @@ protected:
 
   /**
    * Using _elasticity_tensor[_qp] and the consistent tangent operators,
-   * _comsistent_tangent_operator[...] computed by the inelastic models,
+   * _consistent_tangent_operator[...] computed by the inelastic models,
    * compute _Jacobian_mult[_qp]
    */
   virtual void computeQpJacobianMult();
 
   /**
    * Given a trial stress (_stress[_qp]) and a strain increment (elastic_strain_increment)
-   * let the model_number model produce an admissible stress (gets placed back in _stress[_qp]), and
-   * decompose
-   * the strain increment into an elastic part (gets placed back into elastic_strain_increment) and
-   * an
+   * let the model_number model produce an admissible stress (gets placed back
+   * in _stress[_qp]), and decompose the strain increment into an elastic part
+   * (gets placed back into elastic_strain_increment) and an
    * inelastic part (inelastic_strain_increment), as well as computing the
    * consistent_tangent_operator
    * @param model_number The inelastic model to use
-   * @param elastic_strain_increment Upon input, this is the strain increment.  Upon output, it is
-   * the elastic part of the strain increment
-   * @param inelastic_strain_increment The inelastic strain increment corresponding to the supplied
-   * strain increment
+   * @param elastic_strain_increment Upon input, this is the strain increment.
+   * Upon output, it is the elastic part of the strain increment
+   * @param inelastic_strain_increment The inelastic strain increment
+   * corresponding to the supplied strain increment
    * @param consistent_tangent_operator The consistent tangent operator
    */
   virtual void computeAdmissibleState(unsigned model_number,
@@ -112,7 +119,7 @@ protected:
   const unsigned int _max_iterations;
   const Real _relative_tolerance;
   const Real _absolute_tolerance;
-  const bool _output_iteration_info;
+  const bool _internal_solve_full_iteration_history;
   ///@}
 
   /// after updateQpState, rotate the stress, elastic_strain, inelastic_strain and Jacobian_mult using _rotation_increment
@@ -136,6 +143,12 @@ protected:
   /// number of plastic models
   const unsigned _num_models;
 
+  /// Flags to compute tangent during updateState call
+  std::vector<bool> _tangent_computation_flag;
+
+  /// Calculation method for the tangent modulus
+  TangentCalculationMethod _tangent_calculation_method;
+
   /// _inelastic_strain = sum_i (_inelastic_weights_i * inelastic_strain_from_model_i)
   const std::vector<Real> _inelastic_weights;
 
@@ -146,6 +159,11 @@ protected:
   const bool _cycle_models;
 
   MaterialProperty<Real> & _matl_timestep_limit;
+
+  /**
+   * Rank four symmetric identity tensor
+   */
+  const RankFourTensor _identity_symmetric_four;
 
   /**
    * The user supplied list of inelastic models to use in the simulation

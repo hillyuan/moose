@@ -1,34 +1,15 @@
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 #include "StochasticToolsApp.h"
 #include "Moose.h"
 #include "AppFactory.h"
 #include "MooseSyntax.h"
-
-#include "StateSimTester.h"
-#include "StateSimRunner.h"
-
-// Distributions
-#include "UniformDistribution.h"
-#include "WeibullDistribution.h"
-#include "NormalDistribution.h"
-#include "LognormalDistribution.h"
-
-// Samplers
-#include "MonteCarloSampler.h"
-#include "SobolSampler.h"
-
-// VectorPostprocessors
-#include "SamplerData.h"
-#include "StochasticResults.h"
-
-// MultiApps
-#include "SamplerMultiApp.h"
-
-// Transfers
-#include "SamplerTransfer.h"
-#include "SamplerPostprocessorTransfer.h"
-
-// Controls
-#include "SamplerReceiver.h"
 
 template <>
 InputParameters
@@ -38,73 +19,55 @@ validParams<StochasticToolsApp>()
   return params;
 }
 
+registerKnownLabel("StochasticToolsApp");
+
 StochasticToolsApp::StochasticToolsApp(InputParameters parameters) : MooseApp(parameters)
 {
-  Moose::registerObjects(_factory);
-  StochasticToolsApp::registerObjects(_factory);
-
-  Moose::associateSyntax(_syntax, _action_factory);
-  StochasticToolsApp::associateSyntax(_syntax, _action_factory);
+  StochasticToolsApp::registerAll(_factory, _action_factory, _syntax);
 }
 
 StochasticToolsApp::~StochasticToolsApp() {}
 
-// External entry point for dynamic application loading
-extern "C" void
-StochasticToolsApp__registerApps()
+void
+StochasticToolsApp::registerAll(Factory & f, ActionFactory & af, Syntax & /*s*/)
 {
-  StochasticToolsApp::registerApps();
+  Registry::registerObjectsTo(f, {"StochasticToolsApp"});
+  Registry::registerActionsTo(af, {"StochasticToolsApp"});
 }
+
 void
 StochasticToolsApp::registerApps()
 {
   registerApp(StochasticToolsApp);
 }
 
-// External entry point for dynamic object registration
-extern "C" void
-StochasticToolsApp__registerObjects(Factory & factory)
-{
-  StochasticToolsApp::registerObjects(factory);
-}
 void
 StochasticToolsApp::registerObjects(Factory & factory)
 {
-  registerUserObject(StateSimRunner);
-  registerPostprocessor(StateSimTester);
-
-  // Distributions
-  registerDistribution(UniformDistribution);
-  registerDistribution(WeibullDistribution);
-  registerDistribution(NormalDistribution);
-  registerDistribution(LognormalDistribution);
-
-  // Samplers
-  registerSampler(MonteCarloSampler);
-  registerSampler(SobolSampler);
-
-  // VectorPostprocessors
-  registerVectorPostprocessor(SamplerData);
-  registerVectorPostprocessor(StochasticResults);
-
-  // MultiApps
-  registerMultiApp(SamplerMultiApp);
-
-  // Transfers
-  registerTransfer(SamplerTransfer);
-  registerTransfer(SamplerPostprocessorTransfer);
-
-  // Controls
-  registerControl(SamplerReceiver);
+  mooseDeprecated("use registerAll instead of registerObjects");
+  Registry::registerObjectsTo(factory, {"StochasticToolsApp"});
 }
 
-// External entry point for dynamic syntax association
-extern "C" void
-StochasticToolsApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
-{
-  StochasticToolsApp::associateSyntax(syntax, action_factory);
-}
 void
-StochasticToolsApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
+StochasticToolsApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & action_factory)
 {
+  mooseDeprecated("use registerAll instead of associateSyntax");
+  Registry::registerActionsTo(action_factory, {"StochasticToolsApp"});
+}
+
+void
+StochasticToolsApp::registerExecFlags(Factory & /*factory*/)
+{
+  mooseDeprecated("use registerAll instead of registerExecFlags");
+}
+
+extern "C" void
+StochasticToolsApp__registerAll(Factory & f, ActionFactory & af, Syntax & s)
+{
+  StochasticToolsApp::registerAll(f, af, s);
+}
+extern "C" void
+StochasticToolsApp__registerApps()
+{
+  StochasticToolsApp::registerApps();
 }

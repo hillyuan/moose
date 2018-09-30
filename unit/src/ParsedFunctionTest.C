@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ParsedFunctionTest.h"
 
@@ -23,6 +18,7 @@ TEST_F(ParsedFunctionTest, basicConstructor)
   params.set<SubProblem *>("_subproblem") = _fe_problem.get();
   params.set<std::string>("value") = std::string("x + 1.5*y + 2 * z + t/4");
   params.set<std::string>("_object_name") = "test";
+  params.set<std::string>("_type") = "MooseParsedFunction";
   MooseParsedFunction f(params);
   f.initialSetup();
   EXPECT_EQ(f.value(4, Point(1, 2, 3)), 11);
@@ -44,6 +40,7 @@ TEST_F(ParsedFunctionTest, advancedConstructor)
   params.set<std::vector<std::string>>("vals") =
       std::vector<std::string>(1, "-1"); // Dummy value, will be overwritten in test below
   params.set<std::string>("_object_name") = "test1";
+  params.set<std::string>("_type") = "MooseParsedFunction";
 
   MooseParsedFunction f(params);
   f.initialSetup();
@@ -67,6 +64,7 @@ TEST_F(ParsedFunctionTest, advancedConstructor)
   params2.set<std::vector<std::string>>("vals") =
       std::vector<std::string>(3, "-1"); // Dummy values, will be overwritten in test below
   params2.set<std::string>("_object_name") = "test2";
+  params2.set<std::string>("_type") = "MooseParsedFunction";
 
   MooseParsedFunction f2(params2);
   f2.initialSetup();
@@ -87,6 +85,7 @@ TEST_F(ParsedFunctionTest, advancedConstructor)
   params3.set<std::vector<std::string>>("vars") = one_var;
   params3.set<std::vector<std::string>>("vals") = one_val;
   params3.set<std::string>("_object_name") = "test3";
+  params3.set<std::string>("_type") = "MooseParsedFunction";
 
   MooseParsedFunction f3(params3);
   f3.initialSetup();
@@ -106,6 +105,7 @@ TEST_F(ParsedFunctionTest, advancedConstructor)
   params4.set<std::vector<std::string>>("vars") = three_vars;
   params4.set<std::vector<std::string>>("vals") = three_vals;
   params4.set<std::string>("_object_name") = "test4";
+  params4.set<std::string>("_type") = "MooseParsedFunction";
 
   MooseParsedFunction f4(params4);
   f4.initialSetup();
@@ -131,6 +131,7 @@ TEST_F(ParsedFunctionTest, testVariables)
   params.set<std::vector<std::string>>("vals") =
       std::vector<std::string>(1, "-1"); // Dummy value, will be overwritten in test below
   params.set<std::string>("_object_name") = "test1";
+  params.set<std::string>("_type") = "MooseParsedFunction";
 
   MooseParsedFunction f(params);
   f.initialSetup();
@@ -157,6 +158,7 @@ TEST_F(ParsedFunctionTest, testVariables)
   params2.set<std::vector<std::string>>("vals") =
       std::vector<std::string>(3, "-1"); // Dummy values, will be overwritten in test below
   params2.set<std::string>("_object_name") = "test2";
+  params2.set<std::string>("_type") = "MooseParsedFunction";
 
   MooseParsedFunction f2(params2);
   f2.initialSetup();
@@ -187,6 +189,7 @@ TEST_F(ParsedFunctionTest, testConstants)
   params.set<FEProblemBase *>("_fe_problem_base") = _fe_problem.get();
   params.set<SubProblem *>("_subproblem") = _fe_problem.get();
   params.set<std::string>("value") = "log(e) + x";
+  params.set<std::string>("_type") = "MooseParsedFunction";
 
   MooseParsedFunction f(params);
   f.initialSetup();
@@ -198,6 +201,7 @@ TEST_F(ParsedFunctionTest, testConstants)
   params2.set<FEProblemBase *>("_fe_problem_base") = _fe_problem.get();
   params2.set<SubProblem *>("_subproblem") = _fe_problem.get();
   params2.set<std::string>("value") = "sin(pi*x)";
+  params2.set<std::string>("_type") = "MooseParsedFunction";
 
   MooseParsedFunction f2(params2);
   f2.initialSetup();

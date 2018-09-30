@@ -1,19 +1,21 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowMassTimeDerivative.h"
 
-// MOOSE includes
 #include "MooseVariable.h"
 
 #include "libmesh/quadrature.h"
 
-// C++ includes
 #include <limits>
+
+registerMooseObject("PorousFlowApp", PorousFlowMassTimeDerivative);
 
 template <>
 InputParameters
@@ -30,7 +32,7 @@ validParams<PorousFlowMassTimeDerivative>()
   params.addParam<unsigned int>(
       "fluid_component", 0, "The index corresponding to the component for this kernel");
   params.addRequiredParam<UserObjectName>(
-      "PorousFlowDictator", "The UserObject that holds the list of Porous-Flow variable names.");
+      "PorousFlowDictator", "The UserObject that holds the list of PorousFlow variable names.");
   params.addClassDescription(
       "Component mass derivative wrt time for component given by fluid_component");
   return params;
@@ -68,12 +70,13 @@ PorousFlowMassTimeDerivative::PorousFlowMassTimeDerivative(const InputParameters
         "dPorousFlow_mass_frac_nodal_dvar"))
 {
   if (_fluid_component >= _dictator.numComponents())
-    mooseError(
-        "The Dictator proclaims that the number of components in this simulation is ",
-        _dictator.numComponents(),
-        " whereas you have used the Kernel PorousFlowComponetMassTimeDerivative with component = ",
+    paramError(
+        "fluid_component",
+        "The Dictator proclaims that the maximum fluid component index in this simulation is ",
+        _dictator.numComponents() - 1,
+        " whereas you have used ",
         _fluid_component,
-        ".  The Dictator does not take such mistakes lightly");
+        ". Remember that indexing starts at 0. The Dictator does not take such mistakes lightly.");
 }
 
 Real
@@ -95,7 +98,7 @@ PorousFlowMassTimeDerivative::computeQpResidual()
 Real
 PorousFlowMassTimeDerivative::computeQpJacobian()
 {
-  /// If the variable is not a PorousFlow variable (very unusual), the diag Jacobian terms are 0
+  // If the variable is not a PorousFlow variable (very unusual), the diag Jacobian terms are 0
   if (!_var_is_porflow_var)
     return 0.0;
   return computeQpJac(_dictator.porousFlowVariableNum(_var.number()));
@@ -104,7 +107,7 @@ PorousFlowMassTimeDerivative::computeQpJacobian()
 Real
 PorousFlowMassTimeDerivative::computeQpOffDiagJacobian(unsigned int jvar)
 {
-  /// If the variable is not a PorousFlow variable, the OffDiag Jacobian terms are 0
+  // If the variable is not a PorousFlow variable, the OffDiag Jacobian terms are 0
   if (_dictator.notPorousFlowVariable(jvar))
     return 0.0;
   return computeQpJac(_dictator.porousFlowVariableNum(jvar));
@@ -127,7 +130,7 @@ PorousFlowMassTimeDerivative::computeQpJac(unsigned int pvar)
   if (_i != _j)
     return _test[_i][_qp] * dmass / _dt;
 
-  /// As the fluid mass is lumped to the nodes, only non-zero terms are for _i==_j
+  // As the fluid mass is lumped to the nodes, only non-zero terms are for _i==_j
   for (unsigned ph = 0; ph < _num_phases; ++ph)
   {
     dmass += _dfluid_density_dvar[_i][ph][pvar] * _fluid_saturation_nodal[_i][ph] *

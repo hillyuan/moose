@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from peacock.Input.ExecutableInfo import ExecutableInfo
 from peacock.Input.InputTree import InputTree
 import os
@@ -47,19 +56,19 @@ class Tests(Testing.PeacockTester):
 
     def testTransient(self):
         t = self.createTree(input_file=self.transient)
-        self.checkFile(t.getInputFileString(), self.transient_gold)
+        self.checkFile(t.getInputFileString(), self.transient_gold, True)
 
     def testLCF(self):
         t = self.createTree(input_file=self.lcf1)
-        self.checkFile(t.getInputFileString(), self.lcf1_gold)
+        self.checkFile(t.getInputFileString(), self.lcf1_gold, True)
 
     def testFSP(self):
         t = self.createTree(input_file=self.fsp)
-        self.checkFile(t.getInputFileString(), self.fsp_gold)
+        self.checkFile(t.getInputFileString(), self.fsp_gold, True)
 
     def testSimpleDiffusion(self):
         t = self.createTree(input_file=self.simple_diffusion)
-        self.checkFile(t.getInputFileString(), self.simple_diffusion_gold)
+        self.checkFile(t.getInputFileString(), self.simple_diffusion_gold, True)
 
     def testChangingInputFiles(self):
         t = self.createTree(input_file=self.simple_diffusion)
@@ -114,7 +123,7 @@ class Tests(Testing.PeacockTester):
         self.assertEqual(c.paramValue("foo"), "bar")
         self.assertIn(c.path, t.path_map)
 
-        self.assertEqual(c.parent.children_list.index(c.name), 5)
+        self.assertEqual(c.parent.children_list.index(c.name), 6)
         t.moveBlock("/NoExist", 0)
         t.moveBlock(c.path, 0)
         self.assertEqual(c.parent.children_list.index(c.name), 0)

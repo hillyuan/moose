@@ -11,6 +11,7 @@
 MODULE_DIR         ?= $(shell dirname `pwd`)
 MOOSE_DIR          ?= $(shell dirname $(MODULE_DIR))
 FRAMEWORK_DIR      ?= $(MOOSE_DIR)/framework
+ADDITIONAL_CPPFLAGS += -Wall -Wextra
 ###############################################################################
 
 # framework
@@ -26,7 +27,7 @@ include $(MODULE_DIR)/modules.mk
 APPLICATION_DIR    := $(MODULE_DIR)/solid_mechanics
 APPLICATION_NAME   := solid_mechanics
 BUILD_EXEC         := yes
-DEP_APPS           := $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLICATION_NAME))
+GEN_REVISION       := no
 include            $(FRAMEWORK_DIR)/app.mk
 
 ###############################################################################

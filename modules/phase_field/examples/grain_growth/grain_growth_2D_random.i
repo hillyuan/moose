@@ -19,6 +19,8 @@
   zmax = 0
   elem_type = QUAD4 # Type of elements used in the mesh
   uniform_refine = 4 # Initial uniform refinement of the mesh
+
+  parallel_type = replicated # Periodic BCs
 []
 
 [GlobalParams]
@@ -109,7 +111,6 @@
   type = Transient # Type of executioner, here it is transient with an adaptive time step
   scheme = bdf2 # Type of time integration (2nd order backward euler), defaults to 1st order backward euler
 
-  # Preconditioned JFNK (default)
   solve_type = PJFNK
 
   petsc_options_iname = '-pc_type -pc_hypre_type -ksp_gmres_restart -mat_mffd_type'

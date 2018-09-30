@@ -1,8 +1,9 @@
+#This input uses PhaseField-Nonconserved Action to add phase field fracture bulk rate kernels
 [Mesh]
   type = GeneratedMesh
   dim = 2
-  nx = 20
-  ny = 10
+  nx = 40
+  ny = 20
   ymax = 0.5
 []
 
@@ -19,32 +20,29 @@
   displacements = 'disp_x disp_y'
 []
 
-[Variables]
-  [./disp_x]
+[Modules]
+  [./TensorMechanics]
+    [./Master]
+      [./All]
+        add_variables = true
+        strain = SMALL
+        additional_generate_output = 'strain_yy stress_yy'
+        planar_formulation = PLANE_STRAIN
+      [../]
+    [../]
   [../]
-  [./disp_y]
-  [../]
-  [./c]
-  [../]
-  [./b]
-  [../]
-[]
-
-[AuxVariables]
-  [./stress_yy]
-    order = CONSTANT
-    family = MONOMIAL
+  [./PhaseField]
+    [./Nonconserved]
+      [./c]
+        free_energy = E_el
+        kappa = kappa_op
+        mobility = L
+      [../]
+    [../]
   [../]
 []
 
 [Kernels]
-  [./pfbulk]
-    type = AllenCahnPFFracture
-    variable = c
-    beta = b
-  [../]
-  [./TensorMechanics]
-  [../]
   [./solid_x]
     type = PhaseFieldFractureMechanicsOffDiag
     variable = disp_x
@@ -57,29 +55,11 @@
     component = 1
     c = c
   [../]
-  [./dcdt]
-    type = TimeDerivative
+  [./off_disp]
+    type = AllenCahnElasticEnergyOffDiag
     variable = c
-  [../]
-  [./pfintvar]
-    type = Reaction
-    variable = b
-  [../]
-  [./pfintcoupled]
-    type = LaplacianSplit
-    variable = b
-    c = c
-  [../]
-[]
-
-[AuxKernels]
-  [./stress_yy]
-    type = RankTwoAux
-    variable = stress_yy
-    rank_two_tensor = stress
-    index_j = 1
-    index_i = 1
-    execute_on = timestep_end
+    displacements = 'disp_x disp_y'
+    mob_name = L
   [../]
 []
 
@@ -99,7 +79,7 @@
   [./xfix]
     type = PresetBC
     variable = disp_x
-    boundary = top
+    boundary = right
     value = 0
   [../]
 []
@@ -108,24 +88,38 @@
   [./pfbulkmat]
     type = GenericConstantMaterial
     prop_names = 'gc_prop l visco'
-    prop_values = '1e-3 0.08 1e-4'
-  [../]
-  [./elastic]
-    type = ComputeLinearElasticPFFractureStress
-    c = c
+    prop_values = '1e-3 0.05 1e-6'
   [../]
   [./elasticity_tensor]
     type = ComputeElasticityTensor
-    C_ijkl = '120.0 80.0'
-    fill_method = symmetric_isotropic
+    C_ijkl = '127.0 70.8 70.8 127.0 70.8 127.0 73.55 73.55 73.55'
+    fill_method = symmetric9
+    euler_angle_1 = 30
+    euler_angle_2 = 0
+    euler_angle_3 = 0
   [../]
-  [./strain]
-    type = ComputeSmallStrain
+  [./cracked_stress]
+    type = ComputeLinearElasticPFFractureStress
+    c = c
+    kdamage = 1e-6
+    F_name = E_el
+    use_current_history_variable = true
+  [../]
+[]
+
+[Postprocessors]
+  [./av_stress_yy]
+    type = ElementAverageValue
+    variable = stress_yy
+  [../]
+  [./av_strain_yy]
+    type = SideAverageValue
+    variable = disp_y
+    boundary = top
   [../]
 []
 
 [Preconditioning]
-  active = 'smp'
   [./smp]
     type = SMP
     full = true
@@ -136,19 +130,18 @@
   type = Transient
 
   solve_type = PJFNK
-  petsc_options_iname = '-pc_type -ksp_gmres_restart -sub_ksp_type -sub_pc_type -pc_asm_overlap'
-  petsc_options_value = 'asm      31                  preonly       lu           1'
+  petsc_options_iname = '-pc_type -pc_factor_mat_solving_package'
+  petsc_options_value = 'lu superlu_dist'
 
-  nl_rel_tol = 1e-9
+  nl_rel_tol = 1e-8
   l_tol = 1e-4
   l_max_its = 100
-  nl_max_its = 30
+  nl_max_its = 10
 
   dt = 5e-5
-  num_steps = 1
+  num_steps = 2
 []
 
 [Outputs]
   exodus = true
-  print_perf_log = true
 []

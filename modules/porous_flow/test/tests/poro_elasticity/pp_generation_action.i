@@ -96,7 +96,6 @@
   [../]
 []
 
-
 [Kernels]
   [./source]
     type = BodyForce
@@ -134,14 +133,9 @@
     type = ComputeLinearElasticStress
   [../]
   [./porosity]
-    type = PorousFlowPorosityHM
-    at_nodes = true
-    porosity_zero = 0.1
-    biot_coefficient = 0.3
-    solid_bulk = 2
-  [../]
-  [./porosity_qp]
-    type = PorousFlowPorosityHM
+    type = PorousFlowPorosity
+    fluid = true
+    mechanical = true
     porosity_zero = 0.1
     biot_coefficient = 0.3
     solid_bulk = 2

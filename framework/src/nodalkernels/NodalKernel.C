@@ -1,22 +1,17 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "NodalKernel.h"
 #include "Problem.h"
 #include "SubProblem.h"
 #include "SystemBase.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 #include "Assembly.h"
 
 template <>
@@ -28,6 +23,7 @@ validParams<NodalKernel>()
   params += validParams<BlockRestrictable>();
   params += validParams<BoundaryRestrictable>();
   params += validParams<RandomInterface>();
+  params += validParams<TaggingInterface>();
 
   params.addRequiredParam<NonlinearVariableName>(
       "variable", "The name of the variable that this boundary condition applies to");
@@ -70,25 +66,30 @@ NodalKernel::NodalKernel(const InputParameters & parameters)
     TransientInterface(this),
     PostprocessorInterface(this),
     GeometricSearchInterface(this),
-    Restartable(parameters, "BCs"),
-    ZeroInterface(parameters),
+    Restartable(this, "BCs"),
     MeshChangedInterface(parameters),
     RandomInterface(parameters,
-                    *parameters.get<FEProblemBase *>("_fe_problem_base"),
+                    *parameters.getCheckedPointerParam<FEProblemBase *>("_fe_problem_base"),
                     parameters.get<THREAD_ID>("_tid"),
                     true),
     CoupleableMooseVariableDependencyIntermediateInterface(this, true),
-    _subproblem(*parameters.get<SubProblem *>("_subproblem")),
-    _fe_problem(*parameters.get<FEProblemBase *>("_fe_problem_base")),
-    _sys(*parameters.get<SystemBase *>("_sys")),
+    MooseVariableInterface<Real>(this,
+                                 true,
+                                 "variable",
+                                 Moose::VarKindType::VAR_NONLINEAR,
+                                 Moose::VarFieldType::VAR_FIELD_STANDARD),
+    TaggingInterface(this),
+    _subproblem(*getCheckedPointerParam<SubProblem *>("_subproblem")),
+    _fe_problem(*getCheckedPointerParam<FEProblemBase *>("_fe_problem_base")),
+    _sys(*getCheckedPointerParam<SystemBase *>("_sys")),
     _tid(parameters.get<THREAD_ID>("_tid")),
     _assembly(_subproblem.assembly(_tid)),
-    _var(_sys.getVariable(_tid, parameters.get<NonlinearVariableName>("variable"))),
+    _var(*mooseVariable()),
     _mesh(_subproblem.mesh()),
     _current_node(_var.node()),
-    _u(_var.nodalSln()),
-    _u_dot(_var.nodalSlnDot()),
-    _du_dot_du(_var.nodalSlnDuDotDu()),
+    _u(_var.dofValues()),
+    _u_dot(_var.dofValuesDot()),
+    _du_dot_du(_var.dofValuesDuDotDu()),
     _save_in_strings(parameters.get<std::vector<AuxVariableName>>("save_in")),
     _diag_save_in_strings(parameters.get<std::vector<AuxVariableName>>("diag_save_in"))
 
@@ -98,12 +99,13 @@ NodalKernel::NodalKernel(const InputParameters & parameters)
 
   for (unsigned int i = 0; i < _save_in_strings.size(); i++)
   {
-    MooseVariable * var = &_subproblem.getVariable(_tid, _save_in_strings[i]);
+    MooseVariable * var = &_subproblem.getStandardVariable(_tid, _save_in_strings[i]);
 
     if (var->feType() != _var.feType())
-      mooseError("Error in " + name() + ". When saving residual values in an Auxiliary variable "
-                                        "the AuxVariable must be the same type as the nonlinear "
-                                        "variable the object is acting on.");
+      paramError(
+          "save_in",
+          "saved-in auxiliary variable is incompatible with the object's nonlinear variable: ",
+          moose::internal::incompatVarMsg(*var, _var));
 
     _save_in[i] = var;
     var->sys().addVariableToZeroOnResidual(_save_in_strings[i]);
@@ -114,12 +116,13 @@ NodalKernel::NodalKernel(const InputParameters & parameters)
 
   for (unsigned int i = 0; i < _diag_save_in_strings.size(); i++)
   {
-    MooseVariable * var = &_subproblem.getVariable(_tid, _diag_save_in_strings[i]);
+    MooseVariable * var = &_subproblem.getStandardVariable(_tid, _diag_save_in_strings[i]);
 
     if (var->feType() != _var.feType())
-      mooseError("Error in " + name() + ". When saving diagonal Jacobian values in an Auxiliary "
-                                        "variable the AuxVariable must be the same type as the "
-                                        "nonlinear variable the object is acting on.");
+      paramError(
+          "diag_save_in",
+          "saved-in auxiliary variable is incompatible with the object's nonlinear variable: ",
+          moose::internal::incompatVarMsg(*var, _var));
 
     _diag_save_in[i] = var;
     var->sys().addVariableToZeroOnJacobian(_diag_save_in_strings[i]);
@@ -149,7 +152,7 @@ NodalKernel::computeResidual()
     dof_id_type & dof_idx = _var.nodalDofIndex();
     _qp = 0;
     Real res = computeQpResidual();
-    _assembly.cacheResidualContribution(dof_idx, res, Moose::KT_NONTIME);
+    _assembly.cacheResidualContribution(dof_idx, res, _vector_tags);
 
     if (_has_save_in)
     {

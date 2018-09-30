@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef BRINEFLUIDPROPERTIES_H
 #define BRINEFLUIDPROPERTIES_H
@@ -72,16 +74,30 @@ public:
                         Real & drho_dT,
                         Real & drho_dx) const override;
 
-  virtual Real mu_from_rho_T(Real water_density, Real temperature, Real xnacl) const override;
+  virtual Real mu(Real pressure, Real temperature, Real xnacl) const override;
 
-  virtual void mu_drhoTx(Real water_density,
-                         Real temperature,
-                         Real xnacl,
-                         Real dwater_density_dT,
-                         Real & mu,
-                         Real & dmu_drho,
-                         Real & dmu_dT,
-                         Real & dmu_dx) const override;
+  virtual void mu_dpTx(Real pressure,
+                       Real temperature,
+                       Real xnacl,
+                       Real & mu,
+                       Real & dmu_dp,
+                       Real & dmu_dT,
+                       Real & dmu_dx) const override;
+
+  virtual void
+  rho_mu(Real pressure, Real temperature, Real xnacl, Real & rho, Real & mu) const override;
+
+  virtual void rho_mu_dpTx(Real pressure,
+                           Real temperature,
+                           Real xnacl,
+                           Real & rho,
+                           Real & drho_dp,
+                           Real & drho_dT,
+                           Real & drho_dx,
+                           Real & mu,
+                           Real & dmu_dp,
+                           Real & dmu_dT,
+                           Real & dmu_dx) const override;
 
   virtual Real h(Real pressure, Real temperature, Real xnacl) const override;
 
@@ -105,7 +121,7 @@ public:
                       Real & de_dT,
                       Real & de_dx) const override;
 
-  virtual Real k_from_rho_T(Real water_density, Real temperature, Real xnacl) const override;
+  virtual Real k(Real pressure, Real temperature, Real xnacl) const override;
 
   /**
    * Brine vapour pressure
@@ -156,8 +172,6 @@ protected:
    */
   Real massFractionToMoleFraction(Real xnacl) const;
 
-  /// Water97FluidProperties UserObject
-  const Water97FluidProperties * _water97_fp;
   /// Water97FluidProperties UserObject
   const SinglePhaseFluidPropertiesPT * _water_fp;
   /// NaClFluidProperties UserObject

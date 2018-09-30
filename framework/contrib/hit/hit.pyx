@@ -3,6 +3,7 @@ cimport chit
 
 from libcpp.string cimport string
 from libcpp cimport bool as cbool
+from libcpp.vector cimport vector
 
 class NodeType(object):
     All = 'All'
@@ -62,6 +63,25 @@ cpdef NewBlank():
     cdef chit.Node* f = <chit.Node*> new chit.Blank()
     return _initpynode(f)
 
+cdef class Formatter:
+    cdef chit.Formatter _formatter
+
+    def __cinit__(self, style_file=''):
+        self._formatter = chit.Formatter()
+        if style_file != '':
+            with open(style_file, 'r') as f:
+                data = f.read()
+            self._formatter = chit.Formatter(style_file, data)
+
+    def addPattern(self, prefix, order):
+        cdef vector[string] order_vec
+        for o in order:
+            order_vec.push_back(o)
+        self._formatter.addPattern(prefix, order_vec)
+
+    def format(self, fname, content):
+        return str(self._formatter.format(fname, content))
+
 cdef class Node:
     cdef chit.Node* _cnode
     cdef cbool _own
@@ -98,8 +118,9 @@ cdef class Node:
     def __repr__(self):
         return self.render()
 
-    def render(self, indent=0):
-        return self._cnode.render(indent)
+    def render(self, indent=0, indent_text='  ', maxlen=0):
+        cindent = <string> indent_text.encode('utf-8')
+        return self._cnode.render(indent, cindent, maxlen)
 
     def line(self):
         return int(self._cnode.line())

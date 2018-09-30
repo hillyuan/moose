@@ -9,6 +9,7 @@
 ###############################################################################
 MOOSE_DIR          ?= $(shell dirname `pwd`)
 FRAMEWORK_DIR      ?= $(MOOSE_DIR)/framework
+ADDITIONAL_CPPFLAGS += -Wall -Wextra
 ###############################################################################
 
 # framework
@@ -26,9 +27,7 @@ include modules.mk
 APPLICATION_DIR    := $(MOOSE_DIR)/modules/combined
 APPLICATION_NAME   := combined
 BUILD_EXEC         := yes
-# Note: There are no applications that depend on moose_test so the test_up and up
-# targets are not very useful here.  Instead we will test up like this is MOOSE
-DEP_APPS           ?= $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLICATION_NAME))
+GEN_REVISION       := no
 include            $(FRAMEWORK_DIR)/app.mk
 
 ###############################################################################
@@ -36,13 +35,19 @@ include            $(FRAMEWORK_DIR)/app.mk
 
 # This target will build the individual executables in each module
 # and run their respective tests.
-MODULE_DIRS    := $(shell find $(MOOSE_DIR)/modules -maxdepth 1 -mindepth 1 -type d -not -name doc)
+MODULE_DIRS    := $(shell find $(MOOSE_DIR)/modules -maxdepth 1 -mindepth 1 -type d -not -name doc -not -name module_loader)
 MOOSE_COLOR        ?= true
 ifneq ($(MOOSE_COLOR),true)
   COLOR_STRING = '--no-color'
 endif
 
-test_subs:
+.PHONY: builds $(MODULE_DIRS)
+builds: $(MODULE_DIRS)
+
+$(MODULE_DIRS): $(app_LIBS)
+	@$(MAKE) -C $@
+
+test_subs: all builds
 	@echo ======================================================
 	@echo Testing the following modules:
 	@for app in $(MODULE_DIRS); do echo \ $$app; done
@@ -52,6 +57,21 @@ test_subs:
 	for app in $(MODULE_DIRS); \
 	do \
 		echo ====== Testing in $${app} ====== ; \
-		cd $${app} && $(MAKE) && ./run_tests $(COLOR_STRING) -j $(MOOSE_JOBS) $(MOOSE_LOAD) -t || ret_val=1; \
+		cd $${app} && ./run_tests $(COLOR_STRING) -j $(MOOSE_JOBS) $(MOOSE_LOAD) -t || ret_val=1; \
+	done; \
+	exit $$ret_val;)
+
+MOOSE_DOCS_DIR ?= $(MOOSE_DIR)/site
+test_doc: all builds
+	@echo ======================================================
+	@echo Testing MooseDocs for the following modules:
+	@for app in $(MODULE_DIRS); do echo \ $$app; done
+	@echo ======================================================
+	@echo
+	@(ret_val=0; \
+	for app in $(MODULE_DIRS); \
+	do \
+		echo ====== Testing MooseDocs in $${app} ====== ; \
+		cd $${app}/doc && ./moosedocs.py build --check --destination=$(MOOSE_DOCS_DIR) || ret_val=1; \
 	done; \
 	exit $$ret_val;)

@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 """
 With only a filename given, this script runs each unittest in a file in a separate process.
 If the test name is given as well, it will only run that test.
@@ -54,6 +63,6 @@ else:
             cmd.append("-b")
         ret = subprocess.call(cmd)
         if ret != 0:
-            print("%s exited %s" % (t, ret))
+            print("%s exited %s" % (name, ret))
             final_code = 1
     sys.exit(final_code)

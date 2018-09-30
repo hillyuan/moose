@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef SINGLEVARIABLERETURNMAPPINGSOLUTION_H
 #define SINGLEVARIABLERETURNMAPPINGSOLUTION_H
 
@@ -25,11 +28,6 @@ public:
   SingleVariableReturnMappingSolution(const InputParameters & parameters);
   virtual ~SingleVariableReturnMappingSolution() {}
 
-  /// Functions for setting old default tolerances with legacy_return_mapping:
-  void setMaxIts(unsigned int max_its) { _max_its = max_its; }
-  void setRelativeTolerance(Real relative_tolerance) { _relative_tolerance = relative_tolerance; }
-  void setAbsoluteTolerance(Real absolute_tolerance) { _absolute_tolerance = absolute_tolerance; }
-
 protected:
   /**
    * Perform the return mapping iterations
@@ -42,11 +40,27 @@ protected:
                           const ConsoleStream & console);
 
   /**
+   * Compute the minimum permissible value of the scalar.  For some models, the magnitude
+   * of this may be known.
+   * @param effective_trial_stress Effective trial stress
+   */
+  virtual Real minimumPermissibleValue(const Real effective_trial_stress) const;
+
+  /**
    * Compute the maximum permissible value of the scalar.  For some models, the magnitude
    * of this may be known.
    * @param effective_trial_stress Effective trial stress
    */
   virtual Real maximumPermissibleValue(const Real effective_trial_stress) const;
+
+  /**
+   * Compute an initial guess for the value of the scalar. For some cases, an
+   * intellegent starting point can provide enhanced robustness in the Newton
+   * iterations. This is also an opportunity for classes that derive from this
+   * to perform initialization tasks.
+   * @param effective_trial_stress Effective trial stress
+   */
+  virtual Real initialGuess(const Real /*effective_trial_stress*/) { return 0.0; }
 
   /**
    * Compute the residual for a predicted value of the scalar.  This residual should be
@@ -78,22 +92,60 @@ protected:
    */
   virtual void iterationFinalize(Real /*scalar*/) {}
 
-  /// Whether to use the legacy return mapping algorithm and compute residuals in the legacy
-  /// manner.
-  bool _legacy_return_mapping;
+  /**
+   * Output information for a single iteration step to build the convergence history of the model
+   * @param iter_output            Output stream
+   * @param it                     Current iteration count
+   * @param effective_trial_stress Effective trial stress
+   * @param scalar                 Inelastic strain increment magnitude being solved for
+   * @param residual               Current value of the residual
+   * @param reference              Current value of the reference quantity
+   */
+  virtual void outputIterationStep(std::stringstream * iter_output,
+                                   const unsigned int it,
+                                   const Real effective_trial_stress,
+                                   const Real scalar,
+                                   const Real residual,
+                                   const Real reference_residual);
+
+  /**
+   * Output summary information for the convergence history of the model
+   * @param iter_output            Output stream
+   * @param total_it               Total iteration count
+   */
+  virtual void outputIterationSummary(std::stringstream * iter_output, const unsigned int total_it);
 
   /// Whether to check to see whether iterative solution is within admissible range, and set within that range if outside
   bool _check_range;
 
-private:
-  /// Maximum number of return mapping iterations (used only in legacy return mapping)
-  unsigned int _max_its;
+  /// Whether to use line searches to improve convergence
+  bool _line_search;
 
-  /// Maximum number of return mapping iterations used in current procedure. Not settable by user.
-  const unsigned int _fixed_max_its;
+  /// Whether to save upper and lower bounds of root for scalar, and set solution to the midpoint between
+  /// those bounds if outside them
+  bool _bracket_solution;
+
+private:
+  enum class InternalSolveOutput
+  {
+    NEVER,
+    ON_ERROR,
+    ALWAYS
+  } _internal_solve_output_on;
+
+  enum class SolveState
+  {
+    SUCCESS,
+    NAN_INF,
+    EXCEEDED_ITERATIONS
+  };
+
+  /// Maximum number of return mapping iterations. This exists only to avoid an infinite loop, and is
+  /// is intended to be a large number that is not settable by the user.
+  const unsigned int _max_its;
 
   /// Whether to output iteration information all the time (regardless of whether iterations converge)
-  const bool _output_iteration_info;
+  const bool _internal_solve_full_iteration_history;
 
   /// Relative convergence tolerance
   Real _relative_tolerance;
@@ -104,40 +156,33 @@ private:
   /// Multiplier applied to relative and absolute tolerances for acceptable convergence
   Real _acceptable_multiplier;
 
-  /// Whether to use line searches to improve convergence
-  bool _line_search;
-
-  /// Whether to save upper and lower bounds of root for scalar, and set solution to the midpoint between
-  /// those bounds if outside them
-  bool _bracket_solution;
-
   /// Number of residuals to be stored in history
   const std::size_t _num_resids;
 
   /// History of residuals used to check whether progress is still being made on decreasing the residual
   std::vector<Real> _residual_history;
 
-  /**
-   * Method called from within this class to perform the actual return mappping iterations.
-   * @param effective_trial_stress Effective trial stress
-   * @param scalar                 Inelastic strain increment magnitude being solved for
-   * @param iter_output            Output stream -- if null, no output is produced
-   * @return Whether the solution was successful
-   */
-  bool
-  internalSolve(const Real effective_trial_stress, Real & scalar, std::stringstream * iter_output);
+  /// iteration number
+  unsigned int _iteration;
+
+  ///@{ Residual values, kept as members to retain solver state for summary outputting
+  Real _initial_residual;
+  Real _residual;
+  ///@}
+
+  /// MOOSE input name of the object performing the solve
+  const std::string _svrms_name;
 
   /**
    * Method called from within this class to perform the actual return mappping iterations.
-   * This version uses the legacy procedure.
    * @param effective_trial_stress Effective trial stress
    * @param scalar                 Inelastic strain increment magnitude being solved for
    * @param iter_output            Output stream -- if null, no output is produced
    * @return Whether the solution was successful
    */
-  bool internalSolveLegacy(const Real effective_trial_stress,
+  SolveState internalSolve(const Real effective_trial_stress,
                            Real & scalar,
-                           std::stringstream * iter_output);
+                           std::stringstream * iter_output = nullptr);
 
   /**
    * Check to see whether the residual is within the convergence limits.
@@ -157,22 +202,6 @@ private:
    * @return Whether the model converged
    */
   bool convergedAcceptable(const unsigned int it, const Real residual, const Real reference);
-
-  /**
-   * Output information about convergence history of the model
-   * @param iter_output            Output stream
-   * @param it                     Current iteration count
-   * @param effective_trial_stress Effective trial stress
-   * @param scalar                 Inelastic strain increment magnitude being solved for
-   * @param residual               Current value of the residual
-   * @param reference              Current value of the reference quantity
-   */
-  void outputIterInfo(std::stringstream * iter_output,
-                      const unsigned int it,
-                      const Real effective_trial_stress,
-                      const Real scalar,
-                      const Real residual,
-                      const Real reference_residual);
 
   /**
    * Check to see whether solution is within admissible range, and set it within that range

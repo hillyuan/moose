@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef POROUSFLOWDISPERSIVEFLUX_H
 #define POROUSFLOWDISPERSIVEFLUX_H
@@ -72,7 +74,7 @@ protected:
   /// Derivative of the diffusion coefficients wrt PorousFlow variables
   const MaterialProperty<std::vector<std::vector<std::vector<Real>>>> & _ddiffusion_coeff_dvar;
 
-  /// PorousFlow Dictator UserObject
+  /// PorousFlowDictator UserObject
   const PorousFlowDictator & _dictator;
 
   /// Index of the fluid component that this kernel acts on
@@ -102,7 +104,7 @@ protected:
   /// Derivative of permeability wrt PorousFlow variables
   const MaterialProperty<std::vector<RealTensorValue>> & _dpermeability_dvar;
 
-  /// d(permeabiity)/d(grad(porous-flow variable))
+  /// d(permeabiity)/d(grad(PorousFlow variable))
   const MaterialProperty<std::vector<std::vector<RealTensorValue>>> & _dpermeability_dgradvar;
 
   /// Gradient of the pore pressure in each phase

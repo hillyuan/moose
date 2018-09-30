@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "GeneralUserObject.h"
 
@@ -20,12 +15,15 @@ validParams<GeneralUserObject>()
 {
   InputParameters params = validParams<UserObject>();
   params += validParams<MaterialPropertyInterface>();
+  params.addParam<bool>(
+      "force_preaux", false, "Forces the GeneralUserObject to be executed in PREAUX");
+  params.addParamNamesToGroup("force_preaux", "Advanced");
   return params;
 }
 
 GeneralUserObject::GeneralUserObject(const InputParameters & parameters)
   : UserObject(parameters),
-    MaterialPropertyInterface(this),
+    MaterialPropertyInterface(this, Moose::EMPTY_BLOCK_IDS, Moose::EMPTY_BOUNDARY_IDS),
     TransientInterface(this),
     DependencyResolverInterface(),
     UserObjectInterface(this),
@@ -75,6 +73,26 @@ GeneralUserObject::getVectorPostprocessorValueByName(const VectorPostprocessorNa
 {
   _depend_vars.insert(name);
   return VectorPostprocessorInterface::getVectorPostprocessorValueByName(name, vector_name);
+}
+
+const VectorPostprocessorValue &
+GeneralUserObject::getVectorPostprocessorValue(const std::string & name,
+                                               const std::string & vector_name,
+                                               bool use_broadcast)
+{
+  _depend_vars.insert(_pars.get<VectorPostprocessorName>(name));
+  return VectorPostprocessorInterface::getVectorPostprocessorValue(
+      name, vector_name, use_broadcast);
+}
+
+const VectorPostprocessorValue &
+GeneralUserObject::getVectorPostprocessorValueByName(const VectorPostprocessorName & name,
+                                                     const std::string & vector_name,
+                                                     bool use_broadcast)
+{
+  _depend_vars.insert(name);
+  return VectorPostprocessorInterface::getVectorPostprocessorValueByName(
+      name, vector_name, use_broadcast);
 }
 
 void

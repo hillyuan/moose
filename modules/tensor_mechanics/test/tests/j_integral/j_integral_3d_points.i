@@ -45,6 +45,7 @@
   radius_inner = '4.0 5.5'
   radius_outer = '5.5 7.0'
   output_q = false
+  incremental = true
 []
 
 [Modules/TensorMechanics/Master]
@@ -109,9 +110,6 @@
   [../]
   [./elastic_stress]
     type = ComputeFiniteStrainElasticStress
-  [../]
-  [./eshelby]
-    type = EshelbyTensor
   [../]
 []
 

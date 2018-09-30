@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef FORMATTEDTABLE_H
 #define FORMATTEDTABLE_H
@@ -72,6 +67,17 @@ public:
   void append(bool append_existing_file);
 
   /**
+   * Force a new row in the table with the passed in time.
+   */
+  void addRow(Real time);
+
+  /**
+   * Method for adding data to the output table. Data is added to the last row. Method will
+   * error if called on an empty table.
+   */
+  void addData(const std::string & name, Real value);
+
+  /**
    * Method for adding data to the output table.  The dependent variable is named "time"
    */
   void addData(const std::string & name, Real value, Real time);
@@ -81,6 +87,11 @@ public:
    * the dependent variable index lines up with the vector indices.
    */
   void addData(const std::string & name, const std::vector<Real> & vector);
+
+  /**
+   * Retrieve the last time (or independent variable) value.
+   */
+  Real getLastTime();
 
   /**
    * Retrieve Data for last value of given name
@@ -207,8 +218,13 @@ private:
    */
   std::size_t _output_row_index;
 
-  /// Keeps track of whether the current stream is open or not.
-  bool _stream_open;
+  /**
+   * Keeps track of whether the header has been output. This is separate from _output_row_index
+   * because it's possible to output the header with zero rows. We don't consider this a bug,
+   * it helps users understand that they have declared vectors properly but maybe haven't populated
+   * them correctly.
+   */
+  bool _headers_output;
 
   /// Keeps track of whether we want to open an existing file for appending or overwriting.
   bool _append;

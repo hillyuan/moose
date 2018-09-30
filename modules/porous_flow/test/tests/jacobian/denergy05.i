@@ -154,7 +154,10 @@
     type = PorousFlowVolumetricStrain
   [../]
   [./porosity]
-    type = PorousFlowPorosityTHM
+    type = PorousFlowPorosity
+    fluid = true
+    mechanical = true
+    thermal = true
     at_nodes = true
     porosity_zero = 0.7
     thermal_expansion_coeff = 0.7
@@ -188,18 +191,6 @@
     fp = simple_fluid1
     phase = 1
     at_nodes = true
-  [../]
-  [./internal_energy_fluids]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_internal_energy_nodal
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
   [../]
 []
 

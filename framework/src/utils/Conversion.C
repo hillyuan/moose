@@ -1,21 +1,17 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "Conversion.h"
 #include "MooseError.h"
-#include "MultiMooseEnum.h"
+#include "ExecFlagEnum.h"
+#include "MooseUtils.h"
 
 #include "libmesh/string_to_enum.h"
 
@@ -24,7 +20,6 @@
 
 namespace Moose
 {
-std::map<std::string, ExecFlagType> execstore_type_to_enum;
 std::map<std::string, QuadratureType> quadrature_type_to_enum;
 std::map<std::string, CoordinateSystemType> coordinate_system_type_to_enum;
 std::map<std::string, SolveType> solve_type_to_enum;
@@ -34,21 +29,6 @@ std::map<std::string, WhichEigenPairs> which_eigen_pairs_to_enum;
 std::map<std::string, LineSearchType> line_search_type_to_enum;
 std::map<std::string, TimeIntegratorType> time_integrator_to_enum;
 std::map<std::string, MffdType> mffd_type_to_enum;
-
-void
-initExecStoreType()
-{
-  if (execstore_type_to_enum.empty())
-  {
-    execstore_type_to_enum["INITIAL"] = EXEC_INITIAL;
-    execstore_type_to_enum["LINEAR"] = EXEC_LINEAR;
-    execstore_type_to_enum["NONLINEAR"] = EXEC_NONLINEAR;
-    execstore_type_to_enum["TIMESTEP_END"] = EXEC_TIMESTEP_END;
-    execstore_type_to_enum["TIMESTEP_BEGIN"] = EXEC_TIMESTEP_BEGIN;
-    execstore_type_to_enum["FINAL"] = EXEC_FINAL;
-    execstore_type_to_enum["CUSTOM"] = EXEC_CUSTOM;
-  }
-}
 
 void
 initQuadratureType()
@@ -158,6 +138,7 @@ initLineSearchType()
     line_search_type_to_enum["L2"] = LS_L2;
     line_search_type_to_enum["BT"] = LS_BT;
     line_search_type_to_enum["CP"] = LS_CP;
+    line_search_type_to_enum["CONTACT"] = LS_CONTACT;
 #endif
 #endif
   }
@@ -186,21 +167,6 @@ initMffdType()
     mffd_type_to_enum["DS"] = MFFD_DS;
     mffd_type_to_enum["WP"] = MFFD_WP;
   }
-}
-
-template <>
-ExecFlagType
-stringToEnum(const std::string & s)
-{
-  initExecStoreType();
-
-  std::string upper(s);
-  std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-
-  if (!execstore_type_to_enum.count(upper))
-    mooseError("Unknown execution flag: ", upper);
-
-  return execstore_type_to_enum[upper];
 }
 
 template <>
@@ -351,15 +317,19 @@ stringToEnum<MffdType>(const std::string & s)
   return mffd_type_to_enum[upper];
 }
 
-template <>
-std::vector<ExecFlagType>
-vectorStringsToEnum<ExecFlagType>(const MultiMooseEnum & v)
+// Definition in MooseTypes.h
+std::string
+stringify(const Moose::RelationshipManagerType & t)
 {
-  std::vector<ExecFlagType> exec_flags(v.size());
-  for (unsigned int i = 0; i < v.size(); ++i)
-    exec_flags[i] = stringToEnum<ExecFlagType>(v[i]);
-
-  return exec_flags;
+  switch (t)
+  {
+    case Moose::RelationshipManagerType::Geometric:
+      return "Geometric";
+    case Moose::RelationshipManagerType::Algebraic:
+      return "Algebraic";
+    default:
+      return "ERROR";
+  }
 }
 
 std::string
@@ -377,37 +347,6 @@ stringify(const SolveType & t)
       return "FD";
     case ST_LINEAR:
       return "Linear";
-  }
-  return "";
-}
-
-std::string
-stringify(const ExecFlagType & t)
-{
-  switch (t)
-  {
-    case EXEC_INITIAL:
-      return "INITIAL";
-    case EXEC_LINEAR:
-      return "LINEAR";
-    case EXEC_NONLINEAR:
-      return "NONLINEAR";
-    case EXEC_TIMESTEP_END:
-      return "TIMESTEP_END";
-    case EXEC_TIMESTEP_BEGIN:
-      return "TIMESTEP_BEGIN";
-    case EXEC_CUSTOM:
-      return "CUSTOM";
-    case EXEC_FINAL:
-      return "FINAL";
-    case EXEC_FORCED:
-      return "FORCED";
-    case EXEC_FAILED:
-      return "FAILED";
-    case EXEC_SUBDOMAIN:
-      return "SUBDOMAIN";
-    case EXEC_NONE:
-      return "NONE";
   }
   return "";
 }

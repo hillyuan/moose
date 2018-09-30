@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "RichardsMaterial.h"
 #include "Assembly.h"
@@ -12,6 +14,8 @@
 #include <cmath> // std::sinh and std::cosh
 
 #include "libmesh/quadrature.h"
+
+registerMooseObject("RichardsApp", RichardsMaterial);
 
 template <>
 InputParameters
@@ -135,7 +139,8 @@ RichardsMaterial::RichardsMaterial(const InputParameters & parameters)
   // Need to add the variables that the user object is coupled to as dependencies so MOOSE will
   // compute them
   {
-    const std::vector<MooseVariable *> & coupled_vars = _richards_name_UO.getCoupledMooseVars();
+    const std::vector<MooseVariableFEBase *> & coupled_vars =
+        _richards_name_UO.getCoupledMooseVars();
     for (unsigned int i = 0; i < coupled_vars.size(); i++)
       addMooseVariableDependency(coupled_vars[i]);
   }

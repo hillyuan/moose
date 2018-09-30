@@ -1,10 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "MatReaction.h"
+
+registerMooseObject("PhaseFieldApp", MatReaction);
 
 template <>
 InputParameters
@@ -36,7 +41,7 @@ MatReaction::MatReaction(const InputParameters & parameters)
   // Get reaction rate derivatives
   for (unsigned int i = 0; i < _nvar; ++i)
   {
-    MooseVariable * ivar = _coupled_moose_vars[i];
+    MooseVariableFEBase * ivar = _coupled_moose_vars[i];
     _dLdarg[i] = &getMaterialPropertyDerivative<Real>("mob_name", ivar->name());
   }
 }

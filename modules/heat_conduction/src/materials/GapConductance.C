@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "GapConductance.h"
 
@@ -16,6 +18,8 @@
 #include "AddVariableAction.h"
 
 #include "libmesh/string_to_enum.h"
+
+registerMooseObject("HeatConductionApp", GapConductance);
 
 template <>
 InputParameters
@@ -56,6 +60,10 @@ validParams<GapConductance>()
                         "are provided in the Mesh block the "
                         "undisplaced mesh will still be used.");
 
+  params.addParam<std::string>("conductivity_name",
+                               "thermal_conductivity",
+                               "The name of the MaterialProperty associated with conductivity "
+                               "(\"thermal_conductivity\" in the case of heat conduction)");
   return params;
 }
 
@@ -164,12 +172,14 @@ GapConductance::GapConductance(const InputParameters & parameters)
 void
 GapConductance::initialSetup()
 {
-  setGapGeometryParameters(_pars, _coord_sys, _gap_geometry_type, _p1, _p2);
+  setGapGeometryParameters(
+      _pars, _coord_sys, _fe_problem.getAxisymmetricRadialCoord(), _gap_geometry_type, _p1, _p2);
 }
 
 void
 GapConductance::setGapGeometryParameters(const InputParameters & params,
                                          const Moose::CoordinateSystemType coord_sys,
+                                         unsigned int axisymmetric_radial_coord,
                                          GAP_GEOMETRY & gap_geometry_type,
                                          Point & p1,
                                          Point & p2)
@@ -213,8 +223,17 @@ GapConductance::setGapGeometryParameters(const InputParameters & params,
         ::mooseError("The 'cylinder_axis_point_1' and 'cylinder_axis_point_2' cannot be specified "
                      "with axisymmetric models.  The y-axis is used as the cylindrical axis of "
                      "symmetry.");
-      p1 = Point(0, 0, 0);
-      p2 = Point(0, 1, 0);
+
+      if (axisymmetric_radial_coord == 0) // R-Z problem
+      {
+        p1 = Point(0, 0, 0);
+        p2 = Point(0, 1, 0);
+      }
+      else // Z-R problem
+      {
+        p1 = Point(0, 0, 0);
+        p2 = Point(1, 0, 0);
+      }
     }
     else if (coord_sys == Moose::COORD_RSPHERICAL)
       ::mooseError("'gap_geometry_type = CYLINDER' cannot be used with models having a spherical "

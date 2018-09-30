@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "XFEMRankTwoTensorMarkerUserObject.h"
 
@@ -13,11 +15,13 @@
 #include "Assembly.h"
 #include <limits>
 
+registerMooseObject("XFEMApp", XFEMRankTwoTensorMarkerUserObject);
+
 template <>
 InputParameters
 validParams<XFEMRankTwoTensorMarkerUserObject>()
 {
-  InputParameters params = validParams<XFEMMarkerUserObject>();
+  InputParameters params = validParams<XFEMMaterialStateMarkerBase>();
   params.addClassDescription(
       "Mark elements to be cut by XFEM based on a scalar extracted from a RankTwoTensor");
   params.addParam<MooseEnum>(
@@ -41,7 +45,7 @@ validParams<XFEMRankTwoTensorMarkerUserObject>()
 
 XFEMRankTwoTensorMarkerUserObject::XFEMRankTwoTensorMarkerUserObject(
     const InputParameters & parameters)
-  : XFEMMarkerUserObject(parameters),
+  : XFEMMaterialStateMarkerBase(parameters),
     _tensor(getMaterialProperty<RankTwoTensor>(getParam<std::string>("tensor"))),
     _scalar_type(getParam<MooseEnum>("scalar_type")),
     _point1(parameters.get<Point>("point1")),

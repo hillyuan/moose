@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "MaterialPropertyInterface.h"
@@ -27,29 +22,12 @@ validParams<MaterialPropertyInterface>()
   return params;
 }
 
-MaterialPropertyInterface::MaterialPropertyInterface(const MooseObject * moose_object)
-  : MaterialPropertyInterface(moose_object, Moose::EMPTY_BLOCK_IDS, Moose::EMPTY_BOUNDARY_IDS)
-{
-}
-
-MaterialPropertyInterface::MaterialPropertyInterface(const MooseObject * moose_object,
-                                                     const std::set<SubdomainID> & block_ids)
-  : MaterialPropertyInterface(moose_object, block_ids, Moose::EMPTY_BOUNDARY_IDS)
-{
-}
-
-MaterialPropertyInterface::MaterialPropertyInterface(const MooseObject * moose_object,
-                                                     const std::set<BoundaryID> & boundary_ids)
-  : MaterialPropertyInterface(moose_object, Moose::EMPTY_BLOCK_IDS, boundary_ids)
-{
-}
-
 MaterialPropertyInterface::MaterialPropertyInterface(const MooseObject * moose_object,
                                                      const std::set<SubdomainID> & block_ids,
                                                      const std::set<BoundaryID> & boundary_ids)
   : _mi_params(moose_object->parameters()),
     _mi_name(_mi_params.get<std::string>("_object_name")),
-    _mi_feproblem(*_mi_params.get<FEProblemBase *>("_fe_problem_base")),
+    _mi_feproblem(*_mi_params.getCheckedPointerParam<FEProblemBase *>("_fe_problem_base")),
     _mi_tid(_mi_params.get<THREAD_ID>("_tid")),
     _stateful_allowed(true),
     _get_material_property_called(false),
@@ -140,12 +118,12 @@ MaterialPropertyInterface::checkMaterialProperty(const std::string & name)
   // If the material property is boundary restrictable, add to the list of materials to check
   if (_mi_boundary_restricted)
     for (const auto & bnd_id : _mi_boundary_ids)
-      _mi_feproblem.storeDelayedCheckMatProp(_mi_name, bnd_id, name);
+      _mi_feproblem.storeBoundaryDelayedCheckMatProp(_mi_name, bnd_id, name);
 
   // The default is to assume block restrictions
   else
     for (const auto & blk_ids : _mi_block_ids)
-      _mi_feproblem.storeDelayedCheckMatProp(_mi_name, blk_ids, name);
+      _mi_feproblem.storeSubdomainDelayedCheckMatProp(_mi_name, blk_ids, name);
 }
 
 void

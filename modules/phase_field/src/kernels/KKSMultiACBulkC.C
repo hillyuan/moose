@@ -1,10 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "KKSMultiACBulkC.h"
+
+registerMooseObject("PhaseFieldApp", KKSMultiACBulkC);
 
 template <>
 InputParameters
@@ -29,7 +34,7 @@ KKSMultiACBulkC::KKSMultiACBulkC(const InputParameters & parameters)
     _prop_d2F1dc12(getMaterialPropertyDerivative<Real>(_Fj_names[0], _c1_name, _c1_name))
 {
   if (_num_j != coupledComponents("cj_names"))
-    mooseError("Need to pass in as many cj_names as Fj_names in KKSMultiACBulkC ", name());
+    paramError("cj_names", "Need to pass in as many cj_names as Fj_names");
 
   // Load concentration variables into the arrays
   for (unsigned int i = 0; i < _num_j; ++i)
@@ -44,7 +49,7 @@ KKSMultiACBulkC::KKSMultiACBulkC(const InputParameters & parameters)
   // Iterate over all coupled variables
   for (unsigned int i = 0; i < _nvar; ++i)
   {
-    MooseVariable * cvar = _coupled_moose_vars[i];
+    MooseVariableFEBase * cvar = _coupled_moose_vars[i];
 
     // get second partial derivatives wrt c1 and other coupled variable
     _prop_d2F1dc1darg[i] =

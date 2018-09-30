@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "QuadraturePointMarker.h"
 #include "FEProblem.h"
@@ -50,12 +45,12 @@ validParams<QuadraturePointMarker>()
 QuadraturePointMarker::QuadraturePointMarker(const InputParameters & parameters)
   : Marker(parameters),
     Coupleable(this, false),
-    MaterialPropertyInterface(this, blockIDs()),
+    MaterialPropertyInterface(this, blockIDs(), Moose::EMPTY_BOUNDARY_IDS),
     _qrule(_assembly.qRule()),
     _q_point(_assembly.qPoints()),
     _qp(0)
 {
-  const std::vector<MooseVariable *> & coupled_vars = getCoupledMooseVars();
+  const std::vector<MooseVariableFEBase *> & coupled_vars = getCoupledMooseVars();
   for (const auto & var : coupled_vars)
     addMooseVariableDependency(var);
 }

@@ -1,9 +1,22 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import os, re, math
 
 class CSVDiffer:
-    def __init__(self, test_dir, out_files, abs_zero=1e-11, relative_error=5.5e-6):
+    def __init__(self, test_dir, out_files, abs_zero=1e-11, relative_error=5.5e-6, gold_dir='gold',
+            custom_columns=[], custom_rel_err=[], custom_abs_zero=[]):
         self.abs_zero = float(abs_zero)
         self.rel_tol = float(relative_error)
+        self.custom_columns = custom_columns
+        self.custom_rel_err = custom_rel_err
+        self.custom_abs_zero = custom_abs_zero
         self.files = []
         self.msg = ''
         self.num_errors = 0
@@ -16,7 +29,7 @@ class CSVDiffer:
                 self.msg += 'WARNING: Are you sure you want to use csv diff on a .e file?\n'
 
             test_filename = os.path.join(test_dir,out_file)
-            gold_filename = os.path.join(test_dir, 'gold', out_file)
+            gold_filename = os.path.join(test_dir, gold_dir, out_file)
             if not os.path.exists(test_filename):
                 self.addError(test_filename, 'File does not exist!')
             elif not os.path.exists(gold_filename):
@@ -44,6 +57,16 @@ class CSVDiffer:
     # manually clear messages by calling clearDiff
     def diff(self):
 
+        # Setup data structures for holding customized relative tolerance and absolute
+        # zero values and flag for checking variable names
+        rel_err_map = {}
+        abs_zero_map = {}
+        found_column = {}
+        for i in range(0, len(self.custom_columns)):
+            rel_err_map[self.custom_columns[i]] = float(self.custom_rel_err[i])
+            abs_zero_map[self.custom_columns[i]] = float(self.custom_abs_zero[i])
+            found_column[self.custom_columns[i]] = False
+
         for fname, text1, text2 in self.files:
             # use this value to skip the rest of the tests when we've found an error
             # the order of the tests is most general to most specific, so if a general
@@ -68,6 +91,13 @@ class CSVDiffer:
             if foundError:
                 continue
 
+            # check if custom tolerances used, column name exists in one of
+            # the CSV files
+            if self.custom_columns:
+               for mykey in self.custom_columns:
+                   if mykey in small:
+                      found_column[mykey] = True
+
             # now check that each column is the same length
             for key in keys1:
                 if len(table1[key]) != len(table2[key]):
@@ -83,7 +113,13 @@ class CSVDiffer:
             rel_tol   = self.rel_tol
             for key in keys1:
                 for val1, val2 in zip( table1[key], table2[key] ):
-                    # adjust to the absolute zero
+                    # if customized tolerances specified use them otherwise
+                    # use the default
+                    if self.custom_columns:
+                        try:
+                            abs_zero = abs_zero_map[key]
+                        except:
+                            abs_zero = self.abs_zero
                     if abs(val1) < abs_zero:
                         val1 = 0
                     if abs(val2) < abs_zero:
@@ -105,10 +141,24 @@ class CSVDiffer:
                     if max( abs(val1), abs(val2) ) > 0:
                         rel_diff = abs( ( val1 - val2 ) / max( abs(val1), abs(val2) ) )
 
+                    # if customized tolerances specified use them otherwise
+                    # use the default
+                    if self.custom_columns:
+                        try:
+                            rel_tol = rel_err_map[key]
+                        except:
+                            rel_tol = self.rel_tol
                     if rel_diff > rel_tol:
                         self.addError(fname, "The values in column \"" + key.strip() + "\" don't match\n\trel diff:  " + str(val1) + " ~ " + str(val2) + " = " + str(rel_diff))
                         # assume all other vals in this column are wrong too, so don't report them
                         break
+
+        # Loop over variable names to check if any are missing from all the
+        # CSV files being compared
+        if self.custom_columns:
+           for mykey2 in self.custom_columns:
+               if not found_column[mykey2]:
+                  self.addError("all CSV files", "Variable '" + mykey2 + "' in custom_columns is missing" )
 
         return self.msg
 
@@ -152,47 +202,3 @@ class CSVDiffer:
     def getNumErrors(self):
         """Return number of errors in diff"""
         return self.num_errors
-
-# testing the test harness!
-if __name__ == '__main__':
-    # Test for success and ignoring newlines
-    d = CSVDiffer(None, [])
-    d.addCSVPair('out.csv', 'col1,col2\n1,2\n1,2', 'col1,col2\n1,2\n1,2')
-    d.addCSVPair('out2.csv', 'col1,col2\n \n1,2\n1,2', 'col1,col2\n1,2\n\t\n1,2')
-    d.addCSVPair('out3.csv', 'col1,col2\n1,2\n1,2\n\n', 'col1,col2\n1,2\n1,2')
-    print 'Should be 0 errors'
-    print d.diff()
-
-    # Test for different number of columns
-    d = CSVDiffer(None, [])
-    d.addCSVPair('out.csv', 'col1,col2\n1,2\n1,2', 'col1,col2,col3\n1,2,3\n1,2,3')
-    print 'Should be 1 error'
-    print d.diff()
-
-    # Test for different column lengths
-    d = CSVDiffer(None, [])
-    d.addCSVPair('out1.csv', 'col1,col2\n1,2\n1,2', 'col1,col2,col3\n1,2,3\n1,2,3')
-    d.addCSVPair('out2.csv', 'col1,col2\n1,2\n1,2\n3,4', 'col1,col2\n1,2\n1,2')
-    print 'Should be 2 errors'
-    print d.diff()
-
-    # Test for absolute zero logic
-    d = CSVDiffer(None, [])
-    d.addCSVPair('out1.csv', 'col1,col2\n1,2\n1,2', 'col1,col2\n1,2\n1,2.1')
-    d.addCSVPair('out2.csv', 'col1,col2\n1,2\n1,2\n0,-1e-13', 'col1,col2\n1,2\n1,2\n1e-12,1e-13')
-    d.addCSVPair('out3.csv', 'col1,col2\n1,2\n1,2\n0,0', 'col1,col2\n1,2\n1,2\n1e-4,1e-13')
-    print 'Should be 2 errors'
-    print d.diff()
-
-    # Test relative tolerance
-    d = CSVDiffer(None, [])
-    d.addCSVPair('out1.csv', 'col1,col2\n1,2\n1,2', 'col1,col2\n1,2\n1,2.1')
-    d.addCSVPair('out2.csv', 'col1,col2\n1,-2\n1,-2', 'col1,col2\n1,-2\n1,-2.00000000001')
-    d.addCSVPair('out3.csv', 'col1,col2\n1,2\n1,2', 'col1,col2\n1,2\n1.00001,2.0001')
-    print 'Should be 3 errors'
-    print d.diff()
-
-    # test file does not exist
-    d = CSVDiffer('qwertyuiop', ['out.csv'])
-    print 'Should be 1 error'
-    print d.diff()

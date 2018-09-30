@@ -1,3 +1,11 @@
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 #include "ContactTestApp.h"
 #include "ContactApp.h"
 #include "Moose.h"
@@ -12,30 +20,27 @@ validParams<ContactTestApp>()
   return params;
 }
 
+registerKnownLabel("ContactTestApp");
+
 ContactTestApp::ContactTestApp(InputParameters parameters) : MooseApp(parameters)
 {
-  Moose::registerObjects(_factory);
-  ContactApp::registerObjects(_factory);
-
-  Moose::associateSyntax(_syntax, _action_factory);
-  ContactApp::associateSyntax(_syntax, _action_factory);
-
-  bool use_test_objs = getParam<bool>("allow_test_objects");
-  if (use_test_objs)
-  {
-    ContactTestApp::registerObjects(_factory);
-    ContactTestApp::associateSyntax(_syntax, _action_factory);
-  }
+  ContactTestApp::registerAll(
+      _factory, _action_factory, _syntax, getParam<bool>("allow_test_objects"));
 }
 
 ContactTestApp::~ContactTestApp() {}
 
-// External entry point for dynamic application loading
-extern "C" void
-ContactTestApp__registerApps()
+void
+ContactTestApp::registerAll(Factory & f, ActionFactory & af, Syntax & s, bool use_test_objs)
 {
-  ContactTestApp::registerApps();
+  ContactApp::registerAll(f, af, s);
+  if (use_test_objs)
+  {
+    Registry::registerObjectsTo(f, {"ContactTestApp"});
+    Registry::registerActionsTo(af, {"ContactTestApp"});
+  }
 }
+
 void
 ContactTestApp::registerApps()
 {
@@ -43,24 +48,30 @@ ContactTestApp::registerApps()
   registerApp(ContactTestApp);
 }
 
-// External entry point for dynamic object registration
-extern "C" void
-ContactTestApp__registerObjects(Factory & factory)
-{
-  ContactTestApp::registerObjects(factory);
-}
 void
-ContactTestApp::registerObjects(Factory & /*factory*/)
+ContactTestApp::registerObjects(Factory & factory)
+{
+  Registry::registerObjectsTo(factory, {"ContactTestApp"});
+}
+
+void
+ContactTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & action_factory)
+{
+  Registry::registerActionsTo(action_factory, {"ContactTestApp"});
+}
+
+void
+ContactTestApp::registerExecFlags(Factory & /*factory*/)
 {
 }
 
-// External entry point for dynamic syntax association
 extern "C" void
-ContactTestApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
+ContactTestApp__registerAll(Factory & f, ActionFactory & af, Syntax & s)
 {
-  ContactTestApp::associateSyntax(syntax, action_factory);
+  ContactTestApp::registerAll(f, af, s);
 }
-void
-ContactTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
+extern "C" void
+ContactTestApp__registerApps()
 {
+  ContactTestApp::registerApps();
 }

@@ -1,21 +1,18 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "DGCoupledDiffusion.h"
 
 // MOOSE includes
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
+
+registerMooseObject("MooseTestApp", DGCoupledDiffusion);
 
 template <>
 InputParameters
@@ -28,7 +25,7 @@ validParams<DGCoupledDiffusion>()
 
 DGCoupledDiffusion::DGCoupledDiffusion(const InputParameters & parameters)
   : DGKernel(parameters),
-    _v_var(*getVar("v", 0)),
+    _v_var(dynamic_cast<MooseVariable &>(*getVar("v", 0))),
     _v(_v_var.sln()),
     _v_neighbor(_v_var.slnNeighbor()),
     _grad_v(_v_var.gradSln()),

@@ -1,3 +1,11 @@
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 #include "SolidMechanicsTestApp.h"
 #include "SolidMechanicsApp.h"
 #include "Moose.h"
@@ -12,32 +20,27 @@ validParams<SolidMechanicsTestApp>()
   return params;
 }
 
+registerKnownLabel("SolidMechanicsTestApp");
+
 SolidMechanicsTestApp::SolidMechanicsTestApp(InputParameters parameters) : MooseApp(parameters)
 {
-  Moose::registerObjects(_factory);
-  SolidMechanicsApp::registerObjectDepends(_factory);
-  SolidMechanicsApp::registerObjects(_factory);
-
-  Moose::associateSyntax(_syntax, _action_factory);
-  SolidMechanicsApp::associateSyntaxDepends(_syntax, _action_factory);
-  SolidMechanicsApp::associateSyntax(_syntax, _action_factory);
-
-  bool use_test_objs = getParam<bool>("allow_test_objects");
-  if (use_test_objs)
-  {
-    SolidMechanicsTestApp::registerObjects(_factory);
-    SolidMechanicsTestApp::associateSyntax(_syntax, _action_factory);
-  }
+  SolidMechanicsTestApp::registerAll(
+      _factory, _action_factory, _syntax, getParam<bool>("allow_test_objects"));
 }
 
 SolidMechanicsTestApp::~SolidMechanicsTestApp() {}
 
-// External entry point for dynamic application loading
-extern "C" void
-SolidMechanicsTestApp__registerApps()
+void
+SolidMechanicsTestApp::registerAll(Factory & f, ActionFactory & af, Syntax & s, bool use_test_objs)
 {
-  SolidMechanicsTestApp::registerApps();
+  SolidMechanicsApp::registerAll(f, af, s);
+  if (use_test_objs)
+  {
+    Registry::registerObjectsTo(f, {"SolidMechanicsTestApp"});
+    Registry::registerActionsTo(af, {"SolidMechanicsTestApp"});
+  }
 }
+
 void
 SolidMechanicsTestApp::registerApps()
 {
@@ -45,24 +48,30 @@ SolidMechanicsTestApp::registerApps()
   registerApp(SolidMechanicsTestApp);
 }
 
-// External entry point for dynamic object registration
-extern "C" void
-SolidMechanicsTestApp__registerObjects(Factory & factory)
-{
-  SolidMechanicsTestApp::registerObjects(factory);
-}
 void
-SolidMechanicsTestApp::registerObjects(Factory & /*factory*/)
+SolidMechanicsTestApp::registerObjects(Factory & factory)
+{
+  Registry::registerObjectsTo(factory, {"SolidMechanicsTestApp"});
+}
+
+void
+SolidMechanicsTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & action_factory)
+{
+  Registry::registerActionsTo(action_factory, {"SolidMechanicsTestApp"});
+}
+
+void
+SolidMechanicsTestApp::registerExecFlags(Factory & /*factory*/)
 {
 }
 
-// External entry point for dynamic syntax association
 extern "C" void
-SolidMechanicsTestApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
+SolidMechanicsTestApp__registerAll(Factory & f, ActionFactory & af, Syntax & s)
 {
-  SolidMechanicsTestApp::associateSyntax(syntax, action_factory);
+  SolidMechanicsTestApp::registerAll(f, af, s);
 }
-void
-SolidMechanicsTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
+extern "C" void
+SolidMechanicsTestApp__registerApps()
 {
+  SolidMechanicsTestApp::registerApps();
 }

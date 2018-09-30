@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef SIMPLEFLUIDPROPERTIES_H
 #define SIMPLEFLUIDPROPERTIES_H
@@ -42,42 +44,41 @@ public:
   virtual Real molarMass() const override;
 
   /// Thermal expansion coefficient (1/K)
-  virtual Real beta(Real pressure, Real temperature) const override;
+  virtual Real beta_from_p_T(Real pressure, Real temperature) const override;
 
   /// Isobaric specific heat capacity (J/kg/K)
-  virtual Real cp(Real pressure, Real temperature) const override;
+  virtual Real cp_from_p_T(Real pressure, Real temperature) const override;
 
   /// Isochoric specific heat capacity (J/kg/K)
-  virtual Real cv(Real pressure, Real temperature) const override;
+  virtual Real cv_from_p_T(Real pressure, Real temperature) const override;
 
   /// Speed of sound (m/s)
-  virtual Real c(Real pressure, Real temperature) const override;
+  virtual Real c_from_p_T(Real pressure, Real temperature) const override;
 
   /// Thermal conductivity (W/m/K)
-  virtual Real k(Real pressure, Real temperature) const override;
+  virtual Real k_from_p_T(Real pressure, Real temperature) const override;
+
   /// Thermal conductivity and its derivatives wrt pressure and temperature
   virtual void
-  k_dpT(Real pressure, Real temperature, Real & k, Real & dk_dp, Real & dk_dT) const override;
-
-  /// Thermal conductivity (W/m/K)
-  virtual Real k_from_rho_T(Real density, Real temperature) const override;
+  k_from_p_T(Real pressure, Real temperature, Real & k, Real & dk_dp, Real & dk_dT) const override;
 
   /// Specific entropy (J/kg/K)
-  virtual Real s(Real pressure, Real temperature) const override;
+  virtual Real s_from_p_T(Real pressure, Real temperature) const override;
+  virtual void s_from_p_T(Real p, Real T, Real & s, Real & ds_dp, Real & ds_dT) const override;
 
   /// Density from pressure and temperature (kg/m^3)
-  virtual Real rho(Real pressure, Real temperature) const override;
+  virtual Real rho_from_p_T(Real pressure, Real temperature) const override;
 
   /// Density from pressure and temperature and its derivatives wrt pressure and temperature
-  virtual void rho_dpT(
+  virtual void rho_from_p_T(
       Real pressure, Real temperature, Real & rho, Real & drho_dp, Real & drho_dT) const override;
 
   /// Internal energy from pressure and temperature (J/kg)
-  virtual Real e(Real pressure, Real temperature) const override;
+  virtual Real e_from_p_T(Real pressure, Real temperature) const override;
 
   /// Internal energy and its derivatives wrt pressure and temperature
   virtual void
-  e_dpT(Real pressure, Real temperature, Real & e, Real & de_dp, Real & de_dT) const override;
+  e_from_p_T(Real pressure, Real temperature, Real & e, Real & de_dp, Real & de_dT) const override;
 
   /// Density and internal energy from pressure and temperature and derivatives wrt pressure and temperature
   virtual void rho_e_dpT(Real pressure,
@@ -89,28 +90,28 @@ public:
                          Real & de_dp,
                          Real & de_dT) const override;
 
-  virtual Real mu(Real pressure, Real temperature) const override;
+  virtual Real mu_from_p_T(Real pressure, Real temperature) const override;
 
-  virtual void
-  mu_dpT(Real pressure, Real temperature, Real & mu, Real & dmu_dp, Real & dmu_dT) const override;
+  virtual void mu_from_p_T(
+      Real pressure, Real temperature, Real & mu, Real & dmu_dp, Real & dmu_dT) const override;
 
-  /// Dynamic viscosity (Pa s)
-  virtual Real mu_from_rho_T(Real density, Real temperature) const override;
+  virtual void rho_mu(Real pressure, Real temperature, Real & rho, Real & mu) const override;
 
-  /// Dynamic viscosity and its derivatives wrt density and temperature
-  virtual void mu_drhoT_from_rho_T(Real density,
-                                   Real temperature,
-                                   Real ddensity_dT,
-                                   Real & mu,
-                                   Real & dmu_drho,
-                                   Real & dmu_dT) const override;
+  virtual void rho_mu_dpT(Real pressure,
+                          Real temperature,
+                          Real & rho,
+                          Real & drho_dp,
+                          Real & drho_dT,
+                          Real & mu,
+                          Real & dmu_dp,
+                          Real & dmu_dT) const override;
 
   /// Specific enthalpy (J/kg)
-  virtual Real h(Real p, Real T) const override;
+  virtual Real h_from_p_T(Real p, Real T) const override;
 
   /// Specific enthalpy and its derivatives
   virtual void
-  h_dpT(Real pressure, Real temperature, Real & h, Real & dh_dp, Real & dh_dT) const override;
+  h_from_p_T(Real pressure, Real temperature, Real & h, Real & dh_dp, Real & dh_dT) const override;
 
   /// Henry's law constant for dissolution in water
   virtual Real henryConstant(Real temperature) const override;

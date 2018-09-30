@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef TWOPHASEFLUIDPROPERTIES_H
 #define TWOPHASEFLUIDPROPERTIES_H
@@ -13,16 +15,26 @@
 class TwoPhaseFluidProperties;
 class SinglePhaseFluidProperties;
 
+template <>
+InputParameters validParams<TwoPhaseFluidProperties>();
+
 /**
- * Base class for fluid properties used with two phase flow
+ * Base class for fluid properties used with two-phase flow
  */
 class TwoPhaseFluidProperties : public FluidProperties
 {
 public:
   TwoPhaseFluidProperties(const InputParameters & parameters);
 
-  const UserObjectName & getLiquidName() const;
-  const UserObjectName & getVaporName() const;
+  /**
+   * Returns the name of the liquid single-phase fluid properties object
+   */
+  virtual const UserObjectName & getLiquidName() const { return _liquid_name; }
+
+  /**
+   * Returns the name of the vapor single-phase fluid properties object
+   */
+  virtual const UserObjectName & getVaporName() const { return _vapor_name; }
 
   /**
    * Returns the critical pressure
@@ -60,9 +72,9 @@ public:
 
 protected:
   /// The name of the user object that provides liquid phase fluid properties
-  UserObjectName _liquid_name;
+  const UserObjectName _liquid_name;
   /// The name of the user object that provides vapor phase fluid properties
-  UserObjectName _vapor_name;
+  const UserObjectName _vapor_name;
 
   /// The user object that provides liquid phase fluid properties
   const SinglePhaseFluidProperties * _fp_liquid;

@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "Q2PNodalMass.h"
 
@@ -12,6 +14,8 @@
 
 // C++ includes
 #include <iostream>
+
+registerMooseObject("RichardsApp", Q2PNodalMass);
 
 template <>
 InputParameters
@@ -54,13 +58,13 @@ Q2PNodalMass::computeQpResidual()
 
   if (_var_is_pp)
   {
-    density = _density.density(_var.nodalSln()[_i]);
+    density = _density.density(_var.dofValues()[_i]);
     mass = _porosity[_qp] * density * (1 - _other_var_nodal[_i]);
   }
   else
   {
     density = _density.density(_other_var_nodal[_i]);
-    mass = _porosity[_qp] * density * _var.nodalSln()[_i];
+    mass = _porosity[_qp] * density * _var.dofValues()[_i];
   }
 
   return _test[_i][_qp] * mass / _dt;
@@ -77,7 +81,7 @@ Q2PNodalMass::computeQpJacobian()
   if (_var_is_pp)
   {
     // we're calculating the derivative wrt porepressure
-    Real ddensity = _density.ddensity(_var.nodalSln()[_i]);
+    Real ddensity = _density.ddensity(_var.dofValues()[_i]);
     mass_prime = _porosity[_qp] * ddensity * (1 - _other_var_nodal[_i]);
   }
   else
@@ -103,14 +107,14 @@ Q2PNodalMass::computeQpOffDiagJacobian(unsigned int jvar)
   if (_var_is_pp)
   {
     // we're calculating the deriv wrt saturation
-    Real density = _density.density(_var.nodalSln()[_i]);
+    Real density = _density.density(_var.dofValues()[_i]);
     mass_prime = -_porosity[_qp] * density;
   }
   else
   {
     // we're calculating the deriv wrt porepressure
     Real ddensity = _density.ddensity(_other_var_nodal[_i]);
-    mass_prime = _porosity[_qp] * ddensity * _var.nodalSln()[_i];
+    mass_prime = _porosity[_qp] * ddensity * _var.dofValues()[_i];
   }
 
   return _test[_i][_qp] * mass_prime / _dt;

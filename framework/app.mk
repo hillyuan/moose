@@ -1,6 +1,10 @@
 # This file contains common MOOSE application settings
 # Note: MOOSE applications are assumed to reside in peer directories relative to MOOSE and its modules.
-#       This can be overridden by using the MOOSE_DIR environment variable
+#       This can be overridden by using the MOOSE_DIR environment variable.
+
+# This variable is used to determine whether a C++ header revision file is generated for use
+# in your application. You can turn it on/off by changing it in your application Makefile.
+GEN_REVISION ?= yes
 
 # list of application-wide excluded source files
 excluded_srcfiles :=
@@ -13,8 +17,8 @@ STACK := $(STACK).X
 $APPLICATION_DIR$(STACK) := $(APPLICATION_DIR)
 $APPLICATION_NAME$(STACK) := $(APPLICATION_NAME)
 $DEPEND_MODULES$(STACK) := $(DEPEND_MODULES)
+$GEN_REVISION$(STACK) := $(GEN_REVISION)
 $BUILD_EXEC$(STACK) := $(BUILD_EXEC)
-$DEP_APPS$(STACK) := $(DEP_APPS)
 
 -include $(APPLICATION_DIR)/$(APPLICATION_NAME).mk
 
@@ -24,8 +28,8 @@ $DEP_APPS$(STACK) := $(DEP_APPS)
 APPLICATION_DIR := $($APPLICATION_DIR$(STACK))
 APPLICATION_NAME := $($APPLICATION_NAME$(STACK))
 DEPEND_MODULES := $($DEPEND_MODULES$(STACK))
+GEN_REVISION := $($GEN_REVISION$(STACK))
 BUILD_EXEC := $($BUILD_EXEC$(STACK))
-DEP_APPS := $($DEP_APPS$(STACK))
 STACK := $(basename $(STACK))
 
 ifneq ($(SUFFIX),)
@@ -43,7 +47,55 @@ PLUGIN_DIR  := $(APPLICATION_DIR)/plugins
 
 excluded_srcfiles += main.C
 find_excludes     := $(foreach i, $(excluded_srcfiles), -not -name $(i))
-srcfiles    := $(shell find $(SRC_DIRS) -name "*.C" $(find_excludes))
+srcfiles    := $(shell find $(SRC_DIRS) -regex "[^\#~]*\.C" $(find_excludes))
+
+
+### Unity Build ###
+ifeq ($(MOOSE_UNITY),true)
+
+unity_src_dir := $(APPLICATION_DIR)/build/unity_src
+
+# Build unity buiild directory
+$(eval $(call unity_dir_rule, $(unity_src_dir)))
+
+# Exclude .libs... but also: exclude unity building src.
+# The idea here is that if all they have is src then it's a big jumble of stuff
+# that won't benefit from unity building
+# Also, exclude the base directory by default because it's another big jumble
+# of unrelated stuff
+non_unity_dirs := %.libs %/src %src/base $(app_non_unity_dirs)
+
+# Find all of the individual subdirectories
+# We will create a Unity file for each individual subdirectory
+# The idea is that files grouped withing a subdirectory are closely related
+# and will benefit from a Unity build
+srcsubdirs := $(shell find $(APPLICATION_DIR)/src -type d -not -path '*/.libs*')
+
+# Filter out the paths we don't want to Unity build
+unity_srcsubdirs := $(filter-out $(non_unity_dirs), $(srcsubdirs))
+non_unity_srcsubdirs := $(filter $(non_unity_dirs), $(srcsubdirs))
+
+# This is a biggie
+# Loop over the subdirectories, creating a rule to create the Unity source file
+# for each subdirectory.  To do that we need to create a unique name using the
+# full hierarchy of the path underneath src
+$(foreach srcsubdir,$(unity_srcsubdirs),$(eval $(call unity_file_rule,$(call unity_unique_name,$(unity_src_dir),$(APPLICATION_DIR),$(srcsubdir)),$(shell find $(srcsubdir) -maxdepth 1 \( -type f -o -type l \) -regex "[^\#~]*\.C"),$(srcsubdir),$(unity_src_dir))))
+
+# This creates the whole list of Unity source files so we can use it as a dependency
+app_unity_srcfiles := $(foreach srcsubdir,$(unity_srcsubdirs),$(call unity_unique_name,$(unity_src_dir),$(APPLICATION_DIR),$(srcsubdir)))
+
+# Add to the global list of unity source files
+unity_srcfiles += $(app_unity_srcfiles)
+
+# Pick up all of the additional files in the src directory since we're not unity building those
+app_non_unity_srcfiles := $(filter-out %main.C, $(shell find $(non_unity_srcsubdirs) -maxdepth 1 \( -type f -o -type l \) -regex "[^\#~]*\.C"))
+
+# Override srcfiles
+srcfiles    := $(app_unity_srcfiles) $(app_non_unity_srcfiles)
+endif
+
+
+
 csrcfiles   := $(shell find $(SRC_DIRS) -name "*.c")
 fsrcfiles   := $(shell find $(SRC_DIRS) -name "*.f")
 f90srcfiles := $(shell find $(SRC_DIRS) -name "*.f90")
@@ -60,7 +112,7 @@ f90objects  := $(patsubst %.f90, %.$(obj-suffix), $(f90srcfiles))
 
 app_objects := $(objects) $(cobjects) $(fobjects) $(f90objects) $(ADDITIONAL_APP_OBJECTS)
 
-test_srcfiles    := $(shell find $(TEST_SRC_DIRS) -name "*.C" $(find_excludes) 2>/dev/null)
+test_srcfiles    := $(shell find $(TEST_SRC_DIRS) -regex "[^\#~]*\.C" $(find_excludes) 2>/dev/null)
 test_csrcfiles   := $(shell find $(TEST_SRC_DIRS) -name "*.c" 2>/dev/null)
 test_fsrcfiles   := $(shell find $(TEST_SRC_DIRS) -name "*.f" 2>/dev/null)
 test_f90srcfiles := $(shell find $(TEST_SRC_DIRS) -name "*.f90" 2>/dev/null)
@@ -76,7 +128,7 @@ test_f90objects:= $(patsubst %.f90, %.$(obj-suffix), $(test_f90srcfiles))
 app_test_objects := $(test_objects) $(test_cobjects) $(test_fobjects) $(test_f90objects)
 
 # plugin files
-plugfiles   := $(shell find $(PLUGIN_DIR) -name "*.C" 2>/dev/null)
+plugfiles   := $(shell find $(PLUGIN_DIR) -regex "[^\#~]*\.C" 2>/dev/null)
 cplugfiles  := $(shell find $(PLUGIN_DIR) -name "*.c" 2>/dev/null)
 fplugfiles  := $(shell find $(PLUGIN_DIR) -name "*.f" 2>/dev/null)
 f90plugfiles:= $(shell find $(PLUGIN_DIR) -name "*.f90" 2>/dev/null)
@@ -107,8 +159,8 @@ ifneq ($(wildcard $(APPLICATION_DIR)/test/include/*),)
 endif
 
 # header files
-include_dirs	:= $(shell find $(depend_dirs) -type d | grep -v "\.svn")
-app_INCLUDE     := $(foreach i, $(include_dirs), -I$(i)) $(ADDITIONAL_INCLUDES)
+include_dirs	:= $(shell find $(depend_dirs) -type d)
+include_files	:= $(shell find $(depend_dirs) -regex "[^\#~]*\.[hf]")
 
 # clang static analyzer files
 app_analyzer := $(patsubst %.C, %.plist.$(obj-suffix), $(srcfiles))
@@ -126,19 +178,35 @@ else
   app_test_LIB     := $(APPLICATION_DIR)/test/lib/lib$(APPLICATION_NAME)_test-$(METHOD).la
 endif
 
+# all_header_directory
+all_header_dir := $(APPLICATION_DIR)/build/header_symlinks
+
+# header file links
+
+link_names := $(foreach i, $(include_files), $(all_header_dir)/$(notdir $(i)))
+
+
+$(eval $(call all_header_dir_rule, $(all_header_dir)))
+$(call symlink_rules, $(all_header_dir), $(include_files))
+
+header_symlinks:: $(all_header_dir) $(link_names)
+
 # application
 app_EXEC    := $(APPLICATION_DIR)/$(APPLICATION_NAME)-$(METHOD)
 
 # revision header
-CAMEL_CASE_NAME := $(shell echo $(APPLICATION_NAME) | perl -pe 's/(?:^|_)([a-z])/\u$$1/g')
-app_BASE_DIR    ?= base/
-app_HEADER      ?= $(APPLICATION_DIR)/include/$(app_BASE_DIR)$(CAMEL_CASE_NAME)Revision.h
+ifeq ($(GEN_REVISION),yes)
+  CAMEL_CASE_NAME := $(shell echo $(APPLICATION_NAME) | perl -pe 's/(?:^|_)([a-z])/\u$$1/g')
+  app_BASE_DIR    ?= base/
+  app_HEADER      ?= $(APPLICATION_DIR)/include/$(app_BASE_DIR)$(CAMEL_CASE_NAME)Revision.h
+endif
+
 # depend modules
 depend_libs  := $(foreach i, $(DEPEND_MODULES), $(MOOSE_DIR)/modules/$(i)/lib/lib$(i)-$(METHOD).la)
 
 ifeq ($(USE_TEST_LIBS),yes)
   depend_test_libs := $(depend_test_libs) $(app_test_LIB)
-  depend_test_libs_flags := $(foreach i, $(depend_test_libs), -L$(dir $(i)) -l$(shell echo $(notdir $(i)) | perl -pe 's/^lib(.*?)\.la/$$1/'))
+  depend_test_libs_flags :=   $(depend_test_libs)
 endif
 
 
@@ -152,7 +220,7 @@ endif
 # Here we'll filter out MOOSE libs since we'll assume our application already has MOOSE compiled in
 depend_libs := $(filter-out $(moose_LIBS),$(depend_libs))
 # Create -L/-l versions of the depend libs
-depend_libs_flags := $(foreach i, $(depend_libs), -L$(dir $(i)) -l$(shell echo $(notdir $(i)) | perl -pe 's/^lib(.*?)\.la/$$1/'))
+depend_libs_flags :=  $(depend_libs)
 
 # If building shared libs, make the plugins a dependency, otherwise don't.
 ifeq ($(libmesh_shared),yes)
@@ -164,7 +232,7 @@ endif
 app_LIBS       := $(app_LIB) $(app_LIBS)
 app_LIBS_other := $(filter-out $(app_LIB),$(app_LIBS))
 app_HEADERS    := $(app_HEADER) $(app_HEADERS)
-app_INCLUDES   += $(app_INCLUDE)
+app_INCLUDES   += -I$(all_header_dir) $(ADDITIONAL_INCLUDES)
 app_DIRS       += $(APPLICATION_DIR)
 
 # WARNING: the += operator does NOT work here!
@@ -190,26 +258,30 @@ $(eval $(call CXX_RULE_TEMPLATE,_with$(app_LIB_SUFFIX)))
 
 ifeq ($(BUILD_EXEC),yes)
   all:: $(app_EXEC)
+else
+  all:: $(app_LIB)
 endif
 
 BUILD_EXEC :=
 
-app_GIT_DIR := $(shell cd "$(APPLICATION_DIR)" && git rev-parse --show-toplevel)
+app_GIT_DIR := $(shell cd "$(APPLICATION_DIR)" && which git &> /dev/null && git rev-parse --show-toplevel)
 # Use wildcard in case the files don't exist
 app_HEADER_deps := $(wildcard $(app_GIT_DIR)/.git/HEAD $(app_GIT_DIR)/.git/index)
 # Target-specific Variable Values (See GNU-make manual)
 $(app_HEADER): curr_dir    := $(APPLICATION_DIR)
 $(app_HEADER): curr_app    := $(APPLICATION_NAME)
+$(app_HEADER): all_header_dir := $(all_header_dir)
 $(app_HEADER): $(app_HEADER_deps)
-	@echo "MOOSE Checking if header needs updating: "$@"..."
+	@echo "Checking if header needs updating: "$@"..."
 	$(shell $(FRAMEWORK_DIR)/scripts/get_repo_revision.py $(curr_dir) $@ $(curr_app))
+	@ln -sf $@ $(all_header_dir)
 
 # Target-specific Variable Values (See GNU-make manual)
 $(app_LIB): curr_objs := $(app_objects)
 $(app_LIB): curr_dir  := $(APPLICATION_DIR)
 $(app_LIB): curr_deps := $(depend_libs)
 $(app_LIB): curr_libs := $(depend_libs_flags)
-$(app_LIB): $(app_HEADER) $(app_plugin_deps) $(depend_libs) $(app_objects)
+$(app_LIB): $(app_HEADER) $(app_plugin_deps) $(depend_libs) $(app_objects) $(ADDITIONAL_DEPEND_LIBS)
 	@echo "Linking Library "$@"..."
 	@$(libmesh_LIBTOOL) --tag=CXX $(LIBTOOLFLAGS) --mode=link --quiet \
 	  $(libmesh_CXX) $(libmesh_CXXFLAGS) -o $@ $(curr_objs) $(libmesh_LDFLAGS) $(EXTERNAL_FLAGS) -rpath $(curr_dir)/lib $(curr_libs)
@@ -225,17 +297,55 @@ $(app_test_LIB): curr_objs := $(app_test_objects)
 $(app_test_LIB): curr_dir  := $(APPLICATION_DIR)/test
 $(app_test_LIB): curr_deps := $(depend_libs)
 $(app_test_LIB): curr_libs := $(depend_libs_flags)
-$(app_test_LIB): $(app_HEADER) $(app_plugin_deps) $(depend_libs) $(app_test_objects)
+$(app_test_LIB): $(app_HEADER) $(app_plugin_deps) $(depend_libs) $(app_test_objects) $(ADDITIONAL_DEPEND_LIBS)
 	@echo "Linking Library "$@"..."
 	@$(libmesh_LIBTOOL) --tag=CXX $(LIBTOOLFLAGS) --mode=link --quiet \
 	  $(libmesh_CXX) $(libmesh_CXXFLAGS) -o $@ $(curr_objs) $(libmesh_LDFLAGS) $(EXTERNAL_FLAGS) -rpath $(curr_dir)/lib $(curr_libs)
 	@$(libmesh_LIBTOOL) --mode=install --quiet install -c $@ $(curr_dir)/lib
 endif
 
-$(app_EXEC): $(app_LIBS) $(mesh_library) $(main_object) $(app_test_LIB) $(depend_test_libs)
+# For static compiles, there are no references to symbols in the module, etc. object archives outside of
+# themselves.  This causes linkers to omit the symbols from those archives in the final binary
+# which prevents all of the moose objects to not be included/registered in the final binary.  To
+# force this we need to ad special linker flags to static builds.  Dynamic builds are immune since
+# the linker doesn't know what symbols will be needed by any binary that will dynamically link to
+# it in the future - so all symbols remain intact in the dylib/so in that case and are present and
+# registered as expected.  See https://stackoverflow.com/questions/5202142/static-variable-initialization-over-a-library
+# and https://stackoverflow.com/questions/9459980/c-global-variable-not-initialized-when-linked-through-static-libraries-but-ok#11336506
+# for more explanations/details.
+uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
+compilertype := unknown
+applibs :=  $(app_test_LIB) $(app_LIBS) $(depend_test_libs)
+applibs := $(call uniq,$(applibs))
+ifeq ($(libmesh_static),yes)
+  ifneq (,$(findstring clang,$(CXX)))
+    compilertype := clang
+  else
+  ifneq (,$(findstring g++,$(CXX)))
+    compilertype := gcc
+  else
+  ifneq (,$(findstring mpicxx,$(CXX)))
+    ifneq (,$(findstring clang,$(shell mpicxx -show)))
+      compilertype := clang
+    else
+      compilertype := gcc
+    endif
+  endif
+  endif
+  endif
+
+  ifeq ($(compilertype),clang)
+    # replace .a with .dylib for testing in dynamic configuration:
+    applibs := $(foreach lib,$(patsubst %.la,%.a,$(applibs)),-Wl,-force_load,$(lib))
+  else
+    applibs := $(foreach lib,$(patsubst %.la,%.a,$(applibs)),-Wl,--whole-archive,$(lib),--no-whole-archive)
+  endif
+endif
+
+$(app_EXEC): $(app_LIBS) $(mesh_library) $(main_object) $(app_test_LIB) $(depend_test_libs) $(ADDITIONAL_DEPEND_LIBS)
 	@echo "Linking Executable "$@"..."
 	@$(libmesh_LIBTOOL) --tag=CXX $(LIBTOOLFLAGS) --mode=link --quiet \
-	  $(libmesh_CXX) $(libmesh_CXXFLAGS) -o $@ $(main_object) $(app_test_LIB) $(app_LIBS) $(depend_test_libs) $(libmesh_LIBS) $(libmesh_LDFLAGS) $(depend_test_libs_flags) $(EXTERNAL_FLAGS) $(ADDITIONAL_LIBS)
+	  $(libmesh_CXX) $(libmesh_CXXFLAGS) -o $@ $(main_object) $(applibs) $(libmesh_LIBS) $(libmesh_LDFLAGS) $(depend_test_libs_flags) $(EXTERNAL_FLAGS) $(ADDITIONAL_LIBS)
 
 # Clang static analyzer
 sa:: $(app_analyzer)

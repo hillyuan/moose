@@ -1,0 +1,31 @@
+Getting Started:
+    Mac OS: getting_started/installation/mac_os.md
+    Ubuntu: getting_started/installation/ubuntu.md
+    Mint: getting_started/installation/mint.md
+    OpenSUSE: getting_started/installation/opensuse.md
+    Fedora: getting_started/installation/fedora.md
+    CentOS: getting_started/installation/centos.md
+    Windows 10: getting_started/installation/windows10.md
+    HPC Cluster: getting_started/installation/cluster.md
+    Manual Install (GCC): getting_started/installation/manual_installation_gcc.md
+    Manual Install (LLVM): getting_started/installation/manual_installation_llvm.md
+Documentation:
+    Syntax: syntax/index.md
+    Source: source/index.md
+    Examples: examples/index.md
+    Application Usage: application_usage/index.md
+    Application Development: application_development/index.md
+    Framework Development: framework_development/index.md
+    Finite Element Concepts: finite_element_concepts/index.md
+    Modules: modules/index.md
+    Software Quality: sqa/index.md
+    MooseDocs: utilities/MooseDocs/index.md
+    Python: utilities/python/index.md
+    C++ Fundamentals : utilities/c++/index.md
+Help:
+    Frequently Asked Questions: help/faq.md
+    Developer Tools: help/development/index.md
+    INL HPC Connectivity: help/inlhpcconnectivity.md
+    Contact Us: help/contact_us.md
+Wiki (deprecated): https://www.mooseframework.org/old/wiki
+News: newsletter/index.md

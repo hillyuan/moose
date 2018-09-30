@@ -271,7 +271,6 @@
 [Postprocessors]
   [./matl_ts_min]
     type = MaterialTimeStepPostprocessor
-    execute_on = 'linear timestep_end'
   [../]
   [./sigma_xx]
     type = ElementAverageValue
@@ -352,7 +351,7 @@
 
 [Outputs]
   print_linear_residuals = true
-  print_perf_log = true
+  perf_graph = true
   csv = true
   [./out]
     type = Exodus

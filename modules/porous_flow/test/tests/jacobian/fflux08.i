@@ -124,7 +124,9 @@
     at_nodes = false
   [../]
   [./porosity]
-    type = PorousFlowPorosityHM
+    type = PorousFlowPorosity
+    fluid = true
+    mechanical = true
     at_nodes = false
     porosity_zero = 0.1
     biot_coefficient = 0.5
@@ -161,22 +163,6 @@
     fp = simple_fluid
     phase = 0
   [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
-  [./dens_qp_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-    at_nodes = false
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
-  [../]
   [./permeability]
     type = PorousFlowPermeabilityKozenyCarman
     at_nodes = false
@@ -192,11 +178,6 @@
     at_nodes = true
     n = 2
     phase = 0
-  [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
   [../]
 []
 

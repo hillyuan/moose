@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef STRESSDIVERGENCETENSORSTRUSS_H
 #define STRESSDIVERGENCETENSORSTRUSS_H
 
@@ -21,12 +24,13 @@ public:
   StressDivergenceTensorsTruss(const InputParameters & parameters);
 
 protected:
-  virtual void initialSetup();
-  virtual void computeResidual();
-  virtual Real computeQpResidual() { return 0.0; }
+  virtual void initialSetup() override;
+  virtual void computeResidual() override;
+  virtual Real computeQpResidual() override { return 0.0; }
   virtual Real computeStiffness(unsigned int i, unsigned int j);
-  virtual void computeJacobian();
-  virtual void computeOffDiagJacobian(unsigned int jvar);
+  virtual void computeJacobian() override;
+  virtual void computeOffDiagJacobian(MooseVariableFEBase & jvar) override;
+  using Kernel::computeOffDiagJacobian;
 
   std::string _base_name;
 

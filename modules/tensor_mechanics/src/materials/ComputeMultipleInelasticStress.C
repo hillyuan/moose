@@ -1,13 +1,18 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "ComputeMultipleInelasticStress.h"
 
 #include "StressUpdateBase.h"
 #include "MooseException.h"
+
+registerMooseObject("TensorMechanicsApp", ComputeMultipleInelasticStress);
 
 template <>
 InputParameters
@@ -16,7 +21,7 @@ validParams<ComputeMultipleInelasticStress>()
   InputParameters params = validParams<ComputeFiniteStrainElasticStress>();
   params.addClassDescription("Compute state (stress and internal parameters such as plastic "
                              "strains and internal parameters) using an iterative process.  "
-                             "Combinations of creep models and plastic models may be used");
+                             "Combinations of creep models and plastic models may be used.");
   params.addParam<unsigned int>("max_iterations",
                                 30,
                                 "Maximum number of the stress update "
@@ -33,7 +38,7 @@ validParams<ComputeMultipleInelasticStress>()
                         "update iterations over the stress change "
                         "after all update materials are called");
   params.addParam<bool>(
-      "output_iteration_info",
+      "internal_solve_full_iteration_history",
       false,
       "Set to true to output stress update iteration information over the stress change");
   params.addParam<bool>("perform_finite_strain_rotations",
@@ -70,7 +75,7 @@ ComputeMultipleInelasticStress::ComputeMultipleInelasticStress(const InputParame
     _max_iterations(parameters.get<unsigned int>("max_iterations")),
     _relative_tolerance(parameters.get<Real>("relative_tolerance")),
     _absolute_tolerance(parameters.get<Real>("absolute_tolerance")),
-    _output_iteration_info(getParam<bool>("output_iteration_info")),
+    _internal_solve_full_iteration_history(getParam<bool>("internal_solve_full_iteration_history")),
     _perform_finite_strain_rotations(getParam<bool>("perform_finite_strain_rotations")),
     _elasticity_tensor(getMaterialPropertyByName<RankFourTensor>(_base_name + "elasticity_tensor")),
     _elastic_strain_old(getMaterialPropertyOld<RankTwoTensor>(_base_name + "elastic_strain")),
@@ -80,12 +85,15 @@ ComputeMultipleInelasticStress::ComputeMultipleInelasticStress(const InputParame
         getMaterialPropertyOld<RankTwoTensor>(_base_name + "combined_inelastic_strain")),
     _tangent_operator_type(getParam<MooseEnum>("tangent_operator").getEnum<TangentOperatorEnum>()),
     _num_models(getParam<std::vector<MaterialName>>("inelastic_models").size()),
+    _tangent_computation_flag(_num_models, false),
+    _tangent_calculation_method(TangentCalculationMethod::ELASTIC),
     _inelastic_weights(isParamValid("combined_inelastic_strain_weights")
                            ? getParam<std::vector<Real>>("combined_inelastic_strain_weights")
                            : std::vector<Real>(_num_models, true)),
     _consistent_tangent_operator(_num_models),
     _cycle_models(getParam<bool>("cycle_models")),
-    _matl_timestep_limit(declareProperty<Real>("matl_timestep_limit"))
+    _matl_timestep_limit(declareProperty<Real>("matl_timestep_limit")),
+    _identity_symmetric_four(RankFourTensor::initIdentitySymmetricFour)
 {
   if (_inelastic_weights.size() != _num_models)
     mooseError(
@@ -110,9 +118,11 @@ ComputeMultipleInelasticStress::initialSetup()
       hasGuaranteedMaterialProperty(_elasticity_tensor_name, Guarantee::ISOTROPIC);
 
   std::vector<MaterialName> models = getParam<std::vector<MaterialName>>("inelastic_models");
+
   for (unsigned int i = 0; i < _num_models; ++i)
   {
     StressUpdateBase * rrr = dynamic_cast<StressUpdateBase *>(&getMaterialByName(models[i]));
+
     if (rrr)
     {
       _models.push_back(rrr);
@@ -123,6 +133,40 @@ ComputeMultipleInelasticStress::initialSetup()
     }
     else
       mooseError("Model " + models[i] + " is not compatible with ComputeMultipleInelasticStress");
+  }
+
+  // Check if tangent calculation methods are consistent. If all models have
+  // TangentOperatorEnum::ELASTIC or tangent_operator is set by the user as elasic, then the tangent
+  // is never calculated: J_tot = C. If PARTIAL and NONE models are present, utilize PARTIAL
+  // formulation: J_tot = (I + J_1 + ... J_N)^-1 C. If FULL and NONE models are present, utilize
+  // FULL formulation: J_tot = J_1 * C^-1 * J_2 * C^-1 * ... J_N * C. If PARTIAL and FULL models are
+  // present, error out.
+
+  if (_tangent_operator_type != TangentOperatorEnum::elastic)
+  {
+    bool full_present = false;
+    bool partial_present = false;
+    for (unsigned int i = 0; i < _num_models; ++i)
+    {
+      if (_models[i]->getTangentCalculationMethod() == TangentCalculationMethod::FULL)
+      {
+        full_present = true;
+        _tangent_computation_flag[i] = true;
+        _tangent_calculation_method = TangentCalculationMethod::FULL;
+      }
+      else if (_models[i]->getTangentCalculationMethod() == TangentCalculationMethod::PARTIAL)
+      {
+        partial_present = true;
+        _tangent_computation_flag[i] = true;
+        _tangent_calculation_method = TangentCalculationMethod::PARTIAL;
+      }
+    }
+    if (full_present && partial_present)
+      mooseError("In ",
+                 _name,
+                 ": Models that calculate the full tangent operator and the partial tangent "
+                 "operator are being combined. Either set tangent_operator to elastic, implement "
+                 "the corrent tangent formulations, or use different models.");
   }
 }
 
@@ -147,13 +191,7 @@ ComputeMultipleInelasticStress::computeQpStressIntermediateConfiguration()
     // If the elasticity tensor values have changed and the tensor is isotropic,
     // use the old strain to calculate the old stress
     if (_is_elasticity_tensor_guaranteed_isotropic || !_perform_finite_strain_rotations)
-    {
       _stress[_qp] = _elasticity_tensor[_qp] * (_elastic_strain_old[_qp] + _strain_increment[_qp]);
-      // InitialStress Deprecation: remove these lines
-      if (_perform_finite_strain_rotations)
-        rotateQpInitialStress();
-      addQpInitialStress();
-    }
     else
       _stress[_qp] = _stress_old[_qp] + _elasticity_tensor[_qp] * _strain_increment[_qp];
 
@@ -184,7 +222,7 @@ ComputeMultipleInelasticStress::finiteStrainRotation(const bool force_elasticity
       _rotation_increment[_qp] * _inelastic_strain[_qp] * _rotation_increment[_qp].transpose();
   if (force_elasticity_rotation ||
       !(_is_elasticity_tensor_guaranteed_isotropic &&
-        (_tangent_operator_type == TangentOperatorEnum::elastic || _num_models == 0)))
+        (_tangent_calculation_method == TangentCalculationMethod::ELASTIC || _num_models == 0)))
     _Jacobian_mult[_qp].rotate(_rotation_increment[_qp]);
 }
 
@@ -192,13 +230,14 @@ void
 ComputeMultipleInelasticStress::updateQpState(RankTwoTensor & elastic_strain_increment,
                                               RankTwoTensor & combined_inelastic_strain_increment)
 {
-  if (_output_iteration_info == true)
+  if (_internal_solve_full_iteration_history == true)
   {
     _console << std::endl
              << "iteration output for ComputeMultipleInelasticStress solve:"
              << " time=" << _t << " int_pt=" << _qp << std::endl;
   }
-  Real l2norm_delta_stress, first_l2norm_delta_stress;
+  Real l2norm_delta_stress;
+  Real first_l2norm_delta_stress = 1.0;
   unsigned int counter = 0;
 
   std::vector<RankTwoTensor> inelastic_strain_increment;
@@ -225,14 +264,8 @@ ComputeMultipleInelasticStress::updateQpState(RankTwoTensor & elastic_strain_inc
 
       // form the trial stress, with the check for changed elasticity constants
       if (_is_elasticity_tensor_guaranteed_isotropic || !_perform_finite_strain_rotations)
-      {
         _stress[_qp] =
             _elasticity_tensor[_qp] * (_elastic_strain_old[_qp] + elastic_strain_increment);
-        // InitialStress Deprecation: remove these lines
-        if (_perform_finite_strain_rotations)
-          rotateQpInitialStress();
-        addQpInitialStress();
-      }
       else
         _stress[_qp] = _stress_old[_qp] + _elasticity_tensor[_qp] * elastic_strain_increment;
 
@@ -268,12 +301,11 @@ ComputeMultipleInelasticStress::updateQpState(RankTwoTensor & elastic_strain_inc
     // now check convergence in the stress:
     // once the change in stress is within tolerance after each recompute material
     // consider the stress to be converged
-    RankTwoTensor delta_stress(stress_max - stress_min);
-    l2norm_delta_stress = delta_stress.L2norm();
-    if (counter == 0)
+    l2norm_delta_stress = (stress_max - stress_min).L2norm();
+    if (counter == 0 && l2norm_delta_stress > 0.0)
       first_l2norm_delta_stress = l2norm_delta_stress;
 
-    if (_output_iteration_info == true)
+    if (_internal_solve_full_iteration_history == true)
     {
       _console << "stress iteration number = " << counter << "\n"
                << " relative l2 norm delta stress = "
@@ -305,14 +337,29 @@ ComputeMultipleInelasticStress::updateQpState(RankTwoTensor & elastic_strain_inc
   for (unsigned i_rmm = 0; i_rmm < _num_models; ++i_rmm)
     _matl_timestep_limit[_qp] += 1.0 / _models[i_rmm]->computeTimeStepLimit();
 
-  _matl_timestep_limit[_qp] = 1.0 / _matl_timestep_limit[_qp];
+  if (MooseUtils::absoluteFuzzyEqual(_matl_timestep_limit[_qp], 0.0))
+  {
+    _matl_timestep_limit[_qp] = std::numeric_limits<Real>::max();
+  }
+  else
+  {
+    _matl_timestep_limit[_qp] = 1.0 / _matl_timestep_limit[_qp];
+  }
 }
 
 void
 ComputeMultipleInelasticStress::computeQpJacobianMult()
 {
-  if (_tangent_operator_type == TangentOperatorEnum::elastic)
+  if (_tangent_calculation_method == TangentCalculationMethod::ELASTIC)
     _Jacobian_mult[_qp] = _elasticity_tensor[_qp];
+  else if (_tangent_calculation_method == TangentCalculationMethod::PARTIAL)
+  {
+    RankFourTensor A = _identity_symmetric_four;
+    for (unsigned i_rmm = 0; i_rmm < _num_models; ++i_rmm)
+      A += _consistent_tangent_operator[i_rmm];
+    mooseAssert(A.isSymmetric(), "Tangent operator isn't symmetric");
+    _Jacobian_mult[_qp] = A.invSymm() * _elasticity_tensor[_qp];
+  }
   else
   {
     const RankFourTensor E_inv = _elasticity_tensor[_qp].invSymm();
@@ -336,20 +383,28 @@ ComputeMultipleInelasticStress::updateQpStateSingleModel(
   // If the elasticity tensor values have changed and the tensor is isotropic,
   // use the old strain to calculate the old stress
   if (_is_elasticity_tensor_guaranteed_isotropic || !_perform_finite_strain_rotations)
-  {
     _stress[_qp] = _elasticity_tensor[_qp] * (_elastic_strain_old[_qp] + elastic_strain_increment);
-    // InitialStress Deprecation: remove these lines
-    if (_perform_finite_strain_rotations)
-      rotateQpInitialStress();
-    addQpInitialStress();
-  }
   else
     _stress[_qp] = _stress_old[_qp] + _elasticity_tensor[_qp] * elastic_strain_increment;
 
   computeAdmissibleState(model_number,
                          elastic_strain_increment,
                          combined_inelastic_strain_increment,
-                         _Jacobian_mult[_qp]);
+                         _consistent_tangent_operator[0]);
+
+  if (_fe_problem.currentlyComputingJacobian())
+  {
+    if (_tangent_calculation_method == TangentCalculationMethod::ELASTIC)
+      _Jacobian_mult[_qp] = _elasticity_tensor[_qp];
+    else if (_tangent_calculation_method == TangentCalculationMethod::PARTIAL)
+    {
+      RankFourTensor A = _identity_symmetric_four + _consistent_tangent_operator[0];
+      mooseAssert(A.isSymmetric(), "Tangent operator isn't symmetric");
+      _Jacobian_mult[_qp] = A.invSymm() * _elasticity_tensor[_qp];
+    }
+    else
+      _Jacobian_mult[_qp] = _consistent_tangent_operator[0];
+  }
 
   _matl_timestep_limit[_qp] = _models[0]->computeTimeStepLimit();
 
@@ -366,6 +421,7 @@ ComputeMultipleInelasticStress::computeAdmissibleState(unsigned model_number,
                                                        RankTwoTensor & inelastic_strain_increment,
                                                        RankFourTensor & consistent_tangent_operator)
 {
+  const bool jac = _fe_problem.currentlyComputingJacobian();
   _models[model_number]->updateState(elastic_strain_increment,
                                      inelastic_strain_increment,
                                      _rotation_increment[_qp],
@@ -373,6 +429,14 @@ ComputeMultipleInelasticStress::computeAdmissibleState(unsigned model_number,
                                      _stress_old[_qp],
                                      _elasticity_tensor[_qp],
                                      _elastic_strain_old[_qp],
-                                     _tangent_operator_type == TangentOperatorEnum::nonlinear,
+                                     (jac && _tangent_computation_flag[model_number]),
                                      consistent_tangent_operator);
+
+  if (jac && !_tangent_computation_flag[model_number])
+  {
+    if (_tangent_calculation_method == TangentCalculationMethod::PARTIAL)
+      consistent_tangent_operator.zero();
+    else
+      consistent_tangent_operator = _elasticity_tensor[_qp];
+  }
 }

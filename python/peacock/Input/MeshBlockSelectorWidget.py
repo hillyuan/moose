@@ -1,3 +1,12 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from PyQt5 import QtCore, QtWidgets
 import peacock
 
@@ -47,7 +56,7 @@ class MeshBlockSelectorWidget(peacock.base.MooseWidget, QtWidgets.QWidget):
             self.Options.clear()
             self._blocks = blocks
             self.Options.addItem("")
-            for i, block in enumerate(blocks.itervalues()):
+            for block in sorted(blocks.values(), key=lambda b: b.name):
                 self.Options.addItem(block.name)
             self.Options.setCurrentIndex(0)
 

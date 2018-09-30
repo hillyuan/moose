@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef TRANSIENT_H
 #define TRANSIENT_H
@@ -206,6 +201,12 @@ public:
   Real numPicardIts() { return _picard_it + 1; }
 
   /**
+   * Check if Picard iteration converged when maximum number of Picard iterations is greater than
+   * one
+   */
+  virtual bool picardConverged() const;
+
+  /**
    * The relative L2 norm of the difference between solution and old solution vector.
    */
   virtual Real relativeSolutionDifferenceNorm();
@@ -218,6 +219,9 @@ protected:
 
   /// Here for backward compatibility
   FEProblemBase & _problem;
+
+  /// Reference to nonlinear system base for faster access
+  NonlinearSystemBase & _nl;
 
   Moose::TimeIntegratorType _time_scheme;
   std::shared_ptr<TimeStepper> _time_stepper;
@@ -246,8 +250,12 @@ protected:
 
   /// Whether step should be repeated due to xfem modifying the mesh
   bool _xfem_repeat_step;
+  /// Counter for number of xfem updates that have been performed in the current step
   unsigned int _xfem_update_count;
+  /// Maximum number of xfem updates per step
   unsigned int _max_xfem_update;
+  /// Controls whether xfem should update the mesh at the beginning of the time step
+  bool _update_xfem_at_timestep_begin;
 
   Real _end_time;
   Real _dtmin;
@@ -259,9 +267,9 @@ protected:
   /**
    * Steady state detection variables:
    */
-  bool _trans_ss_check;
-  Real _ss_check_tol;
-  Real _ss_tmin;
+  bool _steady_state_detection;
+  Real _steady_state_tolerance;
+  Real _steady_state_start_time;
   Real & _sln_diff_norm;
   Real & _old_time_solution_norm;
 
@@ -315,6 +323,8 @@ protected:
 
   /// The DoFs associates with all of the relaxed variables
   std::set<dof_id_type> _relaxed_dofs;
+
+  PerfID _final_timer;
 };
 
 #endif // TRANSIENTEXECUTIONER_H

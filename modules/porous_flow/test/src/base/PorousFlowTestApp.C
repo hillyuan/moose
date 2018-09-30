@@ -1,3 +1,11 @@
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 #include "PorousFlowTestApp.h"
 #include "PorousFlowApp.h"
 #include "Moose.h"
@@ -12,32 +20,27 @@ validParams<PorousFlowTestApp>()
   return params;
 }
 
+registerKnownLabel("PorousFlowTestApp");
+
 PorousFlowTestApp::PorousFlowTestApp(InputParameters parameters) : MooseApp(parameters)
 {
-  Moose::registerObjects(_factory);
-  PorousFlowApp::registerObjectDepends(_factory);
-  PorousFlowApp::registerObjects(_factory);
-
-  Moose::associateSyntax(_syntax, _action_factory);
-  PorousFlowApp::associateSyntaxDepends(_syntax, _action_factory);
-  PorousFlowApp::associateSyntax(_syntax, _action_factory);
-
-  bool use_test_objs = getParam<bool>("allow_test_objects");
-  if (use_test_objs)
-  {
-    PorousFlowTestApp::registerObjects(_factory);
-    PorousFlowTestApp::associateSyntax(_syntax, _action_factory);
-  }
+  PorousFlowTestApp::registerAll(
+      _factory, _action_factory, _syntax, getParam<bool>("allow_test_objects"));
 }
 
 PorousFlowTestApp::~PorousFlowTestApp() {}
 
-// External entry point for dynamic application loading
-extern "C" void
-PorousFlowTestApp__registerApps()
+void
+PorousFlowTestApp::registerAll(Factory & f, ActionFactory & af, Syntax & s, bool use_test_objs)
 {
-  PorousFlowTestApp::registerApps();
+  PorousFlowApp::registerAll(f, af, s);
+  if (use_test_objs)
+  {
+    Registry::registerObjectsTo(f, {"PorousFlowTestApp"});
+    Registry::registerActionsTo(af, {"PorousFlowTestApp"});
+  }
 }
+
 void
 PorousFlowTestApp::registerApps()
 {
@@ -45,24 +48,30 @@ PorousFlowTestApp::registerApps()
   registerApp(PorousFlowTestApp);
 }
 
-// External entry point for dynamic object registration
-extern "C" void
-PorousFlowTestApp__registerObjects(Factory & factory)
-{
-  PorousFlowTestApp::registerObjects(factory);
-}
 void
-PorousFlowTestApp::registerObjects(Factory & /*factory*/)
+PorousFlowTestApp::registerObjects(Factory & factory)
+{
+  Registry::registerObjectsTo(factory, {"PorousFlowTestApp"});
+}
+
+void
+PorousFlowTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & action_factory)
+{
+  Registry::registerActionsTo(action_factory, {"PorousFlowTestApp"});
+}
+
+void
+PorousFlowTestApp::registerExecFlags(Factory & /*factory*/)
 {
 }
 
-// External entry point for dynamic syntax association
 extern "C" void
-PorousFlowTestApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
+PorousFlowTestApp__registerAll(Factory & f, ActionFactory & af, Syntax & s)
 {
-  PorousFlowTestApp::associateSyntax(syntax, action_factory);
+  PorousFlowTestApp::registerAll(f, af, s);
 }
-void
-PorousFlowTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
+extern "C" void
+PorousFlowTestApp__registerApps()
 {
+  PorousFlowTestApp::registerApps();
 }

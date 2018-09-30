@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef MATERIAL_H
 #define MATERIAL_H
@@ -32,7 +27,6 @@
 #include "VectorPostprocessorInterface.h"
 #include "DependencyResolverInterface.h"
 #include "Restartable.h"
-#include "ZeroInterface.h"
 #include "MeshChangedInterface.h"
 #include "OutputInterface.h"
 #include "RandomInterface.h"
@@ -66,7 +60,6 @@ class Material : public MooseObject,
                  public VectorPostprocessorInterface,
                  public DependencyResolverInterface,
                  public Restartable,
-                 public ZeroInterface,
                  public MeshChangedInterface,
                  public OutputInterface,
                  public RandomInterface
@@ -281,7 +274,7 @@ protected:
   std::map<std::string, int> _props_to_flags;
 
 private:
-  /// Small helper function to call storeMatPropName
+  /// Small helper function to call store{Subdomain,Boundary}MatPropName
   void registerPropName(std::string prop_name, bool is_get, Prop_State state);
 
   /// Check and throw an error if the execution has progerssed past the construction stage
@@ -409,10 +402,10 @@ Material::getZeroMaterialProperty(const std::string & prop_name)
   // Register this material on these blocks and boundaries as a zero property with relaxed
   // consistency checking
   for (std::set<SubdomainID>::const_iterator it = blockIDs().begin(); it != blockIDs().end(); ++it)
-    _fe_problem.storeZeroMatProp(*it, prop_name);
+    _fe_problem.storeSubdomainZeroMatProp(*it, prop_name);
   for (std::set<BoundaryID>::const_iterator it = boundaryIDs().begin(); it != boundaryIDs().end();
        ++it)
-    _fe_problem.storeZeroMatProp(*it, prop_name);
+    _fe_problem.storeBoundaryZeroMatProp(*it, prop_name);
 
   // set values for all qpoints to zero
   // (in multiapp scenarios getMaxQps can return different values in each app; we need the max)

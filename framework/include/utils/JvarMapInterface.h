@@ -1,13 +1,16 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef JVARMAPINTERFACE_H
 #define JVARMAPINTERFACE_H
 
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 #include "NonlinearSystemBase.h"
 
 template <class T>
@@ -28,7 +31,8 @@ class JvarMapKernelInterface : public JvarMapInterfaceBase<T>
 {
 public:
   JvarMapKernelInterface(const InputParameters & parameters);
-  virtual void computeOffDiagJacobian(unsigned int jvar) override;
+  virtual void computeOffDiagJacobian(MooseVariableFEBase & jvar) override;
+  using T::computeOffDiagJacobian;
 };
 
 /**
@@ -46,7 +50,7 @@ class JvarMapIntegratedBCInterface : public JvarMapInterfaceBase<T>
 {
 public:
   JvarMapIntegratedBCInterface(const InputParameters & parameters);
-  virtual void computeJacobianBlock(unsigned int jvar) override;
+  virtual void computeJacobianBlock(MooseVariableFEBase & jvar) override;
 };
 
 /**
@@ -126,10 +130,10 @@ JvarMapIntegratedBCInterface<T>::JvarMapIntegratedBCInterface(const InputParamet
 
 template <class T>
 void
-JvarMapKernelInterface<T>::computeOffDiagJacobian(unsigned int jvar)
+JvarMapKernelInterface<T>::computeOffDiagJacobian(MooseVariableFEBase & jvar)
 {
   // the Kernel is not coupled to the variable; no need to loop over QPs
-  if (this->_jvar_map[jvar] < 0)
+  if (this->_jvar_map[jvar.number()] < 0)
     return;
 
   // call the underlying class' off-diagonal Jacobian
@@ -138,10 +142,10 @@ JvarMapKernelInterface<T>::computeOffDiagJacobian(unsigned int jvar)
 
 template <class T>
 void
-JvarMapIntegratedBCInterface<T>::computeJacobianBlock(unsigned int jvar)
+JvarMapIntegratedBCInterface<T>::computeJacobianBlock(MooseVariableFEBase & jvar)
 {
   // the Kernel is not coupled to the variable; no need to loop over QPs
-  if (this->_jvar_map[jvar] < 0)
+  if (this->_jvar_map[jvar.number()] < 0)
     return;
 
   // call the underlying class' off-diagonal Jacobian

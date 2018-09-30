@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef GENERALIZEDPLANESTRAINUSEROBJECT_H
 #define GENERALIZEDPLANESTRAINUSEROBJECT_H
 
@@ -28,6 +31,7 @@ public:
   void threadJoin(const UserObject & uo) override;
   void finalize() override;
   virtual Real returnResidual(unsigned int scalar_var_id = 0) const;
+  virtual Real returnReferenceResidual(unsigned int scalar_var_id = 0) const;
   virtual Real returnJacobian(unsigned int scalar_var_id = 0) const;
 
 protected:
@@ -42,6 +46,7 @@ protected:
   const Real _factor;
   unsigned int _scalar_out_of_plane_strain_direction;
   std::vector<Real> _residual;
+  std::vector<Real> _reference_residual;
   std::vector<Real> _jacobian;
 };
 

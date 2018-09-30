@@ -16,6 +16,7 @@ endif
 
 # framework
 FRAMEWORK_DIR      := $(MOOSE_DIR)/framework
+ADDITIONAL_CPPFLAGS += -Wall -Wextra
 include $(FRAMEWORK_DIR)/build.mk
 include $(FRAMEWORK_DIR)/moose.mk
 
@@ -37,7 +38,6 @@ RICHARDS                  := no
 SOLID_MECHANICS           := no
 # tensor_mechanics is required by Steps 9-10.
 TENSOR_MECHANICS          := yes
-WATER_STEAM_EOS           := no
 XFEM                      := no
 include $(MOOSE_DIR)/modules/modules.mk
 ###############################################################################
@@ -46,7 +46,7 @@ include $(MOOSE_DIR)/modules/modules.mk
 APPLICATION_DIR    := $(CURDIR)
 APPLICATION_NAME   := darcy_thermo_mech
 BUILD_EXEC         := yes
-DEP_APPS           := $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLICATION_NAME))
+GEN_REVISION       := no
 include            $(FRAMEWORK_DIR)/app.mk
 
 ###############################################################################

@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from PyQt5 import QtCore, QtWidgets
 from peacock import PeacockApp
 from peacock.utils import Testing
@@ -14,7 +23,7 @@ class TestPostprocessorState(Testing.PeacockImageTestCase):
         """
         Creates the peacock application.
         """
-
+        Testing.setupTestCache(self.__class__)
         args = ["-size", "1024", "768", "-i", "../../common/time_data.i", "-e", Testing.find_moose_test_exe(), "-w", os.getcwd()]
         self._app = PeacockApp.PeacockApp(args, self.qapp)
         self._window = self._app.main_widget.tab_plugin.VectorPostprocessorViewer.currentWidget().FigurePlugin

@@ -1,13 +1,18 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "BicrystalBoundingBoxICAction.h"
 #include "Factory.h"
 #include "FEProblem.h"
 #include "Conversion.h"
+
+registerMooseAction("PhaseFieldApp", BicrystalBoundingBoxICAction, "add_ic");
 
 template <>
 InputParameters
@@ -32,7 +37,7 @@ BicrystalBoundingBoxICAction::BicrystalBoundingBoxICAction(const InputParameters
     _op_num(getParam<unsigned int>("op_num"))
 {
   if (_op_num != 2)
-    mooseError("op_num must equal 2 for bicrystal ICs");
+    paramError("op_num", "op_num must equal 2 for bicrystal ICs");
 }
 
 void

@@ -1,24 +1,18 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef RANDOMIC_H
 #define RANDOMIC_H
 
 #include "InitialCondition.h"
-
-// System includes
-#include <string>
+#include "RandomData.h"
+#include "MooseRandom.h"
 
 // Forward Declarations
 class InputParameters;
@@ -48,11 +42,42 @@ public:
   RandomIC(const InputParameters & parameters);
 
   virtual Real value(const Point & p) override;
+  void initialSetup() override;
 
 protected:
-  Real _min;
-  Real _max;
-  Real _range;
+  /// The lower bound of the random number range
+  const Real _min;
+
+  /// The upper bound of the random number range
+  const Real _max;
+
+  /// The range of random numbers (calculated from min and max)
+  const Real _range;
+
+  /// Determines whether a variable basis is elemental or nodal
+  const bool _is_nodal;
+
+  /// Boolean to indicate whether we want to use the old (deprecated) generation pattern
+  const bool _use_legacy;
+
+private:
+  /// RandomData element object, we cannot inherit from RandomInterface in an InitialCondition
+  std::unique_ptr<RandomData> _elem_random_data;
+
+  /// RandomData node object, we cannot inherit from RandomInterface in an InitialCondition
+  std::unique_ptr<RandomData> _node_random_data;
+
+  /// Elemental random number generator
+  MooseRandom * _elem_random_generator;
+
+  /// Nodal random number generator
+  MooseRandom * _node_random_generator;
+
+  /// Random numbers per element (currently limited to a single value at a time)
+  std::map<dof_id_type, Real> _elem_numbers;
+
+  /// Random numbers per node (currently limited to a single value at a time)
+  std::map<dof_id_type, Real> _node_numbers;
 };
 
 #endif // RANDOMIC_H

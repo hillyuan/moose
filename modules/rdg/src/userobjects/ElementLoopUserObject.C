@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ElementLoopUserObject.h"
 
@@ -21,7 +23,6 @@ ElementLoopUserObject::ElementLoopUserObject(const InputParameters & parameters)
     BlockRestrictable(this),
     Coupleable(this, false),
     MooseVariableDependencyInterface(),
-    ZeroInterface(parameters),
     _mesh(_subproblem.mesh()),
     _current_elem(_assembly.elem()),
     _current_elem_volume(_assembly.elemVolume()),
@@ -32,7 +33,7 @@ ElementLoopUserObject::ElementLoopUserObject(const InputParameters & parameters)
     _have_interface_elems(false)
 {
   // Keep track of which variables are coupled so we know what we depend on
-  const std::vector<MooseVariable *> & coupled_vars = getCoupledMooseVars();
+  const std::vector<MooseVariableFEBase *> & coupled_vars = getCoupledMooseVars();
   for (unsigned int i = 0; i < coupled_vars.size(); i++)
     addMooseVariableDependency(coupled_vars[i]);
 }
@@ -42,7 +43,6 @@ ElementLoopUserObject::ElementLoopUserObject(ElementLoopUserObject & x, Threads:
     BlockRestrictable(&x),
     Coupleable(this, false),
     MooseVariableDependencyInterface(),
-    ZeroInterface(x.parameters()),
     _mesh(x._subproblem.mesh()),
     _current_elem(x._assembly.elem()),
     _current_elem_volume(x._assembly.elemVolume()),
@@ -53,7 +53,7 @@ ElementLoopUserObject::ElementLoopUserObject(ElementLoopUserObject & x, Threads:
     _have_interface_elems(false)
 {
   // Keep track of which variables are coupled so we know what we depend on
-  const std::vector<MooseVariable *> & coupled_vars = x.getCoupledMooseVars();
+  const std::vector<MooseVariableFEBase *> & coupled_vars = x.getCoupledMooseVars();
   for (unsigned int i = 0; i < coupled_vars.size(); i++)
     addMooseVariableDependency(coupled_vars[i]);
 }

@@ -1,22 +1,18 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef RESURRECTOR_H
 #define RESURRECTOR_H
 
 // MOOSE includes
 #include "RestartableDataIO.h"
+#include "PerfGraphInterface.h"
 
 // C++ includes
 #include <string>
@@ -29,7 +25,7 @@ class FEProblemBase;
  *
  * It takes care of writing and reading the restart files.
  */
-class Resurrector
+class Resurrector : public PerfGraphInterface
 {
 public:
   Resurrector(FEProblemBase & fe_problem);
@@ -67,6 +63,10 @@ protected:
 
   /// Restartable Data
   RestartableDataIO _restartable;
+
+  /// Timers
+  PerfID _restart_from_file_timer;
+  PerfID _restart_restartable_data_timer;
 
   static const std::string MAT_PROP_EXT;
   static const std::string RESTARTABLE_DATA_EXT;

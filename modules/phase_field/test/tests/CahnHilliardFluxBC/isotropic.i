@@ -10,12 +10,8 @@
 
 [Variables]
   [./c]
-    order = FIRST
-    family = LAGRANGE
-  [../]
-  [./w]
-    order = FIRST
-    family = LAGRANGE
+    order = THIRD
+    family = HERMITE
   [../]
   [./d]
     order = FIRST
@@ -24,32 +20,23 @@
   [../]
 []
 
-[Preconditioning]
-  [./SMP]
-    type = SMP
-    coupled_groups = 'c,w'
-  [../]
-[]
-
 [Kernels]
-  [./cres]
-    type = SplitCHParsed
+  [./CHSolid]
+    type = CahnHilliard
     variable = c
     f_name = F
-    kappa_name = kappa_c
-    w = w
-  [../]
-  [./wres]
-    type = SplitCHWRes
-    variable = w
     mob_name = M
   [../]
-  [./time]
-    type = CoupledTimeDerivative
-    variable = w
-    v = c
+  [./CHInterface]
+    type = CHInterface
+    variable = c
+    mob_name = M
+    kappa_name = kappa_c
   [../]
-
+  [./ie_c]
+    type = TimeDerivative
+    variable = c
+  [../]
   [./diff]
     type = MatDiffusion
     D_name = 10.0
@@ -63,20 +50,16 @@
 
 [BCs]
   [./in_flux]
-    type = CahnHilliardFluxBC
-    variable = w
+    type = NeumannBC
+    variable = c
     boundary = top
-    flux = '0 0.2 0'
-    mob_name = M
-    args = 'c d'
+    value = 0.2
   [../]
   [./out_flux]
-    type = CahnHilliardFluxBC
-    variable = w
+    type = NeumannBC
+    variable = c
     boundary = bottom
-    flux = '0 0.1 0'
-    mob_name = M
-    args = 'c d'
+    value = -0.1
   [../]
 
   [./dirichlet_left]
@@ -131,7 +114,7 @@
   l_max_its = 30
   l_tol = 1.0e-3
   nl_max_its = 10
-  nl_rel_tol = 1.0e-10
+  nl_rel_tol = 1.0e-12
   num_steps = 2
 
   dt = 0.1
@@ -140,5 +123,5 @@
 [Outputs]
   exodus = true
   print_linear_residuals = false
-  print_perf_log = true
+  perf_graph = true
 []

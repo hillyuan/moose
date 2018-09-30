@@ -4,7 +4,6 @@
 []
 
 [XFEM]
-  geometric_cut_userobjects = 'circle_cut_uo'
   qrule = volfrac
   output_cut_plane = true
 []
@@ -75,6 +74,8 @@
   poissons_ratio = 0.3
   youngs_modulus = 207000
   block = 1
+  incremental = true
+  solid_mechanics = true
 []
 
 [SolidMechanics]
@@ -219,7 +220,6 @@
   exodus = true
   [./console]
     type = Console
-    perf_log = true
     output_linear = true
   [../]
 []

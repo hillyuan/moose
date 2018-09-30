@@ -1,12 +1,16 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowCapillaryPressureRSC.h"
 #include "PorousFlowRogersStallybrassClements.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowCapillaryPressureRSC);
 
 template <>
 InputParameters
@@ -40,38 +44,41 @@ PorousFlowCapillaryPressureRSC::PorousFlowCapillaryPressureRSC(const InputParame
   _log_ext = false;
 }
 
-Real PorousFlowCapillaryPressureRSC::capillaryPressureCurve(Real /*saturation*/) const
+Real
+PorousFlowCapillaryPressureRSC::capillaryPressureCurve(Real /*saturation*/, unsigned /*qp*/) const
 {
   mooseError("PorousFlowCapillaryPressureRSC::capillaryPressure not implemented");
   return 0.0;
 }
 
-Real PorousFlowCapillaryPressureRSC::dCapillaryPressureCurve(Real /*saturation*/) const
+Real
+PorousFlowCapillaryPressureRSC::dCapillaryPressureCurve(Real /*saturation*/, unsigned /*qp*/) const
 {
   mooseError("PorousFlowCapillaryPressureRSC::dCapillaryPressure not implemented");
   return 0.0;
 }
 
-Real PorousFlowCapillaryPressureRSC::d2CapillaryPressureCurve(Real /*saturation*/) const
+Real
+PorousFlowCapillaryPressureRSC::d2CapillaryPressureCurve(Real /*saturation*/, unsigned /*qp*/) const
 {
   mooseError("PorousFlowCapillaryPressureRSC::d2CapillaryPressure not implemented");
   return 0.0;
 }
 
 Real
-PorousFlowCapillaryPressureRSC::effectiveSaturation(Real pc) const
+PorousFlowCapillaryPressureRSC::effectiveSaturation(Real pc, unsigned /*qp*/) const
 {
   return PorousFlowRogersStallybrassClements::effectiveSaturation(-pc, _shift, _scale);
 }
 
 Real
-PorousFlowCapillaryPressureRSC::dEffectiveSaturation(Real pc) const
+PorousFlowCapillaryPressureRSC::dEffectiveSaturation(Real pc, unsigned /*qp*/) const
 {
   return -PorousFlowRogersStallybrassClements::dEffectiveSaturation(-pc, _shift, _scale);
 }
 
 Real
-PorousFlowCapillaryPressureRSC::d2EffectiveSaturation(Real pc) const
+PorousFlowCapillaryPressureRSC::d2EffectiveSaturation(Real pc, unsigned /*qp*/) const
 {
   return PorousFlowRogersStallybrassClements::d2EffectiveSaturation(-pc, _shift, _scale);
 }

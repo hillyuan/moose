@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "DependencyResolverTest.h"
 
@@ -161,4 +156,20 @@ TEST_F(DependencyResolverTest, cyclicTest)
         std::string::npos)
         << "failed with unexpected error: " << msg;
   }
+}
+
+TEST_F(DependencyResolverTest, getValuesTest)
+{
+  const std::vector<std::string> & values = _tree.getValues("k0");
+
+  // Make a sorted copy to compare against
+  std::vector<std::string> copy;
+  for (auto val : values)
+    copy.push_back(val);
+
+  std::sort(copy.begin(), copy.end());
+
+  EXPECT_EQ(copy[0], "m0");
+  EXPECT_EQ(copy[1], "m1");
+  EXPECT_EQ(copy[2], "m2");
 }

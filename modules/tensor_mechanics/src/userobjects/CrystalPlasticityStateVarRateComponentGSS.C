@@ -1,10 +1,16 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "CrystalPlasticityStateVarRateComponentGSS.h"
+#include <cmath>
+
+registerMooseObject("TensorMechanicsApp", CrystalPlasticityStateVarRateComponentGSS);
 
 template <>
 InputParameters
@@ -56,7 +62,7 @@ CrystalPlasticityStateVarRateComponentGSS::calcStateVariableEvolutionRateCompone
 
   for (unsigned int i = 0; i < _variable_size; ++i)
     hb(i) = h0 * std::pow(std::abs(1.0 - _mat_prop_state_var[qp][i] / tau_sat), a) *
-            copysign(1.0, 1.0 - _mat_prop_state_var[qp][i] / tau_sat);
+            std::copysign(1.0, 1.0 - _mat_prop_state_var[qp][i] / tau_sat);
 
   for (unsigned int i = 0; i < _variable_size; ++i)
     for (unsigned int j = 0; j < _variable_size; ++j)

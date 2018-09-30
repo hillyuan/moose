@@ -254,56 +254,20 @@
   [./temperature]
     type = PorousFlowTemperature
   [../]
-  [./temperature_nodal]
-    type = PorousFlowTemperature
-    at_nodes = true
-  [../]
   [./ppss]
     type = PorousFlow1PhaseFullySaturated
     porepressure = ppwater
   [../]
-  [./ppss_nodal]
-    type = PorousFlow1PhaseFullySaturated
-    at_nodes = true
-    porepressure = ppwater
-  [../]
   [./massfrac]
     type = PorousFlowMassFraction
-    at_nodes = true
   [../]
   [./simple_fluid]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid
     phase = 0
-    at_nodes = true
-  [../]
-  [./simple_fluid_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid
-    phase = 0
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    include_old = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
-  [./dens_qp_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-    at_nodes = false
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
   [../]
   [./porosity]
     type = PorousFlowPorosityConst
-    porosity = poro
-  [../]
-  [./porosity_nodal]
-    type = PorousFlowPorosityConst
-    at_nodes = true
     porosity = poro
   [../]
   [./permeability]
@@ -314,14 +278,8 @@
   [../]
   [./relperm_water]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 2
     phase = 0
-  [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
   [../]
 []
 
@@ -352,5 +310,5 @@
 [Outputs]
   execute_on = 'initial timestep_end'
   exodus = true
-  print_perf_log = true
+  perf_graph = true
 []

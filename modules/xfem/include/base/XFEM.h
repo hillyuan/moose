@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef XFEM_H
 #define XFEM_H
@@ -64,7 +66,7 @@ public:
 
   ~XFEM();
 
-  void addGeometricCut(const GeometricCutUserObject * geometric_cut);
+  void addGeometricCut(GeometricCutUserObject * geometric_cut);
 
   void addStateMarkedElem(unsigned int elem_id, RealVectorValue & normal);
   void addStateMarkedElem(unsigned int elem_id, RealVectorValue & normal, unsigned int marked_side);
@@ -73,24 +75,53 @@ public:
   void clearStateMarkedElems();
 
   /**
-   * Method to update the mesh due to modified cut planes
+   * Add information about a new cut to be performed on a specific 2d element
+   * @param elem_id   The id of the element to be cut
+   * @param geom_info The object containing information about the cut to be performed
+   * @param interface_id The ID of the interface
    */
-  virtual bool update(Real time, NonlinearSystemBase & nl, AuxiliarySystem & aux);
+  void addGeomMarkedElem2D(const unsigned int elem_id,
+                           const Xfem::GeomMarkedElemInfo2D geom_info,
+                           const unsigned int interface_id);
 
   /**
-   * Initialize the solution on newly created nodes
+   * Add information about a new cut to be performed on a specific 3d element
+   * @param elem_id   The id of the element to be cut
+   * @param geom_info The object containing information about the cut to be performed
+   * @param interface_id The ID of the interface
    */
-  virtual void initSolution(NonlinearSystemBase & nl, AuxiliarySystem & aux);
+  void addGeomMarkedElem3D(const unsigned int elem_id,
+                           const Xfem::GeomMarkedElemInfo3D geom_info,
+                           const unsigned int interface_id);
+
+  /**
+   * Clear out the list of elements to be marked for cutting. Called after cutting is done.
+   */
+  void clearGeomMarkedElems();
+
+  virtual bool update(Real time, NonlinearSystemBase & nl, AuxiliarySystem & aux) override;
+
+  virtual void initSolution(NonlinearSystemBase & nl, AuxiliarySystem & aux) override;
 
   void buildEFAMesh();
   bool markCuts(Real time);
-  bool markCutEdgesByGeometry(Real time);
+  bool markCutEdgesByGeometry();
   bool markCutEdgesByState(Real time);
-  bool markCutFacesByGeometry(Real time);
+  bool markCutFacesByGeometry();
   bool markCutFacesByState();
   bool initCutIntersectionEdge(
       Point cut_origin, RealVectorValue cut_normal, Point & edge_p1, Point & edge_p2, Real & dist);
   bool cutMeshWithEFA(NonlinearSystemBase & nl, AuxiliarySystem & aux);
+
+  /**
+   * Potentially heal the mesh by merging some of the pairs
+   * of partial elements cut by XFEM back into single elements
+   * if indicated by the cutting objects.
+   * @return true if the mesh has been modified due to healing
+   **/
+  bool healMesh();
+
+  virtual bool updateHeal() override;
   Point getEFANodeCoords(EFANode * CEMnode,
                          EFAElement * CEMElem,
                          const Elem * elem,
@@ -100,6 +131,12 @@ public:
    * Get the volume fraction of an element that is physical
    */
   Real getPhysicalVolumeFraction(const Elem * elem) const;
+
+  /**
+   * Return true if the point is inside the element physical domain
+   * Note: if this element is not cut, return true too
+   */
+  bool isPointInsidePhysicalDomain(const Elem * elem, const Point & point) const;
 
   /**
    * Get specified component of normal or origin for cut plane for a given element
@@ -128,30 +165,53 @@ public:
 
   void getCrackTipOrigin(std::map<unsigned int, const Elem *> & elem_id_crack_tip,
                          std::vector<Point> & crack_front_points);
-  // void update_crack_propagation_direction(const Elem* elem, Point direction);
-  // void clear_crack_propagation_direction();
-  /**
-   * Set and get xfem cut data and type
-   */
-  std::vector<Real> & getXFEMCutData();
-  void setXFEMCutData(std::vector<Real> & cut_data);
-  std::string & getXFEMCutType();
-  void setXFEMCutType(std::string & cut_type);
+
   Xfem::XFEM_QRULE & getXFEMQRule();
   void setXFEMQRule(std::string & xfem_qrule);
   void setCrackGrowthMethod(bool use_crack_growth_increment, Real crack_growth_increment);
   virtual bool getXFEMWeights(MooseArray<Real> & weights,
                               const Elem * elem,
                               QBase * qrule,
-                              const MooseArray<Point> & q_points);
-  virtual const ElementPairLocator::ElementPairList * getXFEMCutElemPairs() const
+                              const MooseArray<Point> & q_points) override;
+  virtual bool getXFEMFaceWeights(MooseArray<Real> & weights,
+                                  const Elem * elem,
+                                  QBase * qrule,
+                                  const MooseArray<Point> & q_points,
+                                  unsigned int side) override;
+
+  /**
+   * Get the list of cut element pairs corresponding to a given
+   * interface ID.
+   * @param interface_id The ID of the interface
+   * @return the list of elements cut by that interface
+   **/
+  virtual const ElementPairLocator::ElementPairList * getXFEMCutElemPairs(unsigned int interface_id)
   {
-    return &_sibling_elems;
+    return &_sibling_elems[interface_id];
   }
-  virtual const ElementPairLocator::ElementPairList * getXFEMDisplacedCutElemPairs() const
+
+  /**
+   * Get the list of cut element pairs on the displaced mesh
+   * corresponding to a given interface ID.
+   * @param interface_id The ID of the interface
+   * @return the list of elements cut by that interface
+   **/
+  virtual const ElementPairLocator::ElementPairList *
+  getXFEMDisplacedCutElemPairs(unsigned int interface_id)
   {
-    return &_sibling_displaced_elems;
+    return &_sibling_displaced_elems[interface_id];
   }
+
+  /**
+   * Get the interface ID corresponding to a given GeometricCutUserObject.
+   * @param gcu pointer to the GeometricCutUserObject
+   * @return the interface ID
+   **/
+  virtual unsigned int getGeometricCutID(const GeometricCutUserObject * gcu)
+  {
+    return _geom_marker_id_map[gcu];
+  };
+
   virtual void getXFEMIntersectionInfo(const Elem * elem,
                                        unsigned int plane_id,
                                        Point & normal,
@@ -165,7 +225,18 @@ public:
                                      std::vector<Real> & quad_wts) const;
   bool has_secondary_cut() { return _has_secondary_cut; }
 
-private:
+  /**
+   * Get the EFAElement2D object for a specified libMesh element
+   * @param elem Pointer to the libMesh element for which the object is requested
+   */
+  EFAElement2D * getEFAElem2D(const Elem * elem);
+
+  /**
+   * Get the EFAElement3D object for a specified libMesh element
+   * @param elem Pointer to the libMesh element for which the object is requested
+   */
+  EFAElement3D * getEFAElem3D(const Elem * elem);
+
   void getFragmentEdges(const Elem * elem,
                         EFAElement2D * CEMElem,
                         std::vector<std::vector<Point>> & frag_edges) const;
@@ -185,8 +256,9 @@ private:
 
   std::map<unique_id_type, XFEMCutElem *> _cut_elem_map;
   std::set<const Elem *> _crack_tip_elems;
-  ElementPairLocator::ElementPairList _sibling_elems;
-  ElementPairLocator::ElementPairList _sibling_displaced_elems;
+  std::set<const Elem *> _crack_tip_elems_to_be_healed;
+  std::map<unsigned int, ElementPairLocator::ElementPairList> _sibling_elems;
+  std::map<unsigned int, ElementPairLocator::ElementPairList> _sibling_displaced_elems;
 
   std::map<const Elem *, std::vector<Point>> _elem_crack_origin_direction_map;
 
@@ -195,6 +267,18 @@ private:
   std::map<const Elem *, RealVectorValue> _state_marked_elems;
   std::set<const Elem *> _state_marked_frags;
   std::map<const Elem *, unsigned int> _state_marked_elem_sides;
+
+  /// Data structure for storing information about all 2D elements to be cut by geometry
+  std::map<const Elem *, std::vector<Xfem::GeomMarkedElemInfo2D>> _geom_marked_elems_2d;
+
+  /// Data structure for storing information about all 3D elements to be cut by geometry
+  std::map<const Elem *, std::vector<Xfem::GeomMarkedElemInfo3D>> _geom_marked_elems_3d;
+
+  /// Data structure for storing the elements cut by specific geometric cutters
+  std::map<unsigned int, std::set<unsigned int>> _geom_marker_id_elems;
+
+  /// Data structure for storing the GeommetricCutUserObjects and their corresponding id
+  std::map<const GeometricCutUserObject *, unsigned int> _geom_marker_id_map;
 
   ElementFragmentAlgorithm _efa_mesh;
 

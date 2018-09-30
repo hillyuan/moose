@@ -76,9 +76,9 @@
     temperature = temp
   [../]
   [./porosity]
-    type = PorousFlowPorosityConst
+    type = PorousFlowPorosity
     at_nodes = true
-    porosity = 0.1
+    porosity_zero = 0.1
   [../]
   [./rock_heat]
     type = PorousFlowMatrixInternalEnergy
@@ -101,18 +101,6 @@
     fp = simple_fluid
     phase = 0
     at_nodes = true
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    include_old = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
-  [./internal_energy_fluids]
-    type = PorousFlowJoiner
-    include_old = false
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_internal_energy_nodal
   [../]
 []
 

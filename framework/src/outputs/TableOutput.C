@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "TableOutput.h"
 
@@ -53,6 +48,12 @@ validParams<TableOutput>()
       true,
       "Whether or not the 'time' column should be written for Postprocessor CSV files");
 
+  params.addParam<Real>("new_row_tolerance",
+                        libMesh::TOLERANCE * libMesh::TOLERANCE,
+                        "The independent variable tolerance for determining when a new row should "
+                        "be added to the table (Note: This value must be set independently for "
+                        "Postprocessor output to type=Console and type=CSV file separately.");
+
   return params;
 }
 
@@ -71,15 +72,27 @@ TableOutput::TableOutput(const InputParameters & parameters)
                                       : declareRecoverableData<FormattedTable>("scalar_table")),
     _all_data_table(_tables_restartable ? declareRestartableData<FormattedTable>("all_data_table")
                                         : declareRecoverableData<FormattedTable>("all_data_table")),
+    _new_row_tol(getParam<Real>("new_row_tolerance")),
     _time_data(getParam<bool>("time_data")),
     _time_column(getParam<bool>("time_column"))
 
 {
+  // Set a Boolean indicating whether or not we will output the time column
+  _postprocessor_table.outputTimeColumn(_time_column);
+  _all_data_table.outputTimeColumn(_time_column);
 }
 
 void
 TableOutput::outputPostprocessors()
 {
+  // Add new row to the tables
+  if (_postprocessor_table.empty() ||
+      !MooseUtils::absoluteFuzzyEqual(_postprocessor_table.getLastTime(), time(), _new_row_tol))
+  {
+    _postprocessor_table.addRow(time());
+    _all_data_table.addRow(time());
+  }
+
   // List of names of the postprocessors to output
   const std::set<std::string> & out = getPostprocessorOutput();
 
@@ -88,11 +101,8 @@ TableOutput::outputPostprocessors()
   {
     PostprocessorValue value = _problem_ptr->getPostprocessorValue(out_name);
 
-    _postprocessor_table.outputTimeColumn(_time_column);
-    _postprocessor_table.addData(out_name, value, time());
-
-    _all_data_table.outputTimeColumn(_time_column);
-    _all_data_table.addData(out_name, value, time());
+    _postprocessor_table.addData(out_name, value);
+    _all_data_table.addData(out_name, value);
   }
 }
 
@@ -205,4 +215,16 @@ TableOutput::outputScalarVariables()
     if (need_release)
       value.release();
   }
+}
+
+void
+TableOutput::clear()
+{
+  _postprocessor_table.clear();
+  for (auto & pair : _vector_postprocessor_tables)
+    pair.second.clear();
+  for (auto & pair : _vector_postprocessor_time_tables)
+    pair.second.clear();
+  _scalar_table.clear();
+  _all_data_table.clear();
 }

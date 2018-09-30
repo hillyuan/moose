@@ -1,64 +1,54 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "NodalBC.h"
 
 #include "Assembly.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 #include "SystemBase.h"
+#include "NonlinearSystemBase.h"
 
 template <>
 InputParameters
 validParams<NodalBC>()
 {
-  InputParameters params = validParams<BoundaryCondition>();
+  InputParameters params = validParams<NodalBCBase>();
   params += validParams<RandomInterface>();
-  params.addParam<std::vector<AuxVariableName>>(
-      "save_in",
-      "The name of auxiliary variables to save this BC's residual contributions to.  "
-      "Everything about that variable must match everything about this variable (the "
-      "type, what blocks it's on, etc.)");
-  params.addParam<std::vector<AuxVariableName>>(
-      "diag_save_in",
-      "The name of auxiliary variables to save this BC's diagonal jacobian "
-      "contributions to.  Everything about that variable must match everything "
-      "about this variable (the type, what blocks it's on, etc.)");
 
   return params;
 }
 
 NodalBC::NodalBC(const InputParameters & parameters)
-  : BoundaryCondition(parameters, true), // true is for being Nodal
-    RandomInterface(parameters, _fe_problem, _tid, true),
-    CoupleableMooseVariableDependencyIntermediateInterface(this, true),
+  : NodalBCBase(parameters),
+    MooseVariableInterface<Real>(this,
+                                 true,
+                                 "variable",
+                                 Moose::VarKindType::VAR_NONLINEAR,
+                                 Moose::VarFieldType::VAR_FIELD_STANDARD),
+    _var(*mooseVariable()),
     _current_node(_var.node()),
-    _u(_var.nodalSln()),
-    _save_in_strings(parameters.get<std::vector<AuxVariableName>>("save_in")),
-    _diag_save_in_strings(parameters.get<std::vector<AuxVariableName>>("diag_save_in")),
-    _is_eigen(false)
+    _u(_var.dofValues())
 {
+  addMooseVariableDependency(mooseVariable());
+
   _save_in.resize(_save_in_strings.size());
   _diag_save_in.resize(_diag_save_in_strings.size());
 
   for (unsigned int i = 0; i < _save_in_strings.size(); i++)
   {
-    MooseVariable * var = &_subproblem.getVariable(_tid, _save_in_strings[i]);
+    MooseVariable * var = &_subproblem.getStandardVariable(_tid, _save_in_strings[i]);
 
     if (var->feType() != _var.feType())
-      mooseError("Error in " + name() + ". When saving residual values in an Auxiliary variable "
-                                        "the AuxVariable must be the same type as the nonlinear "
-                                        "variable the object is acting on.");
+      paramError(
+          "save_in",
+          "saved-in auxiliary variable is incompatible with the object's nonlinear variable: ",
+          moose::internal::incompatVarMsg(*var, _var));
 
     _save_in[i] = var;
     var->sys().addVariableToZeroOnResidual(_save_in_strings[i]);
@@ -69,12 +59,13 @@ NodalBC::NodalBC(const InputParameters & parameters)
 
   for (unsigned int i = 0; i < _diag_save_in_strings.size(); i++)
   {
-    MooseVariable * var = &_subproblem.getVariable(_tid, _diag_save_in_strings[i]);
+    MooseVariable * var = &_subproblem.getStandardVariable(_tid, _diag_save_in_strings[i]);
 
     if (var->feType() != _var.feType())
-      mooseError("Error in " + name() + ". When saving diagonal Jacobian values in an Auxiliary "
-                                        "variable the AuxVariable must be the same type as the "
-                                        "nonlinear variable the object is acting on.");
+      paramError(
+          "diag_save_in",
+          "saved-in auxiliary variable is incompatible with the object's nonlinear variable: ",
+          moose::internal::incompatVarMsg(*var, _var));
 
     _diag_save_in[i] = var;
     var->sys().addVariableToZeroOnJacobian(_diag_save_in_strings[i]);
@@ -85,18 +76,18 @@ NodalBC::NodalBC(const InputParameters & parameters)
 }
 
 void
-NodalBC::computeResidual(NumericVector<Number> & residual)
+NodalBC::computeResidual()
 {
   if (_var.isNodalDefined())
   {
     dof_id_type & dof_idx = _var.nodalDofIndex();
     _qp = 0;
     Real res = 0;
+    res = computeQpResidual();
 
-    if (!_is_eigen)
-      res = computeQpResidual();
-
-    residual.set(dof_idx, res);
+    for (auto tag_id : _vector_tags)
+      if (_sys.hasVector(tag_id))
+        _sys.getVector(tag_id).set(dof_idx, res);
 
     if (_has_save_in)
     {
@@ -117,11 +108,15 @@ NodalBC::computeJacobian()
   if (_var.isNodalDefined())
   {
     _qp = 0;
-    Real cached_val = computeQpJacobian();
+    Real cached_val = 0.;
+    cached_val = computeQpJacobian();
+
     dof_id_type cached_row = _var.nodalDofIndex();
 
     // Cache the user's computeQpJacobian() value for later use.
-    _fe_problem.assembly(0).cacheJacobianContribution(cached_row, cached_row, cached_val);
+    for (auto tag : _matrix_tags)
+      if (_sys.hasMatrix(tag))
+        _fe_problem.assembly(0).cacheJacobianContribution(cached_row, cached_row, cached_val, tag);
 
     if (_has_diag_save_in)
     {
@@ -140,13 +135,17 @@ NodalBC::computeOffDiagJacobian(unsigned int jvar)
   else
   {
     _qp = 0;
-    Real cached_val = computeQpOffDiagJacobian(jvar);
+    Real cached_val = 0.0;
+    cached_val = computeQpOffDiagJacobian(jvar);
+
     dof_id_type cached_row = _var.nodalDofIndex();
     // Note: this only works for Lagrange variables...
     dof_id_type cached_col = _current_node->dof_number(_sys.number(), jvar, 0);
 
     // Cache the user's computeQpJacobian() value for later use.
-    _fe_problem.assembly(0).cacheJacobianContribution(cached_row, cached_col, cached_val);
+    for (auto tag : _matrix_tags)
+      if (_sys.hasMatrix(tag))
+        _fe_problem.assembly(0).cacheJacobianContribution(cached_row, cached_col, cached_val, tag);
   }
 }
 

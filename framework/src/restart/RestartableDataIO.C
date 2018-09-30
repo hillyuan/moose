@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "RestartableDataIO.h"
@@ -20,7 +15,6 @@
 #include "MooseApp.h"
 #include "MooseUtils.h"
 #include "NonlinearSystem.h"
-#include "RestartableData.h"
 
 #include <stdio.h>
 #include <fstream>
@@ -52,6 +46,8 @@ RestartableDataIO::writeRestartableData(std::string base_file_name,
 
     std::string file_name = file_name_stream.str();
     out.open(file_name.c_str(), std::ios::out | std::ios::binary);
+    if (out.fail())
+      mooseError("Unable to open file ", file_name);
 
     serializeRestartableData(restartable_datas[tid], out);
 
@@ -61,7 +57,8 @@ RestartableDataIO::writeRestartableData(std::string base_file_name,
 
 void
 RestartableDataIO::serializeRestartableData(
-    const std::map<std::string, RestartableDataValue *> & restartable_data, std::ostream & stream)
+    const std::map<std::string, std::unique_ptr<RestartableDataValue>> & restartable_data,
+    std::ostream & stream)
 {
   unsigned int n_threads = libMesh::n_threads();
   processor_id_type n_procs = _fe_problem.n_processors();
@@ -69,11 +66,7 @@ RestartableDataIO::serializeRestartableData(
   const unsigned int file_version = 2;
 
   { // Write out header
-    char id[2];
-
-    // header
-    id[0] = 'R';
-    id[1] = 'D';
+    char id[] = {'R', 'D'};
 
     stream.write(id, 2);
     stream.write((const char *)&file_version, sizeof(file_version));
@@ -117,7 +110,7 @@ RestartableDataIO::serializeRestartableData(
 
 void
 RestartableDataIO::deserializeRestartableData(
-    const std::map<std::string, RestartableDataValue *> & restartable_data,
+    const std::map<std::string, std::unique_ptr<RestartableDataValue>> & restartable_data,
     std::istream & stream,
     const std::set<std::string> & recoverable_data)
 {
@@ -169,7 +162,7 @@ RestartableDataIO::deserializeRestartableData(
 
       try
       {
-        RestartableDataValue * current_data = restartable_data.at(current_name);
+        auto & current_data = restartable_data.at(current_name);
         current_data->load(stream);
       }
       catch (...)
@@ -204,15 +197,15 @@ RestartableDataIO::deserializeRestartableData(
 void
 RestartableDataIO::serializeSystems(std::ostream & stream)
 {
-  storeHelper(stream, static_cast<SystemBase &>(_fe_problem.getNonlinearSystemBase()), NULL);
-  storeHelper(stream, static_cast<SystemBase &>(_fe_problem.getAuxiliarySystem()), NULL);
+  storeHelper(stream, static_cast<SystemBase &>(_fe_problem.getNonlinearSystemBase()), nullptr);
+  storeHelper(stream, static_cast<SystemBase &>(_fe_problem.getAuxiliarySystem()), nullptr);
 }
 
 void
 RestartableDataIO::deserializeSystems(std::istream & stream)
 {
-  loadHelper(stream, static_cast<SystemBase &>(_fe_problem.getNonlinearSystemBase()), NULL);
-  loadHelper(stream, static_cast<SystemBase &>(_fe_problem.getAuxiliarySystem()), NULL);
+  loadHelper(stream, static_cast<SystemBase &>(_fe_problem.getNonlinearSystemBase()), nullptr);
+  loadHelper(stream, static_cast<SystemBase &>(_fe_problem.getAuxiliarySystem()), nullptr);
 }
 
 void
@@ -282,7 +275,7 @@ RestartableDataIO::readRestartableData(const RestartableDatas & restartable_data
 
   for (unsigned int tid = 0; tid < n_threads; tid++)
   {
-    const std::map<std::string, RestartableDataValue *> & restartable_data = restartable_datas[tid];
+    const auto & restartable_data = restartable_datas[tid];
 
     if (!_in_file_handles[tid].get() || !_in_file_handles[tid]->is_open())
       mooseError("In RestartableDataIO: Need to call readRestartableDataHeader() before calling "

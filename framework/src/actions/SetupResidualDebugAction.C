@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "SetupResidualDebugAction.h"
 
@@ -18,9 +13,11 @@
 #include "ActionWarehouse.h"
 #include "Factory.h"
 #include "FEProblem.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 #include "NonlinearSystemBase.h"
 #include "Conversion.h"
+
+registerMooseAction("MooseApp", SetupResidualDebugAction, "setup_residual_debug");
 
 template <>
 InputParameters
@@ -50,7 +47,8 @@ SetupResidualDebugAction::act()
   for (const auto & var_name : _show_var_residual)
   {
     // add aux-variable
-    MooseVariable & var = _problem->getVariable(0, var_name);
+    MooseVariableFEBase & var = _problem->getVariable(
+        0, var_name, Moose::VarKindType::VAR_NONLINEAR, Moose::VarFieldType::VAR_FIELD_STANDARD);
     InputParameters params = _factory.getValidParams("DebugResidualAux");
     const std::set<SubdomainID> & subdomains = var.activeSubdomains();
 
@@ -77,7 +75,7 @@ SetupResidualDebugAction::act()
 
     params.set<AuxVariableName>("variable") = aux_var_name;
     params.set<NonlinearVariableName>("debug_variable") = var.name();
-    params.set<MultiMooseEnum>("execute_on") = "linear timestep_end";
+    params.set<ExecFlagEnum>("execute_on") = {EXEC_LINEAR, EXEC_TIMESTEP_END};
     _problem->addAuxKernel("DebugResidualAux", kern_name, params);
   }
 }

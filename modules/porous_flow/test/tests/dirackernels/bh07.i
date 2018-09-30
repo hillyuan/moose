@@ -8,6 +8,14 @@
   PorousFlowDictator = dictator
 []
 
+[Functions]
+  [./dts]
+    type = PiecewiseLinear
+    y = '1000 10000'
+    x = '100 1000'
+  [../]
+[]
+
 [Variables]
   [./pp]
     initial_condition = 1E7
@@ -69,55 +77,22 @@
 [Materials]
   [./temperature]
     type = PorousFlowTemperature
-    at_nodes = true
   [../]
-  [./temperature_qp]
-    type = PorousFlowTemperature
-  [../]
-  [./ppss_nodal]
-    type = PorousFlow1PhaseP
-    at_nodes = true
-    porepressure = pp
-    capillary_pressure = pc
-  [../]
-  [./ppss_qp]
+  [./ppss]
     type = PorousFlow1PhaseP
     porepressure = pp
     capillary_pressure = pc
   [../]
   [./massfrac]
     type = PorousFlowMassFraction
-    at_nodes = true
   [../]
   [./simple_fluid]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid
     phase = 0
-    at_nodes = true
-  [../]
-  [./simple_fluid_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid
-    phase = 0
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-    include_old = true
-  [../]
-  [./dens_all_qp]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
   [../]
   [./porosity]
     type = PorousFlowPorosityConst
-    at_nodes = true
     porosity = 0.1
   [../]
   [./permeability]
@@ -126,29 +101,23 @@
   [../]
   [./relperm]
     type = PorousFlowRelativePermeabilityFLAC
-    at_nodes = true
     m = 2
     phase = 0
-  [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
   [../]
 []
 
 [DiracKernels]
   [./bh]
     type = PorousFlowPeacemanBorehole
-    bottom_p_or_t = 0
-    fluid_phase = 0
-    point_file = bh07.bh
-    use_mobility = true
-    SumQuantityUO = borehole_total_outflow_mass
     variable = pp
+    SumQuantityUO = borehole_total_outflow_mass
+    point_file = bh07.bh
+    fluid_phase = 0
+    bottom_p_or_t = 0
     unit_weight = '0 0 0'
-    re_constant = 0.1594
-    character = 2
+    use_mobility = true
+    re_constant = 0.1594  # use Chen and Zhang version
+    character = 2 # double the strength because bh07.bh only fills half the mesh
   [../]
 []
 
@@ -193,8 +162,7 @@
   [./TimeStepper]
     # get only marginally better results for smaller time steps
     type = FunctionDT
-    time_dt = '1000 10000'
-    time_t = '100 1000'
+    function = dts
   [../]
 []
 

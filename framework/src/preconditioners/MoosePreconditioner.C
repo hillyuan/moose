@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "MoosePreconditioner.h"
@@ -43,7 +38,8 @@ validParams<MoosePreconditioner>()
 
 MoosePreconditioner::MoosePreconditioner(const InputParameters & params)
   : MooseObject(params),
-    Restartable(params, "Preconditioners"),
+    Restartable(this, "Preconditioners"),
+    PerfGraphInterface(this),
     _fe_problem(*params.getCheckedPointerParam<FEProblemBase *>("_fe_problem_base"))
 {
   _fe_problem.getNonlinearSystemBase().setPCSide(getParam<MooseEnum>("pc_side"));
@@ -60,48 +56,35 @@ MoosePreconditioner::copyVarValues(MeshBase & mesh,
                                    const unsigned int to_var,
                                    NumericVector<Number> & to_vector)
 {
+  for (auto & node : mesh.local_node_ptr_range())
   {
-    MeshBase::node_iterator it = mesh.local_nodes_begin();
-    MeshBase::node_iterator it_end = mesh.local_nodes_end();
+    unsigned int n_comp = node->n_comp(from_system, from_var);
 
-    for (; it != it_end; ++it)
+    mooseAssert(node->n_comp(from_system, from_var) == node->n_comp(to_system, to_var),
+                "Number of components does not match in each system");
+
+    for (unsigned int i = 0; i < n_comp; i++)
     {
-      Node * node = *it;
+      dof_id_type from_dof = node->dof_number(from_system, from_var, i);
+      dof_id_type to_dof = node->dof_number(to_system, to_var, i);
 
-      unsigned int n_comp = node->n_comp(from_system, from_var);
-
-      mooseAssert(node->n_comp(from_system, from_var) == node->n_comp(to_system, to_var),
-                  "Number of components does not match in each system");
-
-      for (unsigned int i = 0; i < n_comp; i++)
-      {
-        dof_id_type from_dof = node->dof_number(from_system, from_var, i);
-        dof_id_type to_dof = node->dof_number(to_system, to_var, i);
-
-        to_vector.set(to_dof, from_vector(from_dof));
-      }
+      to_vector.set(to_dof, from_vector(from_dof));
     }
   }
+
+  for (auto & elem : as_range(mesh.local_elements_begin(), mesh.local_elements_end()))
   {
-    MeshBase::element_iterator it = mesh.local_elements_begin();
-    MeshBase::element_iterator it_end = mesh.local_elements_end();
+    unsigned int n_comp = elem->n_comp(from_system, from_var);
 
-    for (; it != it_end; ++it)
+    mooseAssert(elem->n_comp(from_system, from_var) == elem->n_comp(to_system, to_var),
+                "Number of components does not match in each system");
+
+    for (unsigned int i = 0; i < n_comp; i++)
     {
-      Elem * elem = *it;
+      dof_id_type from_dof = elem->dof_number(from_system, from_var, i);
+      dof_id_type to_dof = elem->dof_number(to_system, to_var, i);
 
-      unsigned int n_comp = elem->n_comp(from_system, from_var);
-
-      mooseAssert(elem->n_comp(from_system, from_var) == elem->n_comp(to_system, to_var),
-                  "Number of components does not match in each system");
-
-      for (unsigned int i = 0; i < n_comp; i++)
-      {
-        dof_id_type from_dof = elem->dof_number(from_system, from_var, i);
-        dof_id_type to_dof = elem->dof_number(to_system, to_var, i);
-
-        to_vector.set(to_dof, from_vector(from_dof));
-      }
+      to_vector.set(to_dof, from_vector(from_dof));
     }
   }
 }

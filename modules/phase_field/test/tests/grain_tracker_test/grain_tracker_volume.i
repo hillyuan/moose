@@ -13,7 +13,6 @@
   ymax = 2
   zmax = 0
   elem_type = QUAD4
-  num_ghosted_layers = 2
 []
 
 [Variables]
@@ -40,7 +39,7 @@
                0  0  0'
     opposite_corners = '-0.5 -0.5 0
                         1    1    0'
-    inside = '1'
+    inside = 1
     outside = 0
     variable = gr1
   [../]

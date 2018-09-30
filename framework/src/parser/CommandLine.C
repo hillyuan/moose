@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "CommandLine.h"
@@ -24,7 +19,22 @@
 CommandLine::CommandLine(int argc, char * argv[]) : _argc(argc), _argv(argv)
 {
   for (int i = 0; i < argc; i++)
-    _args.push_back(std::string(argv[i]));
+  {
+    auto arg_value = std::string(argv[i]);
+
+    // Handle using a "="
+    if (arg_value.find("=") != std::string::npos)
+    {
+      std::vector<std::string> arg_split;
+
+      MooseUtils::tokenize(arg_value, arg_split, 1, "=");
+
+      for (auto & arg_piece : arg_split)
+        _args.push_back(MooseUtils::trim(arg_piece));
+    }
+    else
+      _args.push_back(arg_value);
+  }
 }
 
 CommandLine::~CommandLine() {}
@@ -61,6 +71,7 @@ CommandLine::populateInputParams(InputParameters & params)
   for (const auto & it : params)
   {
     std::string orig_name = it.first;
+
     if (search(orig_name))
     {
       {
@@ -129,13 +140,9 @@ CommandLine::search(const std::string & option_name)
   if (pos != _cli_options.end())
   {
     for (const auto & search_string : pos->second.cli_switch)
-    {
       for (auto & arg : _args)
-      {
         if (arg == search_string)
           return true;
-      }
-    }
 
     if (pos->second.required)
     {
@@ -175,4 +182,11 @@ CommandLine::printUsage() const
 
   Moose::out << "\nSolver Options:\n"
              << "  See solver manual for details (Petsc or Trilinos)\n";
+}
+
+template <>
+void
+CommandLine::setArgument<std::string>(std::stringstream & stream, std::string & argument)
+{
+  argument = stream.str();
 }

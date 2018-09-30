@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // STL includes
 #include <fstream>
@@ -18,6 +13,8 @@
 // MOOSE includes
 #include "CSVReader.h"
 #include "MooseUtils.h"
+
+registerMooseObject("MooseApp", CSVReader);
 
 template <>
 InputParameters
@@ -43,7 +40,12 @@ validParams<CSVReader>()
                                "omitted it will read comma or space separated files.");
   params.addParam<bool>(
       "ignore_empty_lines", true, "When true new empty lines in the file are ignored.");
-  params.set<MultiMooseEnum>("execute_on") = "initial";
+  params.set<ExecFlagEnum>("execute_on", true) = EXEC_INITIAL;
+
+  // The value from this VPP is naturally already on every processor
+  // TODO: Make this not the case!  See #11415
+  params.set<bool>("_is_broadcast") = true;
+
   return params;
 }
 

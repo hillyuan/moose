@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef NODALKERNEL_H
 #define NODALKERNEL_H
@@ -27,13 +22,17 @@
 #include "BlockRestrictable.h"
 #include "BoundaryRestrictable.h"
 #include "Restartable.h"
-#include "ZeroInterface.h"
 #include "MeshChangedInterface.h"
 #include "RandomInterface.h"
 #include "CoupleableMooseVariableDependencyIntermediateInterface.h"
+#include "MooseVariableInterface.h"
+#include "TaggingInterface.h"
 
 // Forward declerations
-class MooseVariable;
+template <typename>
+class MooseVariableFE;
+typedef MooseVariableFE<Real> MooseVariable;
+typedef MooseVariableFE<VectorValue<Real>> VectorMooseVariable;
 class MooseMesh;
 class SubProblem;
 class SystemBase;
@@ -57,10 +56,11 @@ class NodalKernel : public MooseObject,
                     public PostprocessorInterface,
                     public GeometricSearchInterface,
                     public Restartable,
-                    public ZeroInterface,
                     public MeshChangedInterface,
                     public RandomInterface,
-                    public CoupleableMooseVariableDependencyIntermediateInterface
+                    public CoupleableMooseVariableDependencyIntermediateInterface,
+                    public MooseVariableInterface<Real>,
+                    public TaggingInterface
 {
 public:
   /**
@@ -162,12 +162,12 @@ protected:
 
   /// The aux variables to save the residual contributions to
   bool _has_save_in;
-  std::vector<MooseVariable *> _save_in;
+  std::vector<MooseVariableFEBase *> _save_in;
   std::vector<AuxVariableName> _save_in_strings;
 
   /// The aux variables to save the diagonal Jacobian contributions to
   bool _has_diag_save_in;
-  std::vector<MooseVariable *> _diag_save_in;
+  std::vector<MooseVariableFEBase *> _diag_save_in;
   std::vector<AuxVariableName> _diag_save_in_strings;
 };
 

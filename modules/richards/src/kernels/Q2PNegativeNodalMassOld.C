@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "Q2PNegativeNodalMassOld.h"
 
@@ -12,6 +14,8 @@
 
 // C++ includes
 #include <iostream>
+
+registerMooseObject("RichardsApp", Q2PNegativeNodalMassOld);
 
 template <>
 InputParameters
@@ -53,13 +57,13 @@ Q2PNegativeNodalMassOld::computeQpResidual()
 
   if (_var_is_pp)
   {
-    density_old = _density.density(_var.nodalSlnOld()[_i]);
+    density_old = _density.density(_var.dofValuesOld()[_i]);
     mass_old = _porosity_old[_qp] * density_old * (1 - _other_var_nodal_old[_i]);
   }
   else
   {
     density_old = _density.density(_other_var_nodal_old[_i]);
-    mass_old = _porosity_old[_qp] * density_old * _var.nodalSlnOld()[_i];
+    mass_old = _porosity_old[_qp] * density_old * _var.dofValuesOld()[_i];
   }
 
   return _test[_i][_qp] * (-mass_old) / _dt;

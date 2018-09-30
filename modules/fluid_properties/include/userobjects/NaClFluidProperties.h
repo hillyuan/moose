@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef NACLFLUIDPROPERTIES_H
 #define NACLFLUIDPROPERTIES_H
@@ -31,6 +33,10 @@ InputParameters validParams<NaClFluidProperties>();
  * Int. J. Rock Mech. and Mining Sci., 78 (2015)
  * Note: The function given in this reference doesn't satisfactorily match their
  * experimental data, so the data was refitted using a third order polynomial
+ *
+ * NaCl critical properties from:
+ * From Anderko and Pitzer, Equation of state for pure sodium chloride, Fluid
+ * Phase Equil., 79 (1992)
  */
 class NaClFluidProperties : public SinglePhaseFluidPropertiesPT
 {
@@ -42,39 +48,25 @@ public:
 
   virtual Real molarMass() const override;
 
-  /**
-   * NaCl critical pressure
-   * From Anderko and Pitzer, Equation of state for pure sodium chloride, Fluid
-   * Phase Equil., 79 (1992)
-   * @return critical pressure (Pa)
-   */
-  virtual Real criticalPressure() const;
+  virtual Real criticalPressure() const override;
 
-  /**
-   * NaCl critical temperature
-   * From Anderko and Pitzer, Equation of state for pure sodium chloride, Fluid
-   * Phase Equil., 79 (1992)
-   * @return critical temperature (K)
-   */
-  virtual Real criticalTemperature() const;
+  virtual Real criticalTemperature() const override;
 
-  /**
-   * NaCl critical density
-   * From Anderko and Pitzer, Equation of state for pure sodium chloride, Fluid
-   * Phase Equil., 79 (1992)
-   * @return critical density (kg/m^3)
-   */
-  virtual Real criticalDensity() const;
+  virtual Real criticalDensity() const override;
 
-  virtual Real rho(Real pressure, Real temperature) const override;
+  virtual Real triplePointPressure() const override;
 
-  virtual void rho_dpT(
+  virtual Real triplePointTemperature() const override;
+
+  virtual Real rho_from_p_T(Real pressure, Real temperature) const override;
+
+  virtual void rho_from_p_T(
       Real pressure, Real temperature, Real & rho, Real & drho_dp, Real & drho_dT) const override;
 
-  virtual Real e(Real pressure, Real temperature) const override;
+  virtual Real e_from_p_T(Real pressure, Real temperature) const override;
 
   virtual void
-  e_dpT(Real pressure, Real temperature, Real & e, Real & de_dp, Real & de_dT) const override;
+  e_from_p_T(Real pressure, Real temperature, Real & e, Real & de_dp, Real & de_dT) const override;
 
   virtual void rho_e_dpT(Real pressure,
                          Real temperature,
@@ -85,45 +77,32 @@ public:
                          Real & de_dp,
                          Real & de_dT) const override;
 
-  virtual Real c(Real pressure, Real temperature) const override;
+  virtual Real c_from_p_T(Real pressure, Real temperature) const override;
 
-  virtual Real cp(Real pressure, Real temperature) const override;
+  virtual Real cp_from_p_T(Real pressure, Real temperature) const override;
 
-  virtual Real cv(Real pressure, Real temperature) const override;
+  virtual Real cv_from_p_T(Real pressure, Real temperature) const override;
 
-  virtual Real mu(Real pressure, Real temperature) const override;
+  virtual void rho_mu(Real pressure, Real temperature, Real & rho, Real & mu) const override;
 
-  virtual void
-  mu_dpT(Real pressure, Real temperature, Real & mu, Real & dmu_dp, Real & dmu_dT) const override;
+  virtual void rho_mu_dpT(Real pressure,
+                          Real temperature,
+                          Real & rho,
+                          Real & drho_dp,
+                          Real & drho_dT,
+                          Real & mu,
+                          Real & dmu_dp,
+                          Real & dmu_dT) const override;
 
-  virtual Real mu_from_rho_T(Real density, Real temperature) const override;
-
-  virtual void mu_drhoT_from_rho_T(Real density,
-                                   Real temperature,
-                                   Real ddensity_dT,
-                                   Real & mu,
-                                   Real & dmu_drho,
-                                   Real & dmu_dT) const override;
-
-  virtual Real k(Real pressure, Real temperature) const override;
+  virtual Real k_from_p_T(Real pressure, Real temperature) const override;
 
   virtual void
-  k_dpT(Real pressure, Real temperature, Real & k, Real & dk_dp, Real & dk_dT) const override;
+  k_from_p_T(Real pressure, Real temperature, Real & k, Real & dk_dp, Real & dk_dT) const override;
 
-  virtual Real k_from_rho_T(Real density, Real temperature) const override;
-
-  virtual Real s(Real pressure, Real temperature) const override;
-
-  virtual Real h(Real pressure, Real temperature) const override;
+  virtual Real h_from_p_T(Real pressure, Real temperature) const override;
 
   virtual void
-  h_dpT(Real pressure, Real temperature, Real & h, Real & dh_dp, Real & dh_dT) const override;
-
-  virtual Real beta(Real pressure, Real temperature) const override;
-
-  virtual Real henryConstant(Real temperature) const override;
-
-  virtual void henryConstant_dT(Real temperature, Real & Kh, Real & dKh_dT) const override;
+  h_from_p_T(Real pressure, Real temperature, Real & h, Real & dh_dp, Real & dh_dT) const override;
 
 protected:
   /// NaCl molar mass (kg/mol)

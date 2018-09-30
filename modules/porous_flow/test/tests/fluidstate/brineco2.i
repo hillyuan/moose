@@ -1,7 +1,4 @@
-# Tests correct calculation of properties in PorousFlowFluidStateWaterNCG.
-# This test is run three times, with the initial condition of z (the total mass
-# fraction of NCG in all phases) varied to give either a single phase liquid, a
-# single phase gas, or two phases.
+# Tests correct calculation of properties in PorousFlowBrineCO2
 
 [Mesh]
   type = GeneratedMesh
@@ -191,6 +188,12 @@
     type = PorousFlowCapillaryPressureConst
     pc = 0
   [../]
+  [./fs]
+    type = PorousFlowBrineCO2
+    brine_fp = brine
+    co2_fp = co2
+    capillary_pressure = pc
+  [../]
 []
 
 [Modules]
@@ -208,30 +211,14 @@
   [./temperature]
     type = PorousFlowTemperature
   [../]
-  [./temperature_nodal]
-    type = PorousFlowTemperature
-    at_nodes = true
-  [../]
   [./brineco2]
     type = PorousFlowFluidStateBrineCO2
     gas_porepressure = pgas
     z = z
-    co2_fp = co2
-    brine_fp = brine
-    at_nodes = true
     temperature_unit = Celsius
     xnacl = xnacl
     capillary_pressure = pc
-  [../]
-  [./brineco2_qp]
-    type = PorousFlowFluidStateBrineCO2
-    gas_porepressure = pgas
-    z = z
-    co2_fp = co2
-    brine_fp = brine
-    temperature_unit = Celsius
-    xnacl = xnacl
-    capillary_pressure = pc
+    fluid_state = fs
   [../]
   [./permeability]
     type = PorousFlowPermeabilityConst
@@ -241,23 +228,15 @@
     type = PorousFlowRelativePermeabilityCorey
     n = 2
     phase = 0
-    at_nodes = true
   [../]
   [./relperm1]
     type = PorousFlowRelativePermeabilityCorey
     n = 3
     phase = 1
-    at_nodes = true
-  [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_relative_permeability_nodal
-    at_nodes = true
   [../]
   [./porosity]
     type = PorousFlowPorosityConst
     porosity = 0.1
-    at_nodes = true
   [../]
 []
 
@@ -341,5 +320,5 @@
   csv = true
   file_base = brineco2
   execute_on = 'TIMESTEP_END'
-  print_perf_log = false
+  perf_graph = false
 []

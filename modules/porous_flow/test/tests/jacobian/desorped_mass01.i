@@ -155,21 +155,19 @@
     phase = 0
     at_nodes = true
   [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
   [./porosity]
-    type = PorousFlowPorosityHM
+    type = PorousFlowPorosity
+    fluid = true
+    mechanical = true
     porosity_zero = 0.1
     biot_coefficient = 0.5
     solid_bulk = 1
     at_nodes = true
   [../]
   [./porosity_qp]
-    type = PorousFlowPorosityHM
+    type = PorousFlowPorosity
+    fluid = true
+    mechanical = true
     porosity_zero = 0.1
     biot_coefficient = 0.5
     solid_bulk = 1

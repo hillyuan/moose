@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "EFAElement2D.h"
 
@@ -930,9 +932,8 @@ EFAElement2D::fragmentSanityCheck(unsigned int n_old_frag_edges, unsigned int n_
   }
   else if (n_old_frag_cuts == 3)
   {
-    if (_fragments.size() != 3 ||
-        (_fragments[0]->numEdges() + _fragments[1]->numEdges() + _fragments[2]->numEdges()) !=
-            n_old_frag_edges + 9)
+    if (_fragments.size() != 3 || (_fragments[0]->numEdges() + _fragments[1]->numEdges() +
+                                   _fragments[2]->numEdges()) != n_old_frag_edges + 9)
       EFAError("Incorrect link size for element with 3 cuts");
   }
   else
@@ -1717,8 +1718,8 @@ EFAElement2D::addEdgeCut(unsigned int edge_id,
   if (embedded_node) // use the existing embedded node if it was passed in
     local_embedded = embedded_node;
 
-  if (_edges[edge_id]->hasIntersectionAtPosition(position, edge_node1) &&
-      position > Xfem::tol & position < 1.0 - Xfem::tol)
+  if (_edges[edge_id]->hasIntersectionAtPosition(position, edge_node1) && position > Xfem::tol &&
+      position < 1.0 - Xfem::tol)
   {
     unsigned int emb_id = _edges[edge_id]->getEmbeddedNodeIndex(position, edge_node1);
     EFANode * old_emb = _edges[edge_id]->getEmbeddedNode(emb_id);

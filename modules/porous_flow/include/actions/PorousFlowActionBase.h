@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef POROUSFLOWACTIONBASE_H
 #define POROUSFLOWACTIONBASE_H
 
@@ -32,15 +35,20 @@ protected:
   /**
    * List of Kernels, AuxKernels, Materials, etc, to be added.
    * This list will be used to determine what Materials need
-   * to be added.
-   * Actions may add or remove things from this list
+   * to be added. Actions may add or remove things from this list
    */
   std::vector<std::string> _objects_to_add;
 
   /// The name of the PorousFlowDictator object to be added
   const std::string _dictator_name;
 
-  /// gravity
+  /// Number of aqueous-equilibrium secondary species
+  const unsigned int _num_aqueous_equilibrium;
+
+  /// Number of aqeuous-kinetic secondary species that are involved in mineralisation
+  const unsigned int _num_aqueous_kinetic;
+
+  /// Gravity
   const RealVectorValue _gravity;
 
   /// Name of the mass-fraction variables (if any)
@@ -52,20 +60,20 @@ protected:
   /// Name of the temperature variable (if any)
   const std::vector<VariableName> & _temperature_var;
 
-  /// displacement NonlinearVariable names (if any)
+  /// Displacement NonlinearVariable names (if any)
   const std::vector<NonlinearVariableName> & _displacements;
 
-  /// number of displacement variables supplied
+  /// Number of displacement variables supplied
   const unsigned _ndisp;
 
-  /// displacement Variable names
+  /// Displacement Variable names
   std::vector<VariableName> _coupled_displacements;
 
   /// Coordinate system of the simulation (eg RZ, XYZ, etc)
   Moose::CoordinateSystemType _coord_system;
 
   /**
-   * add the PorousFlowDictator object
+   * Add the PorousFlowDictator object
    */
   virtual void addDictator() = 0;
 
@@ -172,51 +180,6 @@ protected:
    * @param userobject_name name of the user object
    */
   void addCapillaryPressureVG(Real m, Real alpha, std::string userobject_name);
-
-  /**
-   * Adds a PorousFlowJoiner for the material_property Material
-   * @param at_nodes if true: the Joiner should produce a nodal material, otherwise: produce a QP
-   * material
-   * @param material_property Join this PorousFlow Material
-   * @param output_name The name given to this PorousFlowJoiner in the input file
-   */
-  void
-  addJoiner(bool at_nodes, const std::string & material_property, const std::string & output_name);
-
-  /**
-   * Adds a PorousFlowJoiner for the fluid density
-   * @param at_nodes if true: the Joiner should produce a nodal material, otherwise: produce a QP
-   * material
-   */
-  void joinDensity(bool at_nodes);
-
-  /**
-   * Adds a PorousFlowJoiner for the fluid viscosity
-   * @param at_nodes if true: the Joiner should produce a nodal material, otherwise: produce a QP
-   * material
-   */
-  void joinViscosity(bool at_nodes);
-
-  /**
-   * Adds a PorousFlowJoiner for the fluid relative permeability
-   * @param at_nodes if true: the Joiner should produce a nodal material, otherwise: produce a QP
-   * material
-   */
-  void joinRelativePermeability(bool at_nodes);
-
-  /**
-   * Adds a PorousFlowJoiner for the fluid internal energy
-   * @param at_nodes if true: the Joiner should produce a nodal material, otherwise: produce a QP
-   * material
-   */
-  void joinInternalEnergy(bool at_nodes);
-
-  /**
-   * Adds a PorousFlowJoiner for the fluid enthalpy
-   * @param at_nodes if true: the Joiner should produce a nodal material, otherwise: produce a QP
-   * material
-   */
-  void joinEnthalpy(bool at_nodes);
 };
 
 #endif // POROUSFLOWACTIONBASE_H

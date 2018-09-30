@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "SolidModel.h"
 #include "AxisymmetricRZ.h"
@@ -21,6 +23,8 @@
 #include "PiecewiseLinear.h"
 
 #include "libmesh/quadrature.h"
+
+registerMooseObject("SolidMechanicsApp", SolidModel);
 
 template <>
 InputParameters
@@ -209,6 +213,7 @@ SolidModel::SolidModel(const InputParameters & parameters)
     _d_strain_dT(),
     _d_stress_dT(createProperty<SymmTensor>("d_stress_dT")),
     _total_strain_increment(0),
+    _mechanical_strain_increment(0),
     _strain_increment(0),
     _compute_JIntegral(getParam<bool>("compute_JIntegral")),
     _compute_InteractionIntegral(getParam<bool>("compute_InteractionIntegral")),
@@ -739,6 +744,7 @@ SolidModel::computeProperties()
     _total_strain_increment = _strain_increment;
 
     modifyStrainIncrement();
+    _mechanical_strain_increment = _strain_increment;
 
     computeElasticityTensor();
 
@@ -776,8 +782,9 @@ SolidModel::computeStrainEnergyDensity()
 {
   mooseAssert(_SED, "_SED not initialized");
   mooseAssert(_SED_old, "_SED_old not initialized");
-  (*_SED)[_qp] = (*_SED_old)[_qp] + _stress[_qp].doubleContraction(_strain_increment) / 2 +
-                 _stress_old_prop[_qp].doubleContraction(_strain_increment) / 2;
+  (*_SED)[_qp] = (*_SED_old)[_qp] +
+                 _stress[_qp].doubleContraction(_mechanical_strain_increment) / 2 +
+                 _stress_old_prop[_qp].doubleContraction(_mechanical_strain_increment) / 2;
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -837,9 +844,6 @@ SolidModel::computeConstitutiveModelStress()
   // Given the stretching, compute the stress increment and add it to the old stress. Also update
   // the creep strain
   // stress = stressOld + stressIncrement
-
-  if (_step_zero)
-    return;
 
   const SubdomainID current_block = _current_elem->subdomain_id();
   MooseSharedPointer<ConstitutiveModel> cm = _constitutive_model[current_block];
@@ -1297,7 +1301,7 @@ SolidModel::crackingStressRotation()
            // && (*_crack_count)[_qp](i) == 0
            )
           // || _cracked_this_step_count[_q_point[_qp]] > 5
-          )
+      )
       {
         cracked = true;
         ++((*_crack_count)[_qp](i));
@@ -1328,7 +1332,7 @@ SolidModel::crackingStressRotation()
                 sigma(i) > _cracking_stress && num_cracks < _max_cracks &&
                 _active_crack_planes[i] == 1)
                // || _cracked_this_step_count[_q_point[_qp]] > 5
-               )
+      )
       {
         // A new crack
         // _cracked_this_step[_q_point[_qp]] = 1;
@@ -1590,12 +1594,7 @@ SolidModel::createConstitutiveModel(const std::string & cm_name)
 
   Factory & factory = _app.getFactory();
   InputParameters params = factory.getValidParams(cm_name);
-  // These set_attributes calls are to make isParamSetByUser() work correctly on
-  // these parameters in the ConstitutiveModel class, and are needed only for the
-  // legacy_return_mapping option.
-  params.set_attributes("absolute_tolerance", false);
-  params.set_attributes("relative_tolerance", false);
-  params.set_attributes("max_its", false);
+
   params += parameters();
   MooseSharedPointer<ConstitutiveModel> cm =
       factory.create<ConstitutiveModel>(cm_name, name() + "Model", params, _tid);

@@ -1,8 +1,16 @@
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "hit.h"
 #include "Parser.h"
 
-#include "gtest/gtest.h"
+#include "gtest_include.h"
 
 #include <iostream>
 #include <vector>
@@ -43,6 +51,7 @@ TEST(HitTests, FailCases)
       {"extra section close", "[]"},
       {"extra section close 2", "[../]"},
       {"empty  dotslash section name", "[./][]"},
+      {"mismatched consecutive string literal quotes", "foo='bar'\"baz\""},
   };
 
   for (size_t i = 0; i < sizeof(cases) / sizeof(PassFailCase); i++)
@@ -51,6 +60,61 @@ TEST(HitTests, FailCases)
     EXPECT_THROW(hit::parse("TESTCASE", test.input), hit::Error)
         << "case " << i + 1 << " FAIL (" << test.name << "): parser failed to error on bad input '"
         << test.input << "'";
+  }
+}
+
+struct LineCase
+{
+  std::string input;
+  std::vector<int> line_nums;
+};
+
+class LineWalker : public hit::Walker
+{
+public:
+  LineWalker(int i, const std::vector<int> & want_lines) : _case(i), _want(want_lines){};
+  virtual void
+  walk(const std::string & fullpath, const std::string & /*nodepath*/, hit::Node * n) override
+  {
+    if (n->type() == hit::NodeType::Blank || fullpath == "")
+      return;
+
+    if (_count >= _want.size())
+      FAIL() << "case " << _case + 1 << " has more nodes than expected";
+    EXPECT_EQ(_want[_count], n->line())
+        << "case " << _case + 1 << " node " << _count + 1 << " (" << fullpath
+        << ") has wrong line: want " << _want[_count] << ", got " << n->line();
+    _count++;
+  }
+
+private:
+  int _case;
+  std::vector<int> _want;
+  size_t _count = 0;
+};
+
+TEST(HitTests, LineNumbers)
+{
+  // list of expected line numbers for nodes starts at line 1 and skips root and blankline nodes
+  LineCase cases[] = {
+      {"[hello] foo='bar'\n\n\n boo='far'\n\n[]", {1, 1, 4}},
+      {"[hello]\n  foo='bar'\n[]\n[goodbye]\n  boo=42\n[]", {1, 2, 4, 5}},
+      {"[hello]\n\n # comment\n foo='bar' 'baz' # another comment\n\nboo=42[]", {1, 3, 4, 4, 6}}};
+
+  for (size_t i = 0; i < sizeof(cases) / sizeof(LineCase); i++)
+  {
+    auto test = cases[i];
+    try
+    {
+      std::unique_ptr<hit::Node> root(hit::parse("TESTCASE", test.input));
+      LineWalker w(i, test.line_nums);
+      root->walk(&w, hit::NodeType::All);
+    }
+    catch (hit::Error & err)
+    {
+      FAIL() << "case " << i + 1 << " FAIL: unexpected parser error on valid input '" << test.input
+             << "': " << err.what();
+    }
   }
 }
 
@@ -66,6 +130,8 @@ TEST(HitTests, PassCases)
       {"no whitespace between headers/footers", "[hello][]"},
       {"no whitespace with sections and fields", "[hello][world]foo=bar[]baz=42[]"},
       {"no leading ./ in sub-block", "[hello] [world] [] []"},
+      {"consecutive string literals", "foo='bar''baz'"},
+      {"no infinite loop", "foo='bar'\n\n "},
   };
 
   for (size_t i = 0; i < sizeof(cases) / sizeof(PassFailCase); i++)
@@ -166,6 +232,7 @@ TEST(HitTests, ParseFields)
        "hello_./:<>-+world",
        "foo",
        hit::Field::Kind::String},
+      {"left-bracket-after-number", "[hello]foo=42[]", "hello/foo", "42", hit::Field::Kind::Int},
       {"ignore leading spaces 1", "foo=    bar", "foo", "bar", hit::Field::Kind::String},
       {"ignore leading spaces 2", "foo=     \t42", "foo", "42", hit::Field::Kind::Int},
       {"ignore trailing spaces", "foo=bar\t   ", "foo", "bar", hit::Field::Kind::String},
@@ -179,24 +246,29 @@ TEST(HitTests, ParseFields)
        "foo",
        "hello\\nworld",
        hit::Field::Kind::String},
+      {"cosecutive string literal 1", "foo='bar''baz'", "foo", "barbaz", hit::Field::Kind::String},
+      {"cosecutive string literal 2",
+       "foo='bar'\n\n'baz'",
+       "foo",
+       "barbaz",
+       hit::Field::Kind::String},
   };
 
   for (size_t i = 0; i < sizeof(cases) / sizeof(ValCase); i++)
   {
     auto test = cases[i];
     auto root = hit::parse("TEST", test.input);
-    ExpandWalker exw("TEST");
-    root->walk(&exw);
     auto n = root->find(test.key);
     if (!n)
     {
-      FAIL() << "case " << i + 1 << " failed to find key '" << test.key << "'\n";
+      FAIL() << "case " << i + 1 << " (" << test.name << ") failed to find key '" << test.key
+             << "'\n";
       continue;
     }
     if (n->strVal() != test.val)
     {
-      FAIL() << "case " << i + 1 << " wrong value (key=" << test.key << "): got '" << n->strVal()
-             << "', want '" << test.val << "'\n";
+      FAIL() << "case " << i + 1 << " (" << test.name << ") wrong value (key=" << test.key
+             << "): got '" << n->strVal() << "', want '" << test.val << "'\n";
       continue;
     }
 
@@ -212,9 +284,10 @@ TEST(ExpandWalkerTests, All)
 {
   ValCase cases[] = {
       {"substitute string", "foo=bar boo=${foo}", "boo", "bar", hit::Field::Kind::String},
+      {"trailing space", "foo=bar boo=${foo} ", "boo", "bar", hit::Field::Kind::String},
       {"substute number", "foo=42 boo=${foo}", "boo", "42", hit::Field::Kind::Int},
       {"multiple replacements",
-       "foo=42 boo=${foo} ${foo}",
+       "foo=42 boo='${foo} ${foo}'",
        "boo",
        "42 42",
        hit::Field::Kind::String},
@@ -224,16 +297,12 @@ TEST(ExpandWalkerTests, All)
        "src/bar",
        "foo",
        hit::Field::Kind::String},
-      {"repl-header-missing",
-       "[src] bar='${src}' []",
-       "src/bar",
-       "${src}",
-       hit::Field::Kind::String},
+      {"repl-header-missing", "[src] bar='${src}' []", "src/bar", "${src}", hit::Field::Kind::None},
       {"repl-header-shadow",
        "[src] bar='${src}' [] src=foo",
        "src/bar",
        "${src}",
-       hit::Field::Kind::String},
+       hit::Field::Kind::None},
       {"nested shadow",
        "foo=bar [hello] foo=baz boo='${foo}' []",
        "hello/boo",
@@ -244,9 +313,30 @@ TEST(ExpandWalkerTests, All)
   for (size_t i = 0; i < sizeof(cases) / sizeof(ValCase); i++)
   {
     auto test = cases[i];
-    auto root = hit::parse("TEST", test.input);
-    ExpandWalker exw("TEST");
-    root->walk(&exw);
+    hit::Node * root = nullptr;
+    try
+    {
+      root = hit::parse("TEST", test.input);
+      ExpandWalker exw("TEST");
+      root->walk(&exw);
+      if (exw.errors.size() > 0 && test.kind != hit::Field::Kind::None)
+      {
+        for (auto & err : exw.errors)
+          FAIL() << "case " << i + 1 << " unexpected error: " << err << "\n";
+        continue;
+      }
+      else if (exw.errors.size() == 0 && test.kind == hit::Field::Kind::None)
+      {
+        FAIL() << "case " << i + 1 << " missing expected error\n";
+        continue;
+      }
+    }
+    catch (std::exception & err)
+    {
+      FAIL() << "case " << i + 1 << " unexpected error: " << err.what() << "\n";
+      continue;
+    }
+
     auto n = root->find(test.key);
     if (!n)
     {
@@ -263,7 +353,7 @@ TEST(ExpandWalkerTests, All)
     auto f = dynamic_cast<hit::Field *>(n);
     if (!f)
       FAIL() << "case " << i + 1 << " node type is not NodeType::Field";
-    else if (f->kind() != test.kind)
+    else if (test.kind != hit::Field::Kind::None && f->kind() != test.kind)
       FAIL() << "case " << i + 1 << " wrong kind (key=" << test.key << "): got '"
              << strkind(f->kind()) << "', want '" << strkind(test.kind) << "'\n";
   }
@@ -304,15 +394,35 @@ struct RenderCase
   std::string name;
   std::string input;
   std::string output;
+  int maxlen;
 };
 
 TEST(HitTests, RenderCases)
 {
   RenderCase cases[] = {
-      {"root level fields", "foo=bar boo=far", "foo = bar\nboo = far"},
-      {"single section", "[foo]bar=baz[../]", "[foo]\n  bar = baz\n[]"},
-      {"remove leading newline", "\n[foo]bar=baz[../]", "[foo]\n  bar = baz\n[]"},
-      {"preserve consecutive newline", "[foo]\n\nbar=baz[../]", "[foo]\n\n  bar = baz\n[]"},
+      {"root level fields", "foo=bar boo=far", "foo = bar\nboo = far", 0},
+      {"single section", "[foo]bar=baz[../]", "[foo]\n  bar = baz\n[../]", 0},
+      {"remove leading newline", "\n[foo]bar=baz[../]", "[foo]\n  bar = baz\n[../]", 0},
+      {"preserve consecutive newline", "[foo]\n\nbar=baz[../]", "[foo]\n\n  bar = baz\n[../]", 0},
+      {"reflow long string",
+       "foo='hello my name is joe and I work in a button factory'",
+       "foo = 'hello my name is joe '\n      'and I work in a '\n      'button factory'",
+       28},
+      {"don't reflow unquoted string", "foo=unquotedstring", "foo = unquotedstring", 5},
+      {"reflow unbroken string", "foo='longstring'", "foo = 'longst'\n      'ring'", 12},
+      {"reflow pre-broken strings",
+       "foo='why'\n' separate '  'strings?'",
+       "foo = 'why separate strings?'",
+       0},
+      {"preserve quotes preceding blankline", "foo = '42'\n\n", "foo = '42'\n", 0},
+      {"preserve block comment (#10889)",
+       "[hello]\n  foo = '42'\n\n  # comment\n  bar = 'baz'\n[]",
+       "[hello]\n  foo = '42'\n\n  # comment\n  bar = 'baz'\n[]",
+       0},
+      {"preserve block comment 2 (#10889)",
+       "[hello]\n  foo = '42'\n  # comment\n  bar = 'baz'\n[]",
+       "[hello]\n  foo = '42'\n  # comment\n  bar = 'baz'\n[]",
+       0},
   };
 
   for (size_t i = 0; i < sizeof(cases) / sizeof(RenderCase); i++)
@@ -323,21 +433,127 @@ TEST(HitTests, RenderCases)
     try
     {
       root = hit::parse("TESTCASE", test.input);
-      got = root->render();
+      got = root->render(0, "  ", test.maxlen);
     }
     catch (std::exception & err)
     {
       FAIL() << "case " << i + 1 << " FAIL (" << test.name << "): unexpected error: " << err.what();
     }
-    EXPECT_EQ(test.output, got) << "case " << i + 1 << " FAIL";
+    EXPECT_EQ(test.output, got) << "case " << i + 1 << " FAIL (" << test.name << ")";
   }
 }
 
 TEST(HitTests, MergeTree)
 {
-  auto root1 = hit::parse("TESTCASE", "[foo]bar=42[]");
-  auto root2 = hit::parse("TESTCASE", "foo/baz/boo=42");
-  hit::explode(root2);
-  hit::merge(root2, root1);
-  EXPECT_EQ("[foo]\n  bar = 42\n  [baz]\n    boo = 42\n  []\n[]", root1->render());
+  {
+    auto root1 = hit::parse("TESTCASE", "[foo]bar=42[]");
+    auto root2 = hit::parse("TESTCASE", "foo/baz/boo=42");
+    hit::explode(root2);
+    hit::merge(root2, root1);
+    EXPECT_EQ("[foo]\n  bar = 42\n  [baz]\n    boo = 42\n  []\n[]", root1->render());
+  }
+
+  {
+    auto root1 = hit::parse("TESTCASE", "foo/bar=baz");
+    auto root2 = hit::parse("TESTCASE", "foo/bar=42");
+    hit::merge(root2, root1);
+    auto n = root1->find("foo/bar");
+    auto f = dynamic_cast<hit::Field *>(n);
+    if (!f)
+      FAIL() << "merge case node type is not NodeType::Field";
+
+    // Make sure that the the from type overrides the into type on merge
+    else if (f->kind() != hit::Field::Kind::Int)
+      FAIL() << "merge case kind type is not overridden (string)";
+  }
+}
+
+TEST(HitTests, Formatter)
+{
+  RenderCase cases[] = {
+      {"[format]line_length=100[]",
+       "foo='line longer than 20 characters'",
+       "foo = 'line longer than 20 characters'",
+       0},
+      {"[format]line_length=20[]",
+       "foo='line longer than 20 characters'",
+       "foo = 'line longer '\n      'than 20 '\n      'characters'",
+       0},
+      {"[format]canonical_section_markers=true[]", "[./foo][../]", "[foo]\n[]", 0},
+      {"[format]canonical_section_markers=false[]", "[./foo][../]", "[./foo]\n[../]", 0},
+      {"[format]indent_string='    '[]", "[foo]bar=42[]", "[foo]\n    bar = 42\n[]", 0},
+      {"[format]indent_string='      '[]", "[foo]bar=42[]", "[foo]\n      bar = 42\n[]", 0},
+  };
+
+  for (size_t i = 0; i < sizeof(cases) / sizeof(RenderCase); i++)
+  {
+    auto test = cases[i];
+    std::string got;
+    try
+    {
+      hit::Formatter fmter("STYLE", test.name);
+      got = fmter.format("TESTCASE", test.input);
+    }
+    catch (std::exception & err)
+    {
+      FAIL() << "case " << i + 1 << " FAIL (" << test.name << "): unexpected error: " << err.what();
+    }
+    EXPECT_EQ(test.output, got) << "case " << i + 1 << " FAIL (" << test.name << ")";
+  }
+}
+
+struct SortCase
+{
+  struct Pattern
+  {
+    std::string pattern;
+    std::vector<std::string> order;
+  };
+  std::string name;
+  std::string input;
+  std::string want;
+  std::vector<Pattern> patterns;
+};
+
+TEST(HitTests, Formatter_sorting)
+{
+  // clang-format off
+  SortCase cases[] = {
+      {
+        "name",
+        "order = bar outof = foo",
+        "outof = foo\norder = bar",
+        {
+           {"", {"outof", "order"}},
+           {"pattern2", {"param1", "param2"}}
+        }
+      }, {
+        "name",
+        "order = bar outof = foo",
+        "order = bar\noutof = foo",
+        {
+        }
+      }
+  };
+  // clang-format on
+
+  for (size_t i = 0; i < sizeof(cases) / sizeof(RenderCase); i++)
+  {
+    auto test = cases[i];
+    std::string got;
+
+    hit::Formatter fmter;
+    for (auto & pattern : test.patterns)
+      fmter.addPattern(pattern.pattern, pattern.order);
+
+    try
+    {
+      got = fmter.format("TESTCASE", test.input);
+    }
+    catch (std::exception & err)
+    {
+      FAIL() << "case " << i + 1 << " FAIL (" << test.name << "): unexpected error: " << err.what();
+    }
+    EXPECT_EQ(test.want, got) << "case " << i + 1 << " FAIL (" << test.name << ")";
+  }
 }

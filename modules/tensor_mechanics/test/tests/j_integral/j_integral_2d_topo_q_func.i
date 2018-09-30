@@ -44,6 +44,7 @@
   ring_first = 1
   ring_last = 4
   output_q = false
+  incremental = true
 []
 
 [Modules/TensorMechanics/Master]
@@ -96,9 +97,6 @@
   [../]
   [./elastic_stress]
     type = ComputeFiniteStrainElasticStress
-  [../]
-  [./eshelby]
-    type = EshelbyTensor
   [../]
 []
 

@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "SystemInfo.h"
 #include "ExecutablePath.h"
@@ -18,7 +13,6 @@
 
 #include "libmesh/libmesh_config.h"
 
-#include <ctime>
 #include <sstream>
 #include <sys/stat.h>
 #include <iomanip>
@@ -51,8 +45,8 @@ SystemInfo::getInfo() const
     executable = executable.substr(last_slash + 1);
   std::string executable_path(Moose::getExecutablePath() + executable);
   struct stat attrib;
-  stat(executable_path.c_str(), &attrib);
-  oss << std::setw(25) << "Executable Timestamp: " << getTimeStamp(&(attrib.st_mtime)) << "\n";
+  if (!stat(executable_path.c_str(), &attrib))
+    oss << std::setw(25) << "Executable Timestamp: " << getTimeStamp(&(attrib.st_mtime)) << "\n";
 
   oss << std::endl;
   return oss.str();
@@ -60,10 +54,10 @@ SystemInfo::getInfo() const
 
 // TODO: Update libmesh to handle this function "timestamp.h"
 std::string
-SystemInfo::getTimeStamp(time_t * time_stamp) const
+SystemInfo::getTimeStamp(std::time_t * time_stamp) const
 {
   struct tm * tm_struct;
-  time_t local_time;
+  std::time_t local_time;
 
 #ifdef LIBMESH_HAVE_LOCALE
   // Create time_put "facet"

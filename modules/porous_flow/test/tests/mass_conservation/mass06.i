@@ -92,41 +92,29 @@
 [Materials]
   [./temperature]
     type = PorousFlowTemperature
-    at_nodes = true
   [../]
   [./ppss]
     type = PorousFlow2PhasePS
-    at_nodes = true
     phase0_porepressure = pp
     phase1_saturation = sat
     capillary_pressure = pc
   [../]
   [./massfrac]
     type = PorousFlowMassFraction
-    at_nodes = true
     mass_fraction_vars = 'massfrac_ph0_sp0 massfrac_ph1_sp0'
   [../]
   [./simple_fluid0]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid0
-    at_nodes = true
     phase = 0
   [../]
   [./simple_fluid1]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid1
-    at_nodes = true
     phase = 1
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
   [../]
   [./porosity]
     type = PorousFlowPorosityConst
-    at_nodes = true
     porosity = 0.1
   [../]
 []

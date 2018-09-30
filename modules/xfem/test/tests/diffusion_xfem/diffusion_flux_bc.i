@@ -20,7 +20,6 @@
 []
 
 [XFEM]
-  geometric_cut_userobjects = 'line_seg_cut_uo'
   qrule = volfrac
   output_cut_plane = true
 []
@@ -81,13 +80,11 @@
 []
 
 [Outputs]
-  file_base = diffusion_flux_bc_out
   interval = 1
   execute_on = timestep_end
   exodus = true
   [./console]
     type = Console
-    perf_log = true
     output_linear = true
   [../]
 []

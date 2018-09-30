@@ -14,16 +14,20 @@ validParams<StorkApp>()
 
 StorkApp::StorkApp(InputParameters parameters) : MooseApp(parameters)
 {
-  Moose::registerObjects(_factory);
-  ModulesApp::registerObjects(_factory);
-  StorkApp::registerObjects(_factory);
-
-  Moose::associateSyntax(_syntax, _action_factory);
-  ModulesApp::associateSyntax(_syntax, _action_factory);
-  StorkApp::associateSyntax(_syntax, _action_factory);
+  StorkApp::registerAll(_factory, _action_factory, _syntax);
 }
 
 StorkApp::~StorkApp() {}
+
+void
+StorkApp::registerAll(Factory & f, ActionFactory & af, Syntax & s)
+{
+  ModulesApp::registerAll(f, af, s);
+  Registry::registerObjectsTo(f, {"StorkApp"});
+  Registry::registerActionsTo(af, {"StorkApp"});
+
+  /* register custom execute flags, action syntax, etc. here */
+}
 
 void
 StorkApp::registerApps()
@@ -31,45 +35,16 @@ StorkApp::registerApps()
   registerApp(StorkApp);
 }
 
-void
-StorkApp::registerObjects(Factory & /*factory*/)
-{
-  /* Uncomment Factory parameter and register your new production objects here! */
-}
-
-void
-StorkApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
-{
-  /* Uncomment Syntax and ActionFactory parameters and register your new production objects here! */
-}
-
-void
-StorkApp::registerObjectDepends(Factory & /*factory*/)
-{
-}
-
-void
-StorkApp::associateSyntaxDepends(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
-{
-}
-
 /***************************************************************************************************
  *********************** Dynamic Library Entry Points - DO NOT MODIFY ******************************
  **************************************************************************************************/
 extern "C" void
+StorkApp__registerAll(Factory & f, ActionFactory & af, Syntax & s)
+{
+  StorkApp::registerAll(f, af, s);
+}
+extern "C" void
 StorkApp__registerApps()
 {
   StorkApp::registerApps();
-}
-
-extern "C" void
-StorkApp__registerObjects(Factory & factory)
-{
-  StorkApp::registerObjects(factory);
-}
-
-extern "C" void
-StorkApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
-{
-  StorkApp::associateSyntax(syntax, action_factory);
 }

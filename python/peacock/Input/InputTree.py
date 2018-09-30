@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from InputFile import InputFile
 import mooseutils
 import InputTreeWriter
@@ -76,6 +85,8 @@ class InputTree(object):
         """
         try:
             new_input_file = InputFile()
+            if filename is None:
+                filename = ""
             new_input_file.readInputData(input_str, filename)
             return self._setInputFile(new_input_file)
         except Exception as e:

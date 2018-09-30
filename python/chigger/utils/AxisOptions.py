@@ -1,17 +1,13 @@
 #pylint: disable=missing-docstring
-#################################################################
-#                   DO NOT MODIFY THIS HEADER                   #
-#  MOOSE - Multiphysics Object Oriented Simulation Environment  #
-#                                                               #
-#            (c) 2010 Battelle Energy Alliance, LLC             #
-#                      ALL RIGHTS RESERVED                      #
-#                                                               #
-#           Prepared by Battelle Energy Alliance, LLC           #
-#             Under Contract No. DE-AC07-05ID14517              #
-#              With the U. S. Department of Energy              #
-#                                                               #
-#              See COPYRIGHT for full restrictions              #
-#################################################################
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import vtk
 from Options import Options
 
@@ -22,7 +18,7 @@ def get_options():
     opt = Options()
     opt.add('num_ticks', 5, "The number of tick marks to place on the axis.", vtype=int)
     opt.add('lim', "The axis extents.", vtype=list)
-    opt.add('color', [1, 1, 1], "The color of the axis, ticks, and labels.")
+    opt.add('font_color', [1, 1, 1], "The color of the axis, ticks, and labels.")
     opt.add('title', "The axis label.", vtype=str)
     opt.add('font_size', "The axis title and label font sizes, in points.", vtype=int)
     opt.add('title_font_size', "The axis title font size, in points.", vtype=int)
@@ -39,7 +35,8 @@ def get_options():
             allow=['left', 'right', 'top', 'bottom'])
     opt.add('axis_point1', [0, 0], 'Starting location of axis, in absolute viewport coordinates.')
     opt.add('axis_point2', [0, 0], 'Ending location of axis, in absolute viewport coordinates.')
-    opt.add('axis_scale', 1, "The axis scaling factor.")
+    opt.add('axis_scale', 1, "The axis scaling factor.", vtype=float)
+    opt.add('zero_tol', 1e-10, "Tolerance for considering limits to be the same.")
     return opt
 
 def set_options(vtkaxis, opt):
@@ -58,15 +55,35 @@ def set_options(vtkaxis, opt):
 
     # Limits
     if opt.isOptionValid('lim'):
-        vtkaxis.SetBehavior(vtk.vtkAxis.FIXED)
-        vtkaxis.SetRange(*opt['lim'])
-        vtkaxis.RecalculateTickSpacing()
+        lim = opt['lim']
+        if abs(lim[1] - lim[0]) < opt['zero_tol']:
+            vtkaxis.SetBehavior(vtk.vtkAxis.CUSTOM)
+            vtkaxis.SetRange(0, 1)
+
+            pos = vtk.vtkDoubleArray()
+            pos.SetNumberOfTuples(2)
+            pos.SetValue(0, 0)
+            pos.SetValue(1, 1)
+
+            labels = vtk.vtkStringArray()
+            labels.SetNumberOfTuples(2)
+            labels.SetValue(0, str(lim[0]))
+            labels.SetValue(1, str(lim[1]))
+
+            vtkaxis.SetCustomTickPositions(pos, labels)
+        else:
+            vtkaxis.SetCustomTickPositions(None, None)
+            vtkaxis.SetBehavior(vtk.vtkAxis.FIXED)
+            scale = opt['axis_scale']
+            vtkaxis.SetRange(lim[0] * scale, lim[1] * scale)
+            vtkaxis.RecalculateTickSpacing()
     else:
         vtkaxis.SetBehavior(vtk.vtkAxis.AUTO)
+        vtkaxis.SetCustomTickPositions(None, None)
 
     # Color
-    if opt.isOptionValid('color'):
-        clr = opt['color']
+    if opt.isOptionValid('font_color'):
+        clr = opt['font_color']
         vtkaxis.GetTitleProperties().SetColor(*clr)
         vtkaxis.GetLabelProperties().SetColor(*clr)
         vtkaxis.GetPen().SetColorF(*clr)
@@ -107,6 +124,3 @@ def set_options(vtkaxis, opt):
 
     if opt.isOptionValid('axis_point2'):
         vtkaxis.SetPoint2(*opt['axis_point2'])
-
-    if opt.isOptionValid('axis_scale'):
-        vtkaxis.SetScalingFactor(opt['axis_scale'])

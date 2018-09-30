@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from peacock.Input.InputTree import InputTree
 from peacock.Input import InputTreeWriter
 from peacock.Input.ExecutableInfo import ExecutableInfo
@@ -22,14 +31,14 @@ class Tests(Testing.PeacockTester):
     def testWriter(self):
         t = self.createBasic()
         s = InputTreeWriter.inputTreeToString(t.root)
-        self.checkFile(s, "gold/simple_diffusion.i")
+        self.checkFile(s, "gold/simple_diffusion.i", True)
 
     def testInactive(self):
         t = self.createBasic()
         d = t.getBlockInfo("/Kernels/diff")
         d.included = False
         s = InputTreeWriter.inputTreeToString(t.root)
-        self.checkFile(s, "gold/simple_diffusion_no_diff.i")
+        self.checkFile(s, "gold/simple_diffusion_no_diff.i", True)
         k = t.getBlockInfo("/Kernels")
         k.included = False
         b = t.getBlockInfo("/BCs")
@@ -37,7 +46,7 @@ class Tests(Testing.PeacockTester):
         e = t.getBlockInfo("/Executioner")
         e.included = False
         s = InputTreeWriter.inputTreeToString(t.root)
-        self.checkFile(s, "gold/simple_diffusion_inactive.i")
+        self.checkFile(s, "gold/simple_diffusion_inactive.i", True)
 
         d.included = True
         k.included = True

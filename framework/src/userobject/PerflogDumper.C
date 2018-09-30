@@ -1,28 +1,25 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PerflogDumper.h"
 #include "libmesh/perf_log.h"
 
 #include <ostream>
 
+registerMooseObject("MooseApp", PerflogDumper);
+
 template <>
 InputParameters
 validParams<PerflogDumper>()
 {
   InputParameters params = validParams<GeneralUserObject>();
-  params.set<MultiMooseEnum>("execute_on") = "final";
+  params.set<ExecFlagEnum>("execute_on") = EXEC_FINAL;
   params.addParam<std::string>("outfile", "perflog.csv", "name of perf log output file");
   params.addClassDescription("Dumps perlog information to a csv file for further analysis.");
   return params;
@@ -33,6 +30,7 @@ PerflogDumper::PerflogDumper(const InputParameters & parameters) : GeneralUserOb
 void
 PerflogDumper::execute()
 {
+#ifdef LIBMESH_ENABLE_DEPRECATED
   auto & log = Moose::perf_log.get_log_raw();
   std::ofstream f(_pars.get<std::string>("outfile"));
   if (!f.good())
@@ -51,4 +49,8 @@ PerflogDumper::execute()
   }
   if (!f.good())
     mooseError("PerfLogDumper: error writing file '", _pars.get<std::string>("outfile"), "'");
+#else
+  mooseWarning("The version of libMesh you are using does not support direct access "
+               "to the underlying PerfLog container, no log information will be dumped.");
+#endif
 }

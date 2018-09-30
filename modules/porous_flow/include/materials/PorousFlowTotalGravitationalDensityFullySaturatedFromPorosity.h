@@ -1,16 +1,17 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef POROUSFLOWTOTALGRAVITATIONALDENSITYFULLYSATURATEDFROMPOROSITY_H
 #define POROUSFLOWTOTALGRAVITATIONALDENSITYFULLYSATURATEDFROMPOROSITY_H
 
 #include "PorousFlowTotalGravitationalDensityBase.h"
 
-// Forward Declarations
 class PorousFlowTotalGravitationalDensityFullySaturatedFromPorosity;
 
 template <>
@@ -25,7 +26,7 @@ InputParameters validParams<PorousFlowTotalGravitationalDensityFullySaturatedFro
  * density (assumed constant).
  */
 class PorousFlowTotalGravitationalDensityFullySaturatedFromPorosity
-    : public PorousFlowTotalGravitationalDensityBase
+  : public PorousFlowTotalGravitationalDensityBase
 {
 public:
   PorousFlowTotalGravitationalDensityFullySaturatedFromPorosity(const InputParameters & parameters);
@@ -37,10 +38,10 @@ protected:
   /// Solid density
   const Real _rho_s;
 
-  /// fluid density at qps
+  /// Fluid density at qps
   const MaterialProperty<std::vector<Real>> & _rho_f_qp;
 
-  /// porosity at qps
+  /// Porosity at qps
   const MaterialProperty<Real> & _porosity_qp;
 
   /// d(rho_f)/d(PorousFlow variable)

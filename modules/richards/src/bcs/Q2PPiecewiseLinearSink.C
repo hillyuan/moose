@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "Q2PPiecewiseLinearSink.h"
 
@@ -12,6 +14,8 @@
 
 // C++ includes
 #include <iostream>
+
+registerMooseObject("RichardsApp", Q2PPiecewiseLinearSink);
 
 template <>
 InputParameters
@@ -104,7 +108,7 @@ Q2PPiecewiseLinearSink::prepareNodalValues()
   {
     for (unsigned int nodenum = 0; nodenum < _num_nodes; ++nodenum)
     {
-      _pp[nodenum] = _var.nodalSln()[nodenum];
+      _pp[nodenum] = _var.dofValues()[nodenum];
       _sat[nodenum] = _other_var_nodal[nodenum];
     }
   }
@@ -113,7 +117,7 @@ Q2PPiecewiseLinearSink::prepareNodalValues()
     for (unsigned int nodenum = 0; nodenum < _num_nodes; ++nodenum)
     {
       _pp[nodenum] = _other_var_nodal[nodenum];
-      _sat[nodenum] = _var.nodalSln()[nodenum];
+      _sat[nodenum] = _var.dofValues()[nodenum];
     }
   }
 
@@ -184,7 +188,7 @@ Q2PPiecewiseLinearSink::computeQpJacobian()
 }
 
 void
-Q2PPiecewiseLinearSink::computeJacobianBlock(unsigned int jvar)
+Q2PPiecewiseLinearSink::computeJacobianBlock(MooseVariableFEBase & jvar)
 {
   prepareNodalValues();
   IntegratedBC::computeJacobianBlock(jvar);

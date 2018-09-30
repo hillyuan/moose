@@ -1,22 +1,18 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef RESTARTABLEDATAIO_H
 #define RESTARTABLEDATAIO_H
 
 // MOOSE includes
 #include "DataIO.h"
+#include "RestartableData.h"
 
 // C++ includes
 #include <sstream>
@@ -25,8 +21,6 @@
 
 // Forward declarations
 class Backup;
-class RestartableDatas;
-class RestartableDataValue;
 class FEProblemBase;
 
 /**
@@ -74,17 +68,17 @@ private:
   /**
    * Serializes the data into the stream object.
    */
-  void
-  serializeRestartableData(const std::map<std::string, RestartableDataValue *> & restartable_data,
-                           std::ostream & stream);
+  void serializeRestartableData(
+      const std::map<std::string, std::unique_ptr<RestartableDataValue>> & restartable_data,
+      std::ostream & stream);
 
   /**
    * Deserializes the data from the stream object.
    */
-  void
-  deserializeRestartableData(const std::map<std::string, RestartableDataValue *> & restartable_data,
-                             std::istream & stream,
-                             const std::set<std::string> & recoverable_data);
+  void deserializeRestartableData(
+      const std::map<std::string, std::unique_ptr<RestartableDataValue>> & restartable_data,
+      std::istream & stream,
+      const std::set<std::string> & recoverable_data);
 
   /**
    * Serializes the data for the Systems in FEProblemBase

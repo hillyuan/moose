@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "AverageGrainVolume.h"
 #include "FeatureFloodCount.h"
@@ -12,6 +14,8 @@
 #include "MooseVariable.h"
 
 #include "libmesh/quadrature.h"
+
+registerMooseObject("PhaseFieldApp", AverageGrainVolume);
 
 template <>
 InputParameters
@@ -83,7 +87,7 @@ AverageGrainVolume::AverageGrainVolume(const InputParameters & parameters)
     for (auto & coupled_var : coupled_vars)
       _vals.emplace_back(&coupled_var->sln());
 
-    addMooseVariableDependency(coupled_vars);
+    addMooseVariableDependency(_feature_counter->getFECoupledVars());
   }
 }
 
@@ -103,11 +107,8 @@ void
 AverageGrainVolume::execute()
 {
   auto num_features = _feature_volumes.size();
-
-  const auto end = _mesh.getMesh().active_local_elements_end();
-  for (auto el = _mesh.getMesh().active_local_elements_begin(); el != end; ++el)
+  for (const auto & elem : _mesh.getMesh().active_local_element_ptr_range())
   {
-    const Elem * elem = *el;
     _fe_problem.prepare(elem, 0);
     _fe_problem.reinitElem(elem, 0);
 
@@ -158,5 +159,8 @@ AverageGrainVolume::getValue()
   for (auto & volume : _feature_volumes)
     total_volume += volume;
 
-  return total_volume / _feature_volumes.size();
+  unsigned int active_features =
+      _feature_counter ? _feature_counter->getNumberActiveFeatures() : _feature_volumes.size();
+
+  return total_volume / active_features;
 }

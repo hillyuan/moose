@@ -43,6 +43,7 @@
   2d = true
   axis_2d = 2
   equivalent_k = True
+  incremental = true
 []
 
 [AuxVariables]
@@ -119,9 +120,6 @@
   [../]
   [./elastic_stress]
     type = ComputeFiniteStrainElasticStress
-  [../]
-  [./eshelby]
-    type = EshelbyTensor
   [../]
 []
 

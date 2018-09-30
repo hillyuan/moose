@@ -1,41 +1,48 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "MaxIncrement.h"
+
+registerMooseObject("MooseApp", MaxIncrement);
 
 template <>
 InputParameters
 validParams<MaxIncrement>()
 {
   InputParameters params = validParams<ElementDamper>();
-  params.addRequiredParam<Real>("max_increment", "The maximum newton increment for the variable.");
+  params.addRequiredRangeCheckedParam<Real>(
+      "max_increment", "max_increment > 0", "The maximum newton increment for the variable.");
+  MooseEnum increment_type("absolute fractional", "absolute");
+  params.addParam<MooseEnum>(
+      "increment_type",
+      increment_type,
+      "Type of increment to compare against max_increment. 'absolute': use variable increment. "
+      "'fractional': use variable increment divided by the variable value.");
   return params;
 }
 
 MaxIncrement::MaxIncrement(const InputParameters & parameters)
-  : ElementDamper(parameters), _max_increment(parameters.get<Real>("max_increment"))
+  : ElementDamper(parameters),
+    _max_increment(parameters.get<Real>("max_increment")),
+    _increment_type(getParam<MooseEnum>("increment_type").getEnum<IncrementTypeEnum>())
 {
 }
 
 Real
 MaxIncrement::computeQpDamping()
 {
+  Real inc = std::abs(_u_increment[_qp]);
+  if (_increment_type == IncrementTypeEnum::fractional)
+    inc /= std::abs(_u[_qp]);
 
-  if (std::abs(_u_increment[_qp]) > _max_increment)
-  {
-    return std::abs(_max_increment / _u_increment[_qp]);
-  }
+  if (inc > _max_increment)
+    return _max_increment / inc;
 
   return 1.0;
 }

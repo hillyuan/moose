@@ -91,7 +91,6 @@
 [Executioner]
   type = Steady
 
-  # Preconditioned JFNK (default)
   solve_type = 'PJFNK'
 []
 
@@ -100,7 +99,6 @@
 
   [./h]
     type = AverageElementSize
-    variable = u
     execute_on = 'initial timestep_end'
   [../]
 

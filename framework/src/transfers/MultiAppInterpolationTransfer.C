@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "MultiAppInterpolationTransfer.h"
 
@@ -19,12 +14,14 @@
 #include "FEProblem.h"
 #include "MooseMesh.h"
 #include "MooseTypes.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 #include "MultiApp.h"
 
 #include "libmesh/meshfree_interpolation.h"
 #include "libmesh/system.h"
 #include "libmesh/radial_basis_interpolation.h"
+
+registerMooseObject("MooseApp", MultiAppInterpolationTransfer);
 
 template <>
 InputParameters
@@ -36,12 +33,6 @@ validParams<MultiAppInterpolationTransfer>()
   params.addRequiredParam<AuxVariableName>(
       "variable", "The auxiliary variable to store the transferred values in.");
   params.addRequiredParam<VariableName>("source_variable", "The variable to transfer from.");
-  params.addParam<bool>("displaced_source_mesh",
-                        false,
-                        "Whether or not to use the displaced mesh for the source mesh.");
-  params.addParam<bool>("displaced_target_mesh",
-                        false,
-                        "Whether or not to use the displaced mesh for the target mesh.");
 
   params.addParam<unsigned int>(
       "num_points", 3, "The number of nearest points to use for interpolation.");
@@ -71,8 +62,6 @@ MultiAppInterpolationTransfer::MultiAppInterpolationTransfer(const InputParamete
 {
   // This transfer does not work with DistributedMesh
   _fe_problem.mesh().errorIfDistributedMesh("MultiAppInterpolationTransfer");
-  _displaced_source_mesh = getParam<bool>("displaced_source_mesh");
-  _displaced_target_mesh = getParam<bool>("displaced_target_mesh");
 }
 
 void
@@ -94,7 +83,8 @@ MultiAppInterpolationTransfer::execute()
     case TO_MULTIAPP:
     {
       FEProblemBase & from_problem = _multi_app->problemBase();
-      MooseVariable & from_var = from_problem.getVariable(0, _from_var_name);
+      MooseVariableFEBase & from_var = from_problem.getVariable(
+          0, _from_var_name, Moose::VarKindType::VAR_ANY, Moose::VarFieldType::VAR_FIELD_STANDARD);
 
       MeshBase * from_mesh = NULL;
 
@@ -141,13 +131,8 @@ MultiAppInterpolationTransfer::execute()
 
       if (from_is_nodal)
       {
-        MeshBase::const_node_iterator from_nodes_it = from_mesh->local_nodes_begin();
-        MeshBase::const_node_iterator from_nodes_end = from_mesh->local_nodes_end();
-
-        for (; from_nodes_it != from_nodes_end; ++from_nodes_it)
+        for (const auto & from_node : from_mesh->local_node_ptr_range())
         {
-          Node * from_node = *from_nodes_it;
-
           // Assuming LAGRANGE!
           dof_id_type from_dof = from_node->dof_number(from_sys_num, from_var_num, 0);
 
@@ -157,13 +142,9 @@ MultiAppInterpolationTransfer::execute()
       }
       else
       {
-        MeshBase::const_element_iterator from_elements_it = from_mesh->local_elements_begin();
-        MeshBase::const_element_iterator from_elements_end = from_mesh->local_elements_end();
-
-        for (; from_elements_it != from_elements_end; ++from_elements_it)
+        for (const auto & from_elem :
+             as_range(from_mesh->local_elements_begin(), from_mesh->local_elements_end()))
         {
-          Elem * from_elem = *from_elements_it;
-
           // Assuming CONSTANT MONOMIAL
           dof_id_type from_dof = from_elem->dof_number(from_sys_num, from_var_num, 0);
 
@@ -199,13 +180,8 @@ MultiAppInterpolationTransfer::execute()
 
           if (is_nodal)
           {
-            MeshBase::const_node_iterator node_it = mesh->local_nodes_begin();
-            MeshBase::const_node_iterator node_end = mesh->local_nodes_end();
-
-            for (; node_it != node_end; ++node_it)
+            for (const auto & node : mesh->local_node_ptr_range())
             {
-              Node * node = *node_it;
-
               Point actual_position = *node + _multi_app->position(i);
 
               if (node->n_dofs(sys_num, var_num) > 0) // If this variable has dofs at this node
@@ -229,13 +205,8 @@ MultiAppInterpolationTransfer::execute()
           }
           else // Elemental
           {
-            MeshBase::const_element_iterator elem_it = mesh->local_elements_begin();
-            MeshBase::const_element_iterator elem_end = mesh->local_elements_end();
-
-            for (; elem_it != elem_end; ++elem_it)
+            for (auto & elem : as_range(mesh->local_elements_begin(), mesh->local_elements_end()))
             {
-              Elem * elem = *elem_it;
-
               Point centroid = elem->centroid();
               Point actual_position = centroid + _multi_app->position(i);
 
@@ -270,7 +241,8 @@ MultiAppInterpolationTransfer::execute()
     case FROM_MULTIAPP:
     {
       FEProblemBase & to_problem = _multi_app->problemBase();
-      MooseVariable & to_var = to_problem.getVariable(0, _to_var_name);
+      MooseVariableFEBase & to_var = to_problem.getVariable(
+          0, _to_var_name, Moose::VarKindType::VAR_ANY, Moose::VarFieldType::VAR_FIELD_STANDARD);
       SystemBase & to_system_base = to_var.sys();
 
       System & to_sys = to_system_base.system();
@@ -328,7 +300,11 @@ MultiAppInterpolationTransfer::execute()
         Moose::ScopedCommSwapper swapper(_multi_app->comm());
 
         FEProblemBase & from_problem = _multi_app->appProblemBase(i);
-        MooseVariable & from_var = from_problem.getVariable(0, _from_var_name);
+        MooseVariableFEBase & from_var =
+            from_problem.getVariable(0,
+                                     _from_var_name,
+                                     Moose::VarKindType::VAR_ANY,
+                                     Moose::VarFieldType::VAR_FIELD_STANDARD);
         SystemBase & from_system_base = from_var.sys();
 
         System & from_sys = from_system_base.system();
@@ -353,13 +329,8 @@ MultiAppInterpolationTransfer::execute()
 
         if (from_is_nodal)
         {
-          MeshBase::const_node_iterator from_nodes_it = from_mesh->local_nodes_begin();
-          MeshBase::const_node_iterator from_nodes_end = from_mesh->local_nodes_end();
-
-          for (; from_nodes_it != from_nodes_end; ++from_nodes_it)
+          for (const auto & from_node : from_mesh->local_node_ptr_range())
           {
-            Node * from_node = *from_nodes_it;
-
             // Assuming LAGRANGE!
             dof_id_type from_dof = from_node->dof_number(from_sys_num, from_var_num, 0);
 
@@ -369,13 +340,9 @@ MultiAppInterpolationTransfer::execute()
         }
         else
         {
-          MeshBase::const_element_iterator from_elements_it = from_mesh->local_elements_begin();
-          MeshBase::const_element_iterator from_elements_end = from_mesh->local_elements_end();
-
-          for (; from_elements_it != from_elements_end; ++from_elements_it)
+          for (auto & from_element :
+               as_range(from_mesh->local_elements_begin(), from_mesh->local_elements_end()))
           {
-            Elem * from_element = *from_elements_it;
-
             // Assuming LAGRANGE!
             dof_id_type from_dof = from_element->dof_number(from_sys_num, from_var_num, 0);
 
@@ -391,13 +358,8 @@ MultiAppInterpolationTransfer::execute()
       // Now do the interpolation to the target system
       if (is_nodal)
       {
-        MeshBase::const_node_iterator node_it = to_mesh->local_nodes_begin();
-        MeshBase::const_node_iterator node_end = to_mesh->local_nodes_end();
-
-        for (; node_it != node_end; ++node_it)
+        for (auto & node : as_range(to_mesh->local_nodes_begin(), to_mesh->local_nodes_end()))
         {
-          Node * node = *node_it;
-
           if (node->n_dofs(to_sys_num, to_var_num) > 0) // If this variable has dofs at this node
           {
             std::vector<Point> pts;
@@ -419,13 +381,8 @@ MultiAppInterpolationTransfer::execute()
       }
       else // Elemental
       {
-        MeshBase::const_element_iterator elem_it = to_mesh->local_elements_begin();
-        MeshBase::const_element_iterator elem_end = to_mesh->local_elements_end();
-
-        for (; elem_it != elem_end; ++elem_it)
+        for (auto & elem : as_range(to_mesh->local_elements_begin(), to_mesh->local_elements_end()))
         {
-          Elem * elem = *elem_it;
-
           Point centroid = elem->centroid();
 
           if (elem->n_dofs(to_sys_num, to_var_num) > 0) // If this variable has dofs at this elem
@@ -468,14 +425,14 @@ MultiAppInterpolationTransfer::getNearestNode(const Point & p,
   distance = std::numeric_limits<Real>::max();
   Node * nearest = NULL;
 
-  for (MeshBase::const_node_iterator node_it = nodes_begin; node_it != nodes_end; ++node_it)
+  for (auto & node : as_range(nodes_begin, nodes_end))
   {
-    Real current_distance = (p - *(*node_it)).norm();
+    Real current_distance = (p - *node).norm();
 
     if (current_distance < distance)
     {
       distance = current_distance;
-      nearest = *node_it;
+      nearest = node;
     }
   }
 

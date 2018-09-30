@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ComputeFiniteStrain.h"
 #include "Assembly.h"
@@ -16,6 +18,8 @@ ComputeFiniteStrain::decompositionType()
 {
   return MooseEnum("TaylorExpansion EigenSolution", "TaylorExpansion");
 }
+
+registerMooseObject("TensorMechanicsApp", ComputeFiniteStrain);
 
 template <>
 InputParameters
@@ -123,6 +127,9 @@ ComputeFiniteStrain::computeQpStrain()
       _rotation_increment[_qp] * _mechanical_strain[_qp] * _rotation_increment[_qp].transpose();
   _total_strain[_qp] =
       _rotation_increment[_qp] * _total_strain[_qp] * _rotation_increment[_qp].transpose();
+
+  if (_global_strain)
+    _total_strain[_qp] += (*_global_strain)[_qp];
 }
 
 void

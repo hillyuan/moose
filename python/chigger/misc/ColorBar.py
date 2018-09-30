@@ -1,19 +1,14 @@
 #pylint: disable=missing-docstring
-#################################################################
-#                   DO NOT MODIFY THIS HEADER                   #
-#  MOOSE - Multiphysics Object Oriented Simulation Environment  #
-#                                                               #
-#            (c) 2010 Battelle Energy Alliance, LLC             #
-#                      ALL RIGHTS RESERVED                      #
-#                                                               #
-#           Prepared by Battelle Energy Alliance, LLC           #
-#             Under Contract No. DE-AC07-05ID14517              #
-#              With the U. S. Department of Energy              #
-#                                                               #
-#              See COPYRIGHT for full restrictions              #
-#################################################################
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import vtk
-import mooseutils
 from AxisSource import AxisSource
 from .. import base
 from .. import geometric
@@ -68,13 +63,6 @@ class ColorBar(base.ChiggerResult):
         if self.needsInitialize():
             self.initialize()
 
-        # Error if the vtkRenderWindow is not set
-        size = self._vtkrenderer.GetSize()
-        if size == (0, 0):
-            raise mooseutils.MooseException('Calling update() prior to calling '
-                                            'RenderWindow.update() is not supported for this '
-                                            'object.')
-
         # Convenience names for the various sources
         plane, axis0, axis1 = self._sources
 
@@ -122,12 +110,14 @@ class ColorBar(base.ChiggerResult):
         pos = coord.GetComputedViewportValue(self._vtkrenderer)
 
         # Update the bar position
-        plane.setOptions(origin=[pos[0], pos[1], 0], point1=[p0[0], p0[1], 0],
+        plane.setOptions(origin=[pos[0], pos[1], 0],
+                         point1=[p0[0], p0[1], 0],
                          point2=[p1[0], p1[1], 0])
 
         # Set the colormap for the bar
         rng = self.getOption('cmap_range')
         step = (rng[1] - rng[0]) / float(n)
+
         data = vtk.vtkFloatArray()
         data.SetNumberOfTuples(n+1)
         for i in xrange(n+1):

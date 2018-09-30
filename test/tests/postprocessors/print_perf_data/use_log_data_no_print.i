@@ -38,9 +38,10 @@
 []
 
 [Postprocessors]
-  [./elapsed_active]
-    type = PerformanceData
-    event = 'ACTIVE'
+  [./elapsed]
+    type = PerfGraphData
+    section_name = "App"
+    data_type = total
   [../]
 []
 
@@ -49,7 +50,6 @@
   num_steps = 5
   dt = 0.1
 
-  # Preconditioned JFNK (default)
   solve_type = 'PJFNK'
 
   petsc_options_iname = '-pc_type -pc_hypre_type'

@@ -223,7 +223,6 @@
 [Postprocessors]
   [./matl_ts_min]
     type = MaterialTimeStepPostprocessor
-    execute_on = 'timestep_end'
   [../]
   [./stress_xx]
     type = ElementAverageValue
@@ -283,7 +282,6 @@
   csv = true
   [./console]
     type = Console
-    perf_log = true
     output_linear = true
   [../]
 [] # Outputs

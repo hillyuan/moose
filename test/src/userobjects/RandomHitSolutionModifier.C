@@ -1,23 +1,20 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "RandomHitSolutionModifier.h"
 
 // MOOSE includes
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 #include "NonlinearSystemBase.h"
 #include "RandomHitUserObject.h"
+
+registerMooseObject("MooseTestApp", RandomHitSolutionModifier);
 
 template <>
 InputParameters
@@ -35,7 +32,8 @@ RandomHitSolutionModifier::RandomHitSolutionModifier(const InputParameters & par
   : GeneralUserObject(parameters),
     _random_hits(getUserObject<RandomHitUserObject>("random_hits")),
     _mesh(_subproblem.mesh()),
-    _variable(_subproblem.getVariable(0, parameters.get<VariableName>("modify"))),
+    _variable(dynamic_cast<MooseVariable &>(
+        _subproblem.getVariable(0, parameters.get<VariableName>("modify")))),
     _amount(parameters.get<Real>("amount"))
 {
 }
@@ -43,7 +41,7 @@ RandomHitSolutionModifier::RandomHitSolutionModifier(const InputParameters & par
 void
 RandomHitSolutionModifier::execute()
 {
-  UniquePtr<PointLocatorBase> pl = _mesh.getMesh().sub_point_locator();
+  std::unique_ptr<PointLocatorBase> pl = _mesh.getMesh().sub_point_locator();
   pl->enable_out_of_mesh_mode();
 
   const std::vector<Point> & hits = _random_hits.hits();
@@ -60,12 +58,12 @@ RandomHitSolutionModifier::execute()
     if (elem && (elem->processor_id() == processor_id()))
     {
       Real closest_distance = std::numeric_limits<unsigned int>::max();
-      Node * closest_node = NULL;
+      const Node * closest_node = NULL;
 
       // Find the node on that element that is closest.
       for (unsigned int n = 0; n < elem->n_nodes(); n++)
       {
-        Node * cur_node = elem->get_node(n);
+        const Node * cur_node = elem->node_ptr(n);
         Real cur_distance = (hit - *cur_node).norm();
 
         if (cur_distance < closest_distance)

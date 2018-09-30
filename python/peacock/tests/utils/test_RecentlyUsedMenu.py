@@ -1,7 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from peacock.utils.RecentlyUsedMenu import RecentlyUsedMenu
 from peacock.utils import Testing
-from PyQt5.QtCore import QSettings
 from PyQt5 import QtWidgets
 
 class Tests(Testing.PeacockTester):
@@ -9,8 +17,6 @@ class Tests(Testing.PeacockTester):
 
     def setUp(self):
         super(Tests, self).setUp()
-        settings = QSettings()
-        settings.clear()
         self.main_win = QtWidgets.QMainWindow()
         self.menubar = self.main_win.menuBar()
         self.test_menu = self.menubar.addMenu("Test recently used")

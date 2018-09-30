@@ -39,7 +39,7 @@
   [./bad_bc_var_test]
     type = 'RunException'
     input = 'bad_bc_var_test.i'
-    expect_err = "Variable 'foo' does not exist in this system"
+    expect_err = "No nonlinear variable named foo found. Did you specify an auxiliary variable when you meant to specify a nonlinear variable"
   [../]
 
   [./bad_enum_test]
@@ -63,7 +63,7 @@
   [./bad_kernel_var_test]
     type = 'RunException'
     input = 'bad_kernel_var_test.i'
-    expect_err = "Unknown variable"
+    expect_err = "Unknown variable foo"
   [../]
 
   [./Badd_material_test]
@@ -92,17 +92,19 @@
   [../]
 
   [./deprecated_param_default]
-    type = 'RunException'
+    type = 'RunApp'
     input = 'deprecated_param_test.i'
-    expect_err = "The parameter \w+ is deprecated."
-    cli_args = '--error Kernels/nan/deprecated_default=1'
+    expect_out = "The parameter \w+ is deprecated."
+    cli_args = 'Kernels/nan/deprecated_default=1'
+    no_error_deprecated = true
   [../]
 
   [./deprecated_param_no_default]
-    type = 'RunException'
+    type = 'RunApp'
     input = 'deprecated_param_test.i'
-    expect_err = "The parameter \w+ is deprecated."
-    cli_args = '--error Kernels/nan/deprecated_no_default=1'
+    expect_out = "The parameter \w+ is deprecated."
+    cli_args = 'Kernels/nan/deprecated_no_default=1'
+    no_error_deprecated = true
   [../]
 
   [./double_restrict_uo_test]
@@ -156,13 +158,13 @@
   [./function_file_test3]
     type = 'RunException'
     input = 'function_file_test3.i'
-    expect_err = "In Piecewise \S+: Lengths of x and y data do not match."
+    expect_err = "In PiecewiseBase \S+: Lengths of x and y data do not match."
   [../]
 
   [./function_file_test4]
     type = 'RunException'
     input = 'function_file_test4.i'
-    expect_err = "Invalid option \"ROWLS\" in MooseEnum.\s+Valid options \(not case-sensitive\) are \"columns rows\""
+    expect_err = "Invalid option \"rowls\" in MooseEnum.\s+Valid options \(not case-sensitive\) are \"columns rows\""
   [../]
 
   [./function_file_test5]
@@ -261,11 +263,13 @@
     expect_err = "You cannot couple an elemental variable to a nodal variable"
   [../]
 
-  [./invalid_steady_exec_test]
-    type = 'RunException'
-    input = 'invalid_steady_exec_test.i'
-    expect_err = "You have specified time kernels in your steady state simulation"
-  [../]
+#  This will now be caught by a Tag error
+#  [./invalid_steady_exec_test]
+#    type = 'RunException'
+#    input = 'invalid_steady_exec_test.i'
+#    expect_err = "You have specified time kernels in your steady state simulation"
+#    deleted = true
+#  [../]
 
   [./missing_active_section_test]
     type = 'RunException'
@@ -325,31 +329,37 @@
   [./missing_mesh_test]
     type = 'RunException'
     input = 'missing_mesh_test.i'
-    expect_err = "Unable to open file \S+"
+    expect_err = "cannot locate mesh file '\S+'"
   [../]
 
   [./missing_req_par_action_obj_test]
     type = 'RunException'
     input = 'missing_req_par_action_obj_test.i'
-    expect_err = "The following required parameters are missing:\n\s*ConvectionDiffusion/variables"
+    expect_err = "missing required parameter 'ConvectionDiffusion/variables'"
   [../]
 
   [./missing_req_par_mesh_block_test]
     type = 'RunException'
     input = 'missing_req_par_mesh_block_test.i'
-    expect_err = "The following required parameters are missing:\n\s*Mesh/stripes"
+    expect_err = "missing required parameter 'Mesh/stripes'"
   [../]
 
   [./missing_req_par_moose_obj_test]
     type = 'RunException'
     input = 'missing_req_par_moose_obj_test.i'
-    expect_err = "The following required parameters are missing:\n\s*Kernels/diff/variable"
+    expect_err = "missing required parameter 'Kernels/diff/type'"
+  [../]
+
+  [./missing_var_in_kernel_test]
+    type = 'RunException'
+    input = 'missing_var_in_kernel_test.i'
+    expect_err = "missing required parameter 'Kernels/diff/variable'"
   [../]
 
   [./missing_required_coupled_test]
     type = 'RunException'
     input = 'missing_required_coupled.i'
-    expect_err = "The following required parameters are missing:\n\s*Kernels/conv_v/velocity_vector"
+    expect_err = "missing required parameter 'Kernels/conv_v/velocity_vector'"
   [../]
 
   [./multi_precond_test]
@@ -432,8 +442,7 @@
     type = 'RunApp'
     expect_out = "unused parameter 'Mesh/unused_param'"
     input = 'unused_param_test.i'
-    cli_args = '--warn-unused'
-    allow_warnings = true
+    allow_unused = true
     max_parallel = 1 # warning can mix on multiple processes
   [../]
 
@@ -441,8 +450,8 @@
     type = 'RunApp'
     expect_out = "unused parameter 'Executioner/unused_param'"
     input = 'unused_param_test.i'
-    cli_args = '--warn-unused Executioner/unused_param=true'
-    allow_warnings = true
+    cli_args = 'Executioner/unused_param=true'
+    allow_unused = true
     max_parallel = 1 # warning can mix on multiple processes
   [../]
 
@@ -481,7 +490,7 @@
   [./ics_missing_variable]
     type = 'RunException'
     input = 'ic_variable_not_specified.i'
-    expect_err = "The following required parameters are missing:\n\s*ICs/u_ic/variable"
+    expect_err = "missing required parameter 'ICs/u_ic/variable'"
   [../]
 
   [./ic_bnd_for_non_nodal]
@@ -493,7 +502,25 @@
   [./old_integrity_check]
     type = 'RunException'
     input = 'old_integrity_check.i'
-    expect_err = 'You may not couple in old or older values of \S+ when using a \"Steady\" executioner.'
+    expect_err = 'Calling \'coupledGradientOld\' on variable \S+ when using a \"Steady\" executioner is not allowed. This value is available only in transient simulations.'
+  [../]
+
+  [./dot_integrity_check]
+    type = 'RunException'
+    input = 'dot_integrity_check.i'
+    expect_err = 'Calling \'coupledDot\' on variable \S+ when using a \"Steady\" executioner is not allowed. This value is available only in transient simulations.'
+  [../]
+
+  [./scalar_old_integrity_check]
+    type = 'RunException'
+    input = 'scalar_old_integrity_check.i'
+    expect_err = 'Vector tag: TIME does not exist'
+  [../]
+
+  [./scalar_dot_integrity_check]
+    type = 'RunException'
+    input = 'scalar_dot_integrity_check.i'
+    expect_err = 'Vector tag: TIME does not exist.'
   [../]
 
   [./node_value_off_block]
@@ -516,7 +543,10 @@
     type = 'RunException'
     input = 'check_syntax_error.i'
     cli_args = '--check-input'
-    expect_err = 'ced: The number of nodes has to be 2, but it is 3.'
+    expect_err = 'invalid number of nodes: want 2, got 3'
+    # because with distributed, not all nodes end up on one proc, so the number of received nodes
+    # in not 3
+    mesh_mode = REPLICATED
   [../]
 
   [./check_syntax_no_input]
@@ -544,18 +574,153 @@
     expect_err = "Error: mesh has SECOND order elements, so all displacement variables must be SECOND order."
   [../]
 
-  [./perf_log_control_from_multiapp_sub]
-    type = 'RunException'
-    input = 'multi_master.i'
-    expect_err = "Performance logging cannot currently be controlled from a Multiapp"
-    max_parallel = 1
-  [../]
-
   [./function_conflict]
     # Check to see if a warning is produced when a function name could evaluate to a ParsedFunction
     type = 'RunApp'
     input = 'function_conflict.i'
     expect_out = "Function name 'x' could evaluate as a ParsedFunction"
     allow_warnings = true
+  [../]
+
+  [./bad_number]
+    type = 'RunException'
+    input = 'bad_number.i'
+    expect_err = "invalid float syntax for parameter: BCs/right/value"
+  [../]
+
+  [./coupling_field_into_scalar]
+    type = 'RunException'
+    input = 'coupling_field_into_scalar.i'
+    expect_err = "slm: Trying to couple a field variable where scalar variable is expected, 'lambda = v'"
+  [../]
+
+  [./coupling_scalar_into_field]
+    type = 'RunException'
+    input = 'coupling_scalar_into_field.i'
+    expect_err = "coupled: Trying to couple a scalar variable where field variable is expected, 'v = a'"
+  [../]
+
+  [./coupling_nonexistent_field]
+    type = 'RunException'
+    input = 'coupling_nonexistent_field.i'
+    expect_err = "coupled: Coupled variable 'a' was not found"
+  [../]
+
+  [./coupling_nonexistent_scalar]
+    type = 'RunException'
+    input = 'coupling_nonexistent_scalar.i'
+    expect_err = "slm: Coupled variable 'b' was not found"
+  [../]
+
+  [./coupling_itself]
+    type = 'RunException'
+    input = 'coupling_itself.i'
+    expect_err = "Coupled variable 'v' needs to be different from 'variable' with CoupledForce"
+  [../]
+  [./missing_input]
+    type = 'RunException'
+    input = 'missing_input_file.i'
+    expect_err = "Unable to open file"
+  [../]
+
+  [./kernel_with_aux_var]
+    type = 'RunException'
+    input = 'kernel_with_aux_var.i'
+    expect_err = "No nonlinear variable named v found. Did you specify an auxiliary variable when you meant to specify a nonlinear variable"
+  [../]
+  [./bc_with_aux_var]
+    type = 'RunException'
+    input = 'bc_with_aux_var.i'
+    expect_err = "No nonlinear variable named v found. Did you specify an auxiliary variable when you meant to specify a nonlinear variable"
+  [../]
+  [./aux_kernel_with_var]
+    type = 'RunException'
+    input = 'aux_kernel_with_var.i'
+    expect_err = "Variable 'u' does not exist in this system"
+  [../]
+  [./scalar_kernel_with_var]
+    type = 'RunException'
+    input = 'scalar_kernel_with_var.i'
+    expect_err = "Scalar variable 'u' does not exist in this system"
+  [../]
+  [./nodal_kernel_with_aux_var]
+    type = 'RunException'
+    input = 'nodal_kernel_with_aux_var.i'
+    expect_err = "No nonlinear variable named v found. Did you specify an auxiliary variable when you meant to specify a nonlinear variable"
+  [../]
+  [./constraint_with_aux_var]
+    type = 'RunException'
+    input = 'constraint_with_aux_var.i'
+    expect_err = "Cannot add Constraint for variable v, it is not a nonlinear variable"
+  [../]
+  [./scalar_aux_kernel_with_var]
+    type = 'RunException'
+    input = 'scalar_aux_kernel_with_var.i'
+    expect_err = "Scalar variable 'u' does not exist in this system"
+  [../]
+  [./dirac_kernel_with_aux_var]
+    type = 'RunException'
+    input = 'dirac_kernel_with_aux_var.i'
+    expect_err = "No nonlinear variable named v found. Did you specify an auxiliary variable when you meant to specify a nonlinear variable"
+  [../]
+  [./dg_kernel_with_aux_var]
+    type = 'RunException'
+    input = 'dg_kernel_with_aux_var.i'
+    expect_err = "No nonlinear variable named v found. Did you specify an auxiliary variable when you meant to specify a nonlinear variable"
+  [../]
+  [./interface_kernel_with_aux_var]
+    type = 'RunException'
+    input = 'interface_kernel_with_aux_var.i'
+    expect_err = "No nonlinear variable named v found. Did you specify an auxiliary variable when you meant to specify a nonlinear variable"
+  [../]
+  [./kernel_with_empty_var]
+    type = 'RunException'
+    input = 'kernel_with_empty_var.i'
+    expect_err = 'Error constructing object \'rea\' while retrieving value for \'variable\' parameter! Did you set variable = \'\' \(empty string\) by accident'
+  [../]
+  [./vector_kernel_with_standard_var]
+    type = 'RunException'
+    input = 'vector_kernel_with_standard_var.i'
+    expect_err = 'No vector variable named u found. Did you specify a vector variable when you meant to specify a standard variable'
+  [../]
+  [./kernel_with_vector_var]
+    type = 'RunException'
+    input = 'kernel_with_vector_var.i'
+    expect_err = 'No standard variable named u found. Did you specify a vector variable when you meant to specify a standard variable'
+  [../]
+  [./coupled_nodal_for_non_nodal_variable]
+    type = 'RunException'
+    input = 'coupled_nodal_for_non_nodal_variable.i'
+    expect_err = 'm: Trying to get nodal values of variable \'v\', but it is not nodal.'
+    requirement = "The system shall report an error if users try to get nodal values of non-nodal variables."
+    design = 'Coupleable.md'
+    issues = '#11623'
+  [../]
+  [./coupled_nodal_for_non_nodal_variable_old]
+    type = 'RunException'
+    input = 'coupled_nodal_for_non_nodal_variable.i'
+    cli_args = 'Materials/m/lag=OLD'
+    expect_err = 'm: Trying to get old nodal values of variable \'v\', but it is not nodal.'
+    requirement = "The system shall report an error if users try to get old nodal values of non-nodal variables."
+    design = 'Coupleable.md'
+    issues = '#11623'
+  [../]
+  [./coupled_nodal_for_non_nodal_variable_older]
+    type = 'RunException'
+    input = 'coupled_nodal_for_non_nodal_variable.i'
+    cli_args = 'Materials/m/lag=OLDER'
+    expect_err = 'm: Trying to get older nodal values of variable \'v\', but it is not nodal.'
+    requirement = "The system shall report an error if users try to get older nodal values of non-nodal variables."
+    design = 'Coupleable.md'
+    issues = '#11623'
+  [../]
+  [./missing_executioner]
+    type = 'RunException'
+    input = 'missing_executioner.i'
+    expect_err = '"Executioner" does not exist'
+
+    requirement = 'The system shall have an integrity check that ensures an Executioner object exists in the system.'
+    design = 'Executioner/index.md'
+    issues = '#11586'
   [../]
 []

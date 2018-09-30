@@ -1,10 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "ACSwitching.h"
+
+registerMooseObject("PhaseFieldApp", ACSwitching);
 
 template <>
 InputParameters
@@ -35,7 +40,7 @@ ACSwitching::ACSwitching(const InputParameters & parameters)
 {
   // check passed in parameter vectors
   if (_num_j != _hj_names.size())
-    mooseError("Need to pass in as many hj_names as Fj_names in ACSwitching ", name());
+    paramError("hj_names", "Need to pass in as many hj_names as Fj_names");
 
   // reserve space and set phase material properties
   for (unsigned int n = 0; n < _num_j; ++n)
@@ -52,7 +57,7 @@ ACSwitching::ACSwitching(const InputParameters & parameters)
 
     for (unsigned int i = 0; i < _nvar; ++i)
     {
-      MooseVariable * cvar = _coupled_moose_vars[i];
+      MooseVariableFEBase * cvar = _coupled_moose_vars[i];
       // Get derivatives of all Fj wrt all coupled variables
       _prop_dFjdarg[n][i] = &getMaterialPropertyDerivative<Real>(_Fj_names[n], cvar->name());
 

@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "EBSDMeshErrorTest.h"
 
@@ -20,6 +15,7 @@ TEST_F(EBSDMeshErrorTest, fileDoesNotExist)
   InputParameters params = validParams<EBSDMesh>();
   params.addPrivateParam("_moose_app", _app.get());
   params.set<std::string>("_object_name", "EBSD");
+  params.set<std::string>("_type") = "EBSDMesh";
 
   // set filename
   params.set<FileName>("filename") = "FILEDOESNOTEXIST";
@@ -62,6 +58,7 @@ TEST_F(EBSDMeshErrorTest, headerError)
     InputParameters params = validParams<EBSDMesh>();
     params.addPrivateParam("_moose_app", _app.get());
     params.set<std::string>("_object_name") = filename; // use the filename to define a unique name
+    params.set<std::string>("_type") = "EBSDMesh";
 
     // set filename
     params.set<FileName>("filename") = filename;
@@ -98,4 +95,3 @@ TEST_F(EBSDMeshErrorTest, geometrySpecifiedError)
   const char * int_params[nint] = {"nx", "ny", "nz"};
   testParam<unsigned int>(nint, int_params, "TestB");
 }
-

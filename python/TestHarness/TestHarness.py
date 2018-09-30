@@ -1,9 +1,18 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import sys
 if sys.version_info[0:2] != (2, 7):
     print("python 2.7 is required to run the test harness")
     sys.exit(1)
 
-import os, re, inspect, errno, time, copy
+import os, re, inspect, errno, copy, json
 import shlex
 
 from socket import gethostname
@@ -12,25 +21,34 @@ from FactorySystem.Parser import Parser
 from FactorySystem.Warehouse import Warehouse
 import util
 import hit
+from mooseutils import HitNode, hit_parse
 
 import argparse
 from timeit import default_timer as clock
+
+def readTestRoot(fname):
+    with open(fname, 'r') as f:
+        data = f.read()
+    root = hit.parse(fname, data)
+    args = []
+    if root.find('run_tests_args'):
+        args = shlex.split(root.param('run_tests_args'))
+
+    hit_node = HitNode(hitnode=root)
+    hit_parse(hit_node, root, '')
+
+    # TODO: add check to see if the binary exists before returning. This can be used to
+    # allow users to control fallthrough for e.g. individual module binaries vs. the
+    # combined binary.
+    return root.param('app_name'), args, hit_node
 
 def findTestRoot(start=os.getcwd(), method=os.environ.get('METHOD', 'opt')):
     rootdir = os.path.abspath(start)
     while os.path.dirname(rootdir) != rootdir:
         fname = os.path.join(rootdir, 'testroot')
         if os.path.exists(fname):
-            with open(fname, 'r') as f:
-                data = f.read()
-            root = hit.parse(fname, data)
-            args = []
-            if root.find('cli_args'):
-                args = shlex.split(root.param('cli_args'))
-            # TODO: add check to see if the binary exists before returning. This can be used to
-            # allow users to control fallthrough for e.g. individual module binaries vs. the
-            # combined binary.
-            return rootdir, root.param('app_name'), args
+            app_name, args, hit_node = readTestRoot(fname)
+            return rootdir, app_name, args, hit_node
         rootdir = os.path.dirname(rootdir)
     raise RuntimeError('test root directory not found')
 
@@ -38,11 +56,7 @@ class TestHarness:
 
     @staticmethod
     def buildAndRun(argv, app_name, moose_dir):
-        if '--store-timing' in argv:
-            harness = TestTimer(argv, moose_dir, app_name=app_name)
-        else:
-            harness = TestHarness(argv, moose_dir, app_name=app_name)
-
+        harness = TestHarness(argv, moose_dir, app_name=app_name)
         harness.findAndRunTests()
         sys.exit(harness.error_code)
 
@@ -51,9 +65,9 @@ class TestHarness:
         os.environ['PYTHONPATH'] = os.path.join(moose_dir, 'python') + ':' + os.environ.get('PYTHONPATH', '')
 
         if app_name:
-            rootdir, app_name, args = '.', app_name, []
+            rootdir, app_name, args, root_params = '.', app_name, [], HitNode(hitnode=hit.parse('',''))
         else:
-            rootdir, app_name, args = findTestRoot(start=os.getcwd())
+            rootdir, app_name, args, root_params = findTestRoot(start=os.getcwd())
 
         orig_cwd = os.getcwd()
         os.chdir(rootdir)
@@ -62,6 +76,8 @@ class TestHarness:
         self.factory = Factory()
 
         self.app_name = app_name
+
+        self.root_params = root_params
 
         # Build a Warehouse to hold the MooseObjects
         self.warehouse = Warehouse()
@@ -90,8 +106,10 @@ class TestHarness:
         self.moose_dir = moose_dir
         self.base_dir = os.getcwd()
         self.run_tests_dir = os.path.abspath('.')
+        self.results_storage = '.previous_test_results.json'
         self.code = '2d2d6769726c2d6d6f6465'
         self.error_code = 0x0
+        self.keyboard_talk = True
         # Assume libmesh is a peer directory to MOOSE if not defined
         if os.environ.has_key("LIBMESH_DIR"):
             self.libmesh_dir = os.environ['LIBMESH_DIR']
@@ -109,6 +127,7 @@ class TestHarness:
         checks['platform'] = util.getPlatforms()
         checks['submodules'] = util.getInitializedSubmodules(self.run_tests_dir)
         checks['exe_objects'] = None # This gets calculated on demand
+        checks['registered_apps'] = None # This gets extracted on demand
 
         # The TestHarness doesn't strictly require the existence of libMesh in order to run. Here we allow the user
         # to select whether they want to probe for libMesh configuration options.
@@ -126,13 +145,18 @@ class TestHarness:
             checks['dof_id_bytes'] = set(['ALL'])
             checks['petsc_debug'] = set(['ALL'])
             checks['curl'] = set(['ALL'])
-            checks['tbb'] = set(['ALL'])
+            checks['threading'] = set(['ALL'])
             checks['superlu'] = set(['ALL'])
+            checks['parmetis'] = set(['ALL'])
+            checks['chaco'] = set(['ALL'])
+            checks['party'] = set(['ALL'])
+            checks['ptscotch'] = set(['ALL'])
             checks['slepc'] = set(['ALL'])
             checks['unique_id'] = set(['ALL'])
             checks['cxx11'] = set(['ALL'])
             checks['asio'] =  set(['ALL'])
             checks['boost'] = set(['ALL'])
+            checks['fparser_jit'] = set(['ALL'])
         else:
             checks['compiler'] = util.getCompilers(self.libmesh_dir)
             checks['petsc_version'] = util.getPetscVersion(self.libmesh_dir)
@@ -147,13 +171,18 @@ class TestHarness:
             checks['dof_id_bytes'] = util.getLibMeshConfigOption(self.libmesh_dir, 'dof_id_bytes')
             checks['petsc_debug'] = util.getLibMeshConfigOption(self.libmesh_dir, 'petsc_debug')
             checks['curl'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'curl')
-            checks['tbb'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'tbb')
+            checks['threading'] =  util.getLibMeshThreadingModel(self.libmesh_dir)
             checks['superlu'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'superlu')
+            checks['parmetis'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'parmetis')
+            checks['chaco'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'chaco')
+            checks['party'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'party')
+            checks['ptscotch'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'ptscotch')
             checks['slepc'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'slepc')
             checks['unique_id'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'unique_id')
             checks['cxx11'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'cxx11')
             checks['asio'] =  util.getIfAsioExists(self.moose_dir)
             checks['boost'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'boost')
+            checks['fparser_jit'] =  util.getLibMeshConfigOption(self.libmesh_dir, 'fparser_jit')
 
         # Override the MESH_MODE option if using the '--distributed-mesh'
         # or (deprecated) '--parallel-mesh' option.
@@ -188,21 +217,52 @@ class TestHarness:
         if self.options.input_file_name != '':
             self._infiles = self.options.input_file_name.split(',')
 
+        if self.options.spec_file and os.path.isdir(self.options.spec_file):
+            search_dir = self.options.spec_file
+
+        elif self.options.spec_file and os.path.isfile(self.options.spec_file):
+            search_dir = os.path.dirname(self.options.spec_file)
+            self._infiles = [os.path.basename(self.options.spec_file)]
+
+        else:
+            search_dir = os.getcwd()
+
         try:
-            self.base_dir = os.getcwd()
-            for dirpath, dirnames, filenames in os.walk(self.base_dir, followlinks=True):
+            testroot_params = {}
+            for dirpath, dirnames, filenames in os.walk(search_dir, followlinks=True):
                 # Prune submdule paths when searching for tests
-                if self.base_dir != dirpath and os.path.exists(os.path.join(dirpath, '.git')):
+
+                dir_name = os.path.basename(dirpath)
+                if (self.base_dir != dirpath and os.path.exists(os.path.join(dirpath, '.git'))) or dir_name in [".git", ".svn"]:
                     dirnames[:] = []
+                    filenames[:] = []
+
+                if self.options.use_subdir_exe and testroot_params and not dirpath.startswith(testroot_params["testroot_dir"]):
+                    # Reset the params when we go outside the current testroot base directory
+                    testroot_params = {}
 
                 # walk into directories that aren't contrib directories
                 if "contrib" not in os.path.relpath(dirpath, os.getcwd()):
                     for file in filenames:
+                        if self.options.use_subdir_exe and file == "testroot":
+                            # Rely on the fact that os.walk does a depth first traversal.
+                            # Any directories below this one will use the executable specified
+                            # in this testroot file unless it is overridden.
+                            app_name, args, root_params = readTestRoot(os.path.join(dirpath, file))
+                            full_app_name = app_name + "-" + self.options.method
+                            testroot_params["executable"] = os.path.join(dirpath, full_app_name)
+                            testroot_params["testroot_dir"] = dirpath
+                            caveats = [full_app_name]
+                            if args:
+                                caveats.append("Ignoring args %s" % args)
+                            testroot_params["caveats"] = caveats
+                            testroot_params["root_params"] = root_params
+
                         # See if there were other arguments (test names) passed on the command line
                         if file in self._infiles \
                                and os.path.abspath(os.path.join(dirpath, file)) not in launched_tests:
 
-                            if self.prunePath(file):
+                            if self.notMySpecFile(dirpath, file):
                                 continue
 
                             saved_cwd = os.getcwd()
@@ -210,20 +270,10 @@ class TestHarness:
                             os.chdir(dirpath)
 
                             # Get the testers for this test
-                            testers = self.createTesters(dirpath, file, find_only)
+                            testers = self.createTesters(dirpath, file, find_only, testroot_params)
 
-                            # Some 'test' files generate empty tests. Such as an entirely commented out
-                            # test block:
-                            #
-                            # [Tests]
-                            #   # [./test]
-                            #   # [../]
-                            # []
-                            #
-                            # We do not want to send an empty list of testers to the scheduler.
-                            if len(testers):
-                                # Schedule the testers for immediate execution
-                                self.scheduler.schedule(testers)
+                            # Schedule the testers for immediate execution
+                            self.scheduler.schedule(testers)
 
                             # record these launched test to prevent this test from launching again
                             # due to os.walk following symbolic links
@@ -235,31 +285,37 @@ class TestHarness:
             # Wait for all the tests to complete
             self.scheduler.waitFinish()
 
-            self.cleanup()
+            # TODO: this DOES NOT WORK WITH MAX FAILES (max failes is considered a scheduler error at the moment)
+            if not self.scheduler.schedulerError():
+                self.cleanup()
 
             # flags for the TestHarness start at the high bit
-            if self.num_failed:
+            if self.num_failed or self.scheduler.schedulerError():
                 self.error_code = self.error_code | 0x80
 
         except KeyboardInterrupt:
             # Attempt to kill jobs currently running
-            self.scheduler.killRemaining()
-
-            if self.writeFailedTest != None:
-                self.writeFailedTest.close()
-            print('\nExiting due to keyboard interrupt...')
+            self.scheduler.killRemaining(keyboard=True)
+            self.keyboard_interrupt()
             sys.exit(1)
 
         return
 
+    def keyboard_interrupt(self):
+        """ Control how keyboard interrupt displays """
+        if self.keyboard_talk:
+            # Prevent multiple keyboard interrupt messages
+            self.keyboard_talk = False
+            print('\nExiting due to keyboard interrupt...')
+
    # Create and return list of tester objects. A tester is created by providing
     # abspath to basename (dirpath), and the test file in queustion (file)
-    def createTesters(self, dirpath, file, find_only):
+    def createTesters(self, dirpath, file, find_only, testroot_params={}):
         # Build a Parser to parse the objects
         parser = Parser(self.factory, self.warehouse)
 
         # Parse it
-        parser.parse(file)
+        parser.parse(file, testroot_params.get("root_params", self.root_params))
         self.parse_errors.extend(parser.errors)
 
         # Retrieve the tests from the warehouse
@@ -267,7 +323,14 @@ class TestHarness:
 
         # Augment the Testers with additional information directly from the TestHarness
         for tester in testers:
-            self.augmentParameters(file, tester)
+
+            # Initialize the status system for each tester object immediately after creation
+            tester.initStatusSystem(self.options)
+
+            self.augmentParameters(file, tester, testroot_params)
+            if testroot_params.get("caveats"):
+                # Show what executable we are using if using a different testroot file
+                tester.addCaveats(testroot_params["caveats"])
 
         # Short circuit this loop if we've only been asked to parse Testers
         # Note: The warehouse will accumulate all testers in this mode
@@ -283,23 +346,14 @@ class TestHarness:
 
         return testers
 
-    def prunePath(self, filename):
-        test_dir = os.path.abspath(os.path.dirname(filename))
+    def notMySpecFile(self, dirpath, filename):
+        """ true if dirpath/filename does not match supplied --spec-file """
+        if (self.options.spec_file
+            and os.path.isfile(self.options.spec_file)
+            and os.path.join(dirpath, filename) != self.options.spec_file):
+            return True
 
-        # Filter tests that we want to run
-        # Under the new format, we will filter based on directory not filename since it is fixed
-        prune = True
-        if len(self.tests) == 0:
-            prune = False # No filter
-        else:
-            for item in self.tests:
-                if test_dir.find(item) > -1:
-                    prune = False
-
-        # Return the inverse of will_run to indicate that this path should be pruned
-        return prune
-
-    def augmentParameters(self, filename, tester):
+    def augmentParameters(self, filename, tester, testroot_params={}):
         params = tester.parameters()
 
         # We are going to do some formatting of the path that is printed
@@ -320,11 +374,12 @@ class TestHarness:
         params['test_name'] = formatted_name
         params['test_dir'] = test_dir
         params['relative_path'] = relative_path
-        params['executable'] = self.executable
+        params['executable'] = testroot_params.get("executable", self.executable)
         params['hostname'] = self.host_name
         params['moose_dir'] = self.moose_dir
         params['base_dir'] = self.base_dir
         params['first_directory'] = first_directory
+        params['root_params'] = testroot_params.get("root_params", self.root_params)
 
         if params.isValid('prereq'):
             if type(params['prereq']) != list:
@@ -338,11 +393,11 @@ class TestHarness:
         # When running in valgrind mode, we end up with a ton of output for each failed
         # test.  Therefore, we limit the number of fails...
         if self.options.valgrind_mode and self.num_failed > self.options.valgrind_max_fails:
-            tester.setStatus('Max Fails Exceeded', tester.bucket_fail)
+            tester.setStatus(tester.fail, 'Max Fails Exceeded')
         elif self.num_failed > self.options.max_fails:
-            tester.setStatus('Max Fails Exceeded', tester.bucket_fail)
+            tester.setStatus(tester.fail, 'Max Fails Exceeded')
         elif tester.parameters().isValid('have_errors') and tester.parameters()['have_errors']:
-            tester.setStatus('Parser Error', tester.bucket_skip)
+            tester.setStatus(tester.fail, 'Parser Error')
 
     # This method splits a lists of tests into two pieces each, the first piece will run the test for
     # approx. half the number of timesteps and will write out a restart file.  The second test will
@@ -351,7 +406,7 @@ class TestHarness:
         new_tests = []
 
         for part1 in testers:
-            if part1.parameters()['recover'] == True:
+            if part1.parameters()['recover'] == True and not part1.parameters()['check_input']:
                 # Clone the test specs
                 part2 = copy.deepcopy(part1)
 
@@ -371,9 +426,12 @@ class TestHarness:
                 part2_params['prereq'].append(part1.parameters()['test_name'])
                 part2_params['delete_output_before_running'] = False
                 part2_params['cli_args'].append('--recover --recoversuffix ' + self.options.recoversuffix)
-                part2_params.addParam('caveats', ['recover'], "")
+                part2.addCaveats('recover')
 
                 new_tests.append(part2)
+
+            elif part1.parameters()['recover'] == True and part1.parameters()['check_input']:
+                part1.setStatus(part1.silent)
 
         testers.extend(new_tests)
         return testers
@@ -384,134 +442,100 @@ class TestHarness:
         else:
             return True
 
-    # Method contianing logic on whether or not we should print results of given tester
-    def canPrint(self, tester):
-        if tester.isSkipped() and self.options.report_skipped is False:
-            return False
-
-        elif tester.isSilent() or (tester.isDeleted() and not self.options.extra_info):
-            return False
-
-        return True
-
-    # Format the status message to make any caveats easy to read when they are printed
-    def formatCaveats(self, tester):
-        caveats = []
-        result = ''
-
-        if tester.specs.isValid('caveats'):
-            caveats = tester.specs['caveats']
-
-        # PASS and DRY_RUN fall into this catagory
-        if tester.didPass():
-            if self.options.extra_info:
-                checks = ['platform', 'compiler', 'petsc_version', 'mesh_mode', 'method', 'library_mode', 'dtk', 'unique_ids']
-                for check in checks:
-                    if not 'ALL' in tester.specs[check]:
-                        caveats.append(', '.join(tester.specs[check]))
-            if len(caveats):
-                result = '[' + ', '.join(caveats).upper() + '] ' + tester.getSuccessMessage()
-            else:
-                result = tester.getSuccessMessage()
-
-        # FAIL, DIFF and DELETED fall into this catagory
-        elif tester.didFail() or tester.didDiff() or tester.isDeleted():
-            result = 'FAILED (%s)' % tester.getStatusMessage()
-
-        elif tester.isSkipped():
-            # Include caveats in skipped messages? Usefull to know when a scaled long "RUNNING..." test completes
-            # but Exodiff is instructed to 'SKIP' on scaled tests.
-            if len(caveats):
-                result = '[' + ', '.join(caveats).upper() + '] skipped (' + tester.getStatusMessage() + ')'
-            else:
-                result = 'skipped (' + tester.getStatusMessage() + ')'
-        else:
-            result = tester.getStatusMessage()
-        return result
-
-    # Print and return formatted current tester status output
-    def printResult(self, tester_data):
-        """ Method to print a testers status to the screen """
-        tester = tester_data.getTester()
-        caveat_formatted_results = None
-
+    def printOutput(self, job):
+        """ Method to print a testers output to the screen """
+        tester = job.getTester()
+        output = ''
         # Print what ever status the tester has at the time
-        if self.canPrint(tester):
-            if self.options.verbose or (tester.didFail() and not self.options.quiet):
-                output = 'Working Directory: ' + tester.getTestDir() + '\nRunning command: ' + tester.getCommand(self.options) + '\n'
+        if self.options.verbose or (tester.isFail() and not self.options.quiet):
+            output = 'Working Directory: ' + tester.getTestDir() + '\nRunning command: ' + tester.getCommand(self.options) + '\n'
+            output += job.getOutput()
+            output = output.replace('\r', '\n')  # replace the carriage returns with newlines
+            lines = output.split('\n')
 
-                output += tester_data.getOutput()
-                output = output.replace('\r', '\n')  # replace the carriage returns with newlines
-                lines = output.split('\n')
+            # Obtain color based on test status
+            color = tester.getColor()
 
-                # Obtain color based on test status
-                color = tester.getColor()
+            if output != '':
+                test_name = util.colorText(tester.getTestName()  + ": ", color, colored=self.options.colored, code=self.options.code)
+                output = test_name + ("\n" + test_name).join(lines)
+                print(output)
+        return output
 
-                if output != '':
-                    test_name = util.colorText(tester.getTestName()  + ": ", color, colored=self.options.colored, code=self.options.code)
-                    output = test_name + ("\n" + test_name).join(lines)
-                    print(output)
+    def normalizeStatus(self, job):
+        """ Determine when to use a job status as opposed to tester status """
+        tester = job.getTester()
+        message = job.getStatusMessage()
+        if job.isFail():
+            tester.setStatus(tester.fail, message)
 
-            caveat_formatted_results = self.formatCaveats(tester)
-            print(util.formatResult(tester_data, caveat_formatted_results, self.options))
-        return caveat_formatted_results
+        elif (job.isSkip()
+              and not tester.isSilent()
+              and not tester.isDeleted()
+              and not tester.isFail()):
+            tester.setStatus(tester.skip, message)
 
-    def handleTestStatus(self, tester_data):
-        """ Method to handle a testers status """
-        tester = tester_data.getTester()
+        return tester
 
-        # print and store those results
-        result = self.printResult(tester_data)
+    def handleJobStatus(self, job):
+        """ Method to handle a job status """
+        tester = job.getTester()
+        if not tester.isSilent():
+            # Print results and perform any desired post job processing
+            if job.isFinished():
+                tester = self.normalizeStatus(job)
 
-        # Test is finished and had some results to print
-        if result and tester.isFinished():
-            timing = tester_data.getTiming()
+                # perform printing of application output if so desired
+                self.printOutput(job)
 
-            # Store these results to a table we will use when we print final results
-            self.test_table.append( (tester_data, result, timing) )
+                # Print status with caveats
+                print(util.formatResult(job, self.options, caveats=True))
 
-            self.postRun(tester.specs, timing)
-            # Tally the results of this test to be used in our Final Test Results footer
-            if tester.isSkipped():
-                self.num_skipped += 1
-            elif tester.didPass():
-                self.num_passed += 1
-            elif tester.isQueued() or tester.isWaiting():
-                self.num_pending += 1
+                timing = job.getTiming()
+
+                # Save these results for 'Final Test Result' summary
+                self.test_table.append( (job, tester.getStatus().status, timing) )
+
+                self.postRun(tester.specs, timing)
+
+                if tester.isSkip():
+                    self.num_skipped += 1
+                elif tester.isPass():
+                    self.num_passed += 1
+                elif tester.isFail():
+                    self.num_failed += 1
+                else:
+                    self.num_pending += 1
+
+            # Just print current status without saving results
             else:
-                self.num_failed += 1
-
-            # Write results to a file if asked to do so
-            if not tester.isSkipped():
-                if not tester.didPass() and not self.options.failed_tests:
-                    self.writeFailedTest.write(tester.getTestName() + '\n')
-
-                if self.options.file:
-                    self.file.write(util.formatResult( tester_data, result, self.options, color=False) + '\n')
-
-                if self.options.sep_files or (self.options.fail_files and not tester.didPass()) or (self.options.ok_files and tester.didPass()):
-                    fname = os.path.join(tester.getTestDir(), tester.getTestName().split('/')[-1] + '.' + result[:6] + '.txt')
-                    f = open(fname, 'w')
-                    f.write(util.formatResult( tester_data, tester_data.getOutput(), self.options, color=False) + '\n')
-                    f.close()
+                print(util.formatResult(job, self.options, result='RUNNING', caveats=False))
 
     # Print final results, close open files, and exit with the correct error code
     def cleanup(self):
+        # Not interesting in printing any final results if we are cleaning up old queue manager runs
+        if self.options.queue_cleanup:
+            try:
+                os.remove(self.results_storage)
+            except OSError:
+                pass
+            return
+
         # Print the results table again if a bunch of output was spewed to the screen between
         # tests as they were running
         if len(self.parse_errors) > 0:
-            print('\n\nParser Errors:\n' + ('-' * (util.TERM_COLS-1)))
+            print('\n\nParser Errors:\n' + ('-' * (util.TERM_COLS)))
             for err in self.parse_errors:
                 print(util.colorText(err, 'RED', html=True, colored=self.options.colored, code=self.options.code))
 
         if (self.options.verbose or (self.num_failed != 0 and not self.options.quiet)) and not self.options.dry_run:
-            print('\n\nFinal Test Results:\n' + ('-' * (util.TERM_COLS-1)))
-            for (tester_data, result, timing) in sorted(self.test_table, key=lambda x: x[1], reverse=True):
-                print(util.formatResult(tester_data, result, self.options))
+            print('\n\nFinal Test Results:\n' + ('-' * (util.TERM_COLS)))
+            for (job, result, timing) in sorted(self.test_table, key=lambda x: x[1], reverse=True):
+                print(util.formatResult(job, self.options, caveats=True))
 
         time = clock() - self.start_time
 
-        print('-' * (util.TERM_COLS-1))
+        print('-' * (util.TERM_COLS))
 
         # Mask off TestHarness error codes to report parser errors
         fatal_error = ''
@@ -523,11 +547,11 @@ class TestHarness:
 
         # Alert the user to their session file
         if self.options.queueing:
-            print 'Your session file is %s' % self.options.session_file
+            print('Your session file is %s' % self.results_storage)
 
         # Print a different footer when performing a dry run
         if self.options.dry_run:
-            print('Processed %d tests in %.1f seconds' % (self.num_passed+self.num_skipped, time))
+            print('Processed %d tests in %.1f seconds.' % (self.num_passed+self.num_skipped, time))
             summary = '<b>%d would run</b>'
             summary += ', <b>%d would be skipped</b>'
             summary += fatal_error
@@ -535,7 +559,7 @@ class TestHarness:
                              colored=self.options.colored, code=self.options.code ))
 
         else:
-            print('Ran %d tests in %.1f seconds' % (self.num_passed+self.num_failed, time))
+            print('Ran %d tests in %.1f seconds.' % (self.num_passed+self.num_failed, time))
 
             if self.num_passed:
                 summary = '<g>%d passed</g>'
@@ -550,36 +574,127 @@ class TestHarness:
                 summary += ', <r>%d FAILED</r>'
             else:
                 summary += ', <b>%d failed</b>'
+            if self.scheduler.maxFailures():
+                summary += '\n<r>MAX FAILURES REACHED</r>'
+
             summary += fatal_error
 
             print(util.colorText( summary % (self.num_passed, self.num_skipped, self.num_pending, self.num_failed),  "", html = True, \
                              colored=self.options.colored, code=self.options.code ))
 
-        if self.file:
-            self.file.close()
+            # Perform any write-to-disc operations
+            self.writeResults()
 
-        # Close the failed_tests file
-        if self.writeFailedTest != None:
-            self.writeFailedTest.close()
+    def writeResults(self):
+        """ write test results to disc in some fashion the user has requested """
+        all_jobs = self.scheduler.retrieveJobs()
+
+        # Record the input file name that was used
+        self.options.results_storage['INPUT_FILE_NAME'] = self.options.input_file_name
+
+        # Write some useful data to our results_storage
+        for job in all_jobs:
+            tester = job.getTester()
+
+            # If queueing, do not store silent results in session file
+            if tester.isSilent() and self.options.queueing:
+                continue
+
+            # Create empty key based on TestDir, or re-inialize with existing data so we can append to it
+            self.options.results_storage[tester.getTestDir()] = self.options.results_storage.get(tester.getTestDir(), {})
+            self.options.results_storage[tester.getTestDir()][tester.getTestName()] = {'NAME'      : job.getTestNameShort(),
+                                                                                       'LONG_NAME' : tester.getTestName(),
+                                                                                       'TIMING'    : job.getTiming(),
+                                                                                       'STATUS'    : tester.getStatus().status,
+                                                                                       'FAIL'      : tester.isFail(),
+                                                                                       'COLOR'     : tester.getStatus().color,
+                                                                                       'CAVEATS'   : list(tester.getCaveats()),
+                                                                                       'OUTPUT'    : job.getOutput(),
+                                                                                       'COMMAND'   : tester.getCommand(self.options)}
+
+            # Additional data to store (overwrites any previous matching keys)
+            self.options.results_storage[tester.getTestDir()].update(job.getMetaData())
+
+        if self.options.output_dir:
+            self.results_storage = os.path.join(self.options.output_dir, self.results_storage)
+
+        if self.options.results_storage:
+            try:
+                with open(self.results_storage, 'w') as data_file:
+                    json.dump(self.options.results_storage, data_file, indent=2)
+            except UnicodeDecodeError:
+                print('\nERROR: Unable to write results due to unicode decode/encode error')
+
+                # write to a plain file to aid in reproducing error
+                with open(self.results_storage + '.unicode_error' , 'w') as f:
+                    f.write(self.options.results_storage)
+
+                sys.exit(1)
+            except IOError:
+                print('\nERROR: Unable to write results due to permissions')
+                sys.exit(1)
+
+        try:
+            # Write one file, with verbose information (--file)
+            if self.options.file:
+                with open(os.path.join(self.output_dir, self.options.file), 'w') as f:
+                    for job in all_jobs:
+                        tester = job.getTester()
+
+                        # Do not write information about silent tests
+                        if tester.isSilent():
+                            continue
+
+                        formated_results = util.formatResult( job, self.options, result=job.getOutput(), color=False)
+                        f.write(formated_results + '\n')
+
+            # Write a separate file for each test with verbose information (--sep-files, --sep-files-ok, --sep-files-fail)
+            if ((self.options.ok_files and self.num_passed)
+                or (self.options.fail_files and self.num_failed)):
+                for job in all_jobs:
+                    tester = job.getTester()
+
+                    if self.options.output_dir:
+                        output_dir = self.options.output_dir
+                    else:
+                        output_dir = tester.getTestDir()
+
+                    # Yes, by design test dir will be apart of the output file name
+                    output_file = os.path.join(output_dir, '.'.join([os.path.basename(tester.getTestDir()),
+                                                                     job.getTestNameShort(),
+                                                                     tester.getStatus().status,
+                                                                     'txt']))
+
+                    formated_results = util.formatResult(job, self.options, result=job.getOutput(), color=False)
+
+                    # Passing tests
+                    if self.options.ok_files and tester.isPass():
+                        with open(output_file, 'w') as f:
+                            f.write(formated_results)
+
+                    # Failing tests
+                    if self.options.fail_files and tester.isFail():
+                        with open(output_file, 'w') as f:
+                            f.write(formated_results)
+
+        except IOError:
+            print('Permission error while writing results to disc')
+            sys.exit(1)
+        except:
+            print('Error while writing results to disc')
+            sys.exit(1)
 
     def initialize(self, argv, app_name):
         # Load the scheduler plugins
         self.factory.loadPlugins([os.path.join(self.moose_dir, 'python', 'TestHarness')], 'schedulers', "IS_SCHEDULER")
 
-        # Set a global queueing flag
         self.options.queueing = False
-
         if self.options.pbs:
+            # The results .json file will be this new session file
+            self.original_storage = self.results_storage
+            self.results_storage = os.path.abspath(self.options.pbs)
             self.options.queueing = True
             scheduler_plugin = 'RunPBS'
-
-            # Unify the queueing file
-            self.options.session_file = self.options.pbs
-
-        # User is wanting to clean up old queue sessions
-        elif self.options.queue_cleanup:
-            scheduler_plugin = 'QueueManager'
-            self.options.session_file = self.options.queue_cleanup
 
         # The default scheduler plugin
         else:
@@ -609,16 +724,31 @@ class TestHarness:
                 if ex.errno == errno.EEXIST: pass
                 else: raise
 
-        # Open the file to redirect output to and set the quiet option for file output
-        if self.options.file:
-            self.file = open(os.path.join(self.output_dir, self.options.file), 'w')
-        if self.options.file or self.options.fail_files or self.options.sep_files:
-            self.options.quiet = True
+        # Use a previous results file, or declare the variable
+        self.options.results_storage = {}
+        if self.useExistingStorage():
+            with open(self.results_storage, 'r') as f:
+                try:
+                    self.options.results_storage = json.load(f)
+
+                    # Adhere to previous input file syntax, or set the default
+                    self.options.input_file_name = self.options.results_storage.get('INPUT_FILE_NAME', 'tests')
+
+                except ValueError:
+                    # This is a hidden file, controled by the TestHarness. So we probably shouldn't error
+                    # and exit. Perhaps a warning instead, and create a new file? Down the road, when
+                    # we use this file for PBS etc, this should probably result in an exception.
+                    print('INFO: Previous %s file is damaged. Creating a new one...' % (self.results_storage))
+
+    def useExistingStorage(self):
+        """ reasons for returning bool if we should use a previous results_storage file """
+        if (os.path.exists(self.results_storage)
+            and (self.options.failed_tests or self.options.pbs)):
+            return True
 
     ## Parse command line options and assign them to self.options
     def parseCLArgs(self, argv):
         parser = argparse.ArgumentParser(description='A tool used to test MOOSE based applications')
-        parser.add_argument('test_name', nargs=argparse.REMAINDER)
         parser.add_argument('--opt', action='store_const', dest='method', const='opt', help='test the app_name-opt binary')
         parser.add_argument('--dbg', action='store_const', dest='method', const='dbg', help='test the app_name-dbg binary')
         parser.add_argument('--devel', action='store_const', dest='method', const='devel', help='test the app_name-devel binary')
@@ -638,7 +768,7 @@ class TestHarness:
         parser.add_argument('-l', '--load-average', action='store', type=float, dest='load', help='Do not run additional tests if the load average is at least LOAD')
         parser.add_argument('-t', '--timing', action='store_true', dest='timing', help='Report Timing information for passing tests')
         parser.add_argument('-s', '--scale', action='store_true', dest='scaling', help='Scale problems that have SCALE_REFINE set')
-        parser.add_argument('-i', nargs=1, action='store', type=str, dest='input_file_name', default='', help='The default test specification file to look for (default="tests").')
+        parser.add_argument('-i', nargs=1, action='store', type=str, dest='input_file_name', default='', help='The test specification file to look for')
         parser.add_argument('--libmesh_dir', nargs=1, action='store', type=str, dest='libmesh_dir', help='Currently only needed for bitten code coverage')
         parser.add_argument('--skip-config-checks', action='store_true', dest='skip_config_checks', help='Skip configuration checks (all tests will run regardless of restrictions)')
         parser.add_argument('--parallel', '-p', nargs='?', action='store', type=int, dest='parallel', const=1, help='Number of processors to use when running mpiexec')
@@ -654,17 +784,20 @@ class TestHarness:
         parser.add_argument('--failed-tests', action='store_true', dest='failed_tests', help='Run tests that previously failed')
         parser.add_argument('--check-input', action='store_true', dest='check_input', help='Run check_input (syntax) tests only')
         parser.add_argument('--no-check-input', action='store_true', dest='no_check_input', help='Do not run check_input (syntax) tests')
+        parser.add_argument('--spec-file', action='store', type=str, dest='spec_file', help='Supply a path to the tests spec file to run the tests found therein. Or supply a path to a directory in which the TestHarness will search for tests. You can further alter which tests spec files are found through the use of -i and --re')
 
         # Options that pass straight through to the executable
         parser.add_argument('--parallel-mesh', action='store_true', dest='parallel_mesh', help='Deprecated, use --distributed-mesh instead')
         parser.add_argument('--distributed-mesh', action='store_true', dest='distributed_mesh', help='Pass "--distributed-mesh" to executable')
         parser.add_argument('--error', action='store_true', help='Run the tests with warnings as errors (Pass "--error" to executable)')
         parser.add_argument('--error-unused', action='store_true', help='Run the tests with errors on unused parameters (Pass "--error-unused" to executable)')
+        parser.add_argument('--error-deprecated', action='store_true', help='Run the tests with errors on deprecations')
 
         # Option to use for passing unwrapped options to the executable
         parser.add_argument('--cli-args', nargs='?', type=str, dest='cli_args', help='Append the following list of arguments to the command line (Encapsulate the command in quotes)')
 
         parser.add_argument('--dry-run', action='store_true', dest='dry_run', help="Pass --dry-run to print commands to run, but don't actually run them")
+        parser.add_argument('--use-subdir-exe', action="store_true", help='If there are sub directories that contain a new testroot, use that for running tests under that directory.')
 
         outputgroup = parser.add_argument_group('Output Options', 'These options control the output of the test harness. The sep-files options write output to files named test_name.TEST_RESULT.txt. All file output will overwrite old files')
         outputgroup.add_argument('-v', '--verbose', action='store_true', dest='verbose', help='show the output of every test')
@@ -676,24 +809,26 @@ class TestHarness:
         outputgroup.add_argument('-x', '--sep-files', action='store_true', dest='sep_files', help='Write the output of each test to a separate file. Only quiet output to terminal. This is equivalant to \'--sep-files-fail --sep-files-ok\'')
         outputgroup.add_argument('--sep-files-ok', action='store_true', dest='ok_files', help='Write the output of each passed test to a separate file')
         outputgroup.add_argument('-a', '--sep-files-fail', action='store_true', dest='fail_files', help='Write the output of each FAILED test to a separate file. Only quiet output to terminal.')
-        outputgroup.add_argument("--store-timing", action="store_true", dest="store_time", help="Store timing in the SQL database: $HOME/timingDB/timing.sqlite A parent directory (timingDB) must exist.")
         outputgroup.add_argument("--testharness-unittest", action="store_true", help="Run the TestHarness unittests that test the TestHarness.")
-        outputgroup.add_argument("--revision", nargs=1, action="store", type=str, dest="revision", help="The current revision being tested. Required when using --store-timing.")
         outputgroup.add_argument("--yaml", action="store_true", dest="yaml", help="Dump the parameters for the testers in Yaml Format")
         outputgroup.add_argument("--dump", action="store_true", dest="dump", help="Dump the parameters for the testers in GetPot Format")
         outputgroup.add_argument("--no-trimmed-output", action="store_true", dest="no_trimmed_output", help="Do not trim the output")
 
         queuegroup = parser.add_argument_group('Queue Options', 'Options controlling which queue manager to use')
-        queuegroup.add_argument('--pbs', nargs='?', action='store', type=str, metavar='session_name', const='generate', help='Use PBS as your scheduler. Optional: Supply a name to identify this session with. If session exists, the scheduler will instead display the results of that session.')
-        queuegroup.add_argument('--queue-project', nargs=1, action='store', type=str, default='moose', metavar='project', help='Identify your PBS job with this project (default:  moose)')
-        queuegroup.add_argument('--queue-cleanup', nargs=1, metavar='session_name', help='Clean up directories/files created by session')
+        queuegroup.add_argument('--pbs', nargs=1, action='store', metavar='session_name', help='Launch tests using PBS as your scheduler. You must supply a name to identify this session with')
+        queuegroup.add_argument('--pbs-pre-source', nargs=1, action="store", dest='queue_source_command', metavar='source file', help='Source specified file before launching tests')
+        queuegroup.add_argument('--pbs-project', nargs=1, action='store', dest='queue_project', type=str, default='moose', metavar='project', help='Identify your job(s) with this project (default:  moose)')
+        queuegroup.add_argument('--pbs-queue', nargs=1, action='store', dest='queue_queue', type=str, metavar='queue', help='Submit jobs to the specified queue')
+        queuegroup.add_argument('--pbs-cleanup', nargs=1, action="store", metavar='session_name', help='Clean up files generated by supplied session_name')
+        queuegroup.add_argument('--queue-project', nargs=1, action='store', type=str, default='moose', metavar='project', help='Deprecated. Use --pbs-project')
+        queuegroup.add_argument('--queue-queue', nargs=1, action='store', type=str, metavar='queue', help='Deprecated. Use --pbs-queue')
+        queuegroup.add_argument('--queue-cleanup', action="store_true", help='Deprecated. Use --pbs-cleanup')
 
         code = True
         if self.code.decode('hex') in argv:
             del argv[argv.index(self.code.decode('hex'))]
             code = False
         self.options = parser.parse_args(argv[1:])
-        self.tests = self.options.test_name
         self.options.code = code
 
         self.options.runtags = [tag for tag in self.options.run.split(',') if tag != '']
@@ -703,43 +838,52 @@ class TestHarness:
             if type(value) == list and len(value) == 1:
                 setattr(self.options, key, value[0])
 
-        # If attempting to test only failed_tests, open the .failed_tests file and create a list object
-        # otherwise, open the failed_tests file object for writing (clobber).
-        failed_tests_file = os.path.join(os.getcwd(), '.failed_tests')
-        if self.options.failed_tests:
-            with open(failed_tests_file, 'r') as tmp_failed_tests:
-                self.options._test_list = tmp_failed_tests.read().split('\n')
-        else:
-            self.writeFailedTest = open(failed_tests_file, 'w')
-
         self.checkAndUpdateCLArgs()
 
     ## Called after options are parsed from the command line
     # Exit if options don't make any sense, print warnings if they are merely weird
     def checkAndUpdateCLArgs(self):
+        # Support deprecated cleanup method for now
+        if self.options.pbs_cleanup:
+            self.options.pbs = self.options.pbs_cleanup
+            self.options.queue_cleanup = True
+
         opts = self.options
         if opts.output_dir and not (opts.file or opts.sep_files or opts.fail_files or opts.ok_files):
             print('WARNING: --output-dir is specified but no output files will be saved, use -f or a --sep-files option')
         if opts.group == opts.not_group:
             print('ERROR: The group and not_group options cannot specify the same group')
             sys.exit(1)
-        if opts.store_time and not (opts.revision):
-            print('ERROR: --store-timing is specified but no revision')
-            sys.exit(1)
-        if opts.store_time:
-            # timing returns Active Time, while store_timing returns Solve Time.
-            # Thus we need to turn off timing.
-            opts.timing = False
-            opts.scaling = True
-        if opts.valgrind_mode and (opts.parallel > 1 or opts.nthreads > 1):
-            print('ERROR: --parallel and/or --threads can not be used with --valgrind')
-            sys.exit(1)
-        if opts.queue_cleanup and opts.pbs:
-            print('ERROR: --queue-cleanup and --pbs can not be used together')
+        if opts.valgrind_mode and opts.nthreads > 1:
+            print('ERROR: --threads can not be used with --valgrind')
             sys.exit(1)
         if opts.check_input and opts.no_check_input:
             print('ERROR: --check-input and --no-check-input can not be used together')
             sys.exit(1)
+        if opts.check_input and opts.enable_recover:
+            print('ERROR: --check-input and --recover can not be used together')
+            sys.exit(1)
+        if opts.spec_file and not os.path.exists(opts.spec_file):
+            print('ERROR: --spec-file supplied but path does not exist')
+            sys.exit(1)
+        if opts.failed_tests and opts.pbs:
+            print('ERROR: --failed-tests and --pbs can not be used simultaneously')
+            sys.exit(1)
+        if opts.queue_cleanup and not opts.pbs:
+            print('ERROR: --queue-cleanup can not be used without additional queue options')
+            sys.exit(1)
+        if opts.queue_source_command and not os.path.exists(opts.queue_source_command):
+            print('ERROR: pre-source supplied but path does not exist')
+            sys.exit(1)
+
+        # Flatten input_file_name from ['tests', 'speedtests'] to just tests if none supplied
+        # We can not support running two spec files during one launch into a third party queue manager.
+        # This is because Jobs created by spec files, have no way of accessing other jobs created by
+        # other spec files. They only know about the jobs a single spec file generates.
+        # NOTE: Which means, tests and speedtests running simultaneously currently have a chance to
+        # clobber each others output during normal operation!?
+        if opts.pbs and not opts.input_file_name:
+            self.options.input_file_name = 'tests'
 
         # Update any keys from the environment as necessary
         if not self.options.method:
@@ -759,6 +903,16 @@ class TestHarness:
         if opts.heavy_tests:
             self.options.report_skipped = False
 
+        # User wants to write all output, so unify the options involved
+        if opts.sep_files:
+            opts.ok_files = True
+            opts.fail_files = True
+            opts.quiet = True
+
+        # User wants only failed files, so unify the options involved
+        elif opts.fail_files:
+            opts.quiet = True
+
     def postRun(self, specs, timing):
         return
 
@@ -769,82 +923,6 @@ class TestHarness:
         elif self.options.dump:
             self.factory.printDump("Tests")
             sys.exit(0)
-        elif self.options.queue_cleanup:
-            self.scheduler.cleanUp()
-            sys.exit(0)
 
     def getOptions(self):
         return self.options
-
-#################################################################################################################################
-# The TestTimer TestHarness
-# This method finds and stores timing for individual tests.  It is activated with --store-timing
-#################################################################################################################################
-
-CREATE_TABLE = """create table timing
-(
-  app_name text,
-  test_name text,
-  revision text,
-  date int,
-  seconds real,
-  scale int,
-  load real
-);"""
-
-class TestTimer(TestHarness):
-    def __init__(self, argv, moose_dir, app_name=None):
-        TestHarness.__init__(self, argv, app_name=app_name)
-        try:
-            from sqlite3 import dbapi2 as sqlite
-            assert sqlite # silence pyflakes warning
-        except:
-            print('Error: --store-timing requires the sqlite3 python module.')
-            sys.exit(1)
-        self.db_file = self.options.dbFile
-        if not self.db_file:
-            home = os.environ['HOME']
-            self.db_file = os.path.join(home, 'timingDB/timing.sqlite')
-            if not os.path.exists(self.db_file):
-                print('Warning: creating new database at default location: ' + str(self.db_file))
-                self.createDB(self.db_file)
-            else:
-                print('Warning: Assuming database location ' + self.db_file)
-
-    def createDB(self, fname):
-        from sqlite3 import dbapi2 as sqlite
-        print('Creating empty database at ' + fname)
-        con = sqlite.connect(fname)
-        cr = con.cursor()
-        cr.execute(CREATE_TABLE)
-        con.commit()
-
-    def preRun(self):
-        from sqlite3 import dbapi2 as sqlite
-        # Delete previous data if app_name and repo revision are found
-        con = sqlite.connect(self.db_file)
-        cr = con.cursor()
-        cr.execute('delete from timing where app_name = ? and revision = ?', (self.app_name, self.options.revision))
-        con.commit()
-
-    # After the run store the results in the database
-    def postRun(self, test, timing):
-        from sqlite3 import dbapi2 as sqlite
-        con = sqlite.connect(self.db_file)
-        cr = con.cursor()
-
-        timestamp = int(time.time())
-        load = os.getloadavg()[0]
-
-        # accumulate the test results
-        data = []
-        sum_time = 0
-        num = 0
-        # Were only interested in storing scaled data
-        if timing != None and test['scale_refine'] != 0:
-            sum_time += float(timing)
-            num += 1
-            data.append( (self.app_name, test['test_name'].split('/').pop(), self.options.revision, timestamp, timing, test['scale_refine'], load) )
-        # Insert the data into the database
-        cr.executemany('insert into timing values (?,?,?,?,?,?,?)', data)
-        con.commit()

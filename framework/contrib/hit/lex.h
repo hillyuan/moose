@@ -85,7 +85,7 @@ public:
   /// tokens returns the list of tokens generated from the lexing process that represent the input
   /// text provided to this lexer.  tokens will be empty until after the run function has been
   /// called and completes execution.
-  std::vector<Token> tokens();
+  std::vector<Token> & tokens();
   /// run executes the lexer causing it to processes the input and generate a sequence of tokens
   /// representing it.  start is the first, starting LexFunc.  run calls start, passing in this
   /// lexer instance as an argument.  If start returns another LexFunc, it is called with this lexer
@@ -100,6 +100,9 @@ public:
   /// offset to the current pos.
   void emit(TokType type);
 
+  /// lastToken returns the offset of the last character of the most recent emitted token.
+  size_t lastToken();
+
   /// error emits an error token with the given messsage.  For convenience returns an nullptr
   /// LexFunc that can be directly returns by any LexFunc that calls error.
   LexFunc error(const std::string & msg);
@@ -107,6 +110,10 @@ public:
   /// next consumes and returns the next byte of input, advancing the lexer's position
   /// offset by one.
   char next();
+
+  /// rewind resets the current position and start offsets backward to the first character
+  /// following the last emitted token.
+  void rewind();
 
   /// accept conditionally accepts the next byte of input if it is one of the characters in the
   /// valid set.  It returns true if a character was consumed and false otherwise.
@@ -124,7 +131,7 @@ public:
   /// tokens - effectively skipping a portion of the input text.
   void ignore();
   /// backup unconsumes the most recently consumed byte of input, reducing the position offset by
-  /// one.  This should only be called at most once after each call to next.
+  /// one.  This should usually only be called once after each call to next.
   void backup();
 
   /// input returns the full input text the lexer is operating on i.e. the entire input string it

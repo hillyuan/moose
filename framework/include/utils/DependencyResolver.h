@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef DEPENDENCYRESOLVER_H
 #define DEPENDENCYRESOLVER_H
@@ -75,6 +70,11 @@ public:
   void addItem(const T & value);
 
   /**
+   * Clear Items from the resolver
+   */
+  void clear();
+
+  /**
    * Returns a vector of sets that represent dependency resolved values.  Items in the same
    * subvector have no dependence upon one and other.
    */
@@ -107,6 +107,11 @@ public:
    */
   bool dependsOn(const std::vector<T> & keys, const T & value);
 
+  /**
+   * Returns a vector of values that the given key depends on
+   */
+  const std::vector<T> & getValues(const T & key);
+
   bool operator()(const T & a, const T & b);
 
 private:
@@ -122,8 +127,11 @@ private:
   /// This is our main data structure a multimap that contains any number of dependencies in a key = value format
   std::multimap<T, T> _depends;
 
+  /// Used to avoid duplicate tracking of identical insertions of dependencies
+  std::set<std::pair<T, T>> _unique_deps;
+
   /// Extra items that need to come out in the sorted list but contain no dependencies
-  std::vector<T> _independent_items;
+  std::set<T> _independent_items;
 
   // A vector retaining the order in which items were added to the
   // resolver, to disambiguate ordering of items with no
@@ -135,6 +143,9 @@ private:
 
   /// The sorted vector (if requested)
   std::vector<T> _ordered_items_vector;
+
+  /// List of values that a given key depends upon
+  std::vector<T> _values_vector;
 };
 
 template <typename T>
@@ -196,6 +207,11 @@ template <typename T>
 void
 DependencyResolver<T>::insertDependency(const T & key, const T & value)
 {
+  auto k = std::make_pair(key, value);
+  if (_unique_deps.count(k) > 0)
+    return;
+  _unique_deps.insert(k);
+
   if (dependsOn(value, key))
   {
     throw CyclicDependencyException<T>(
@@ -212,9 +228,21 @@ template <typename T>
 void
 DependencyResolver<T>::addItem(const T & value)
 {
-  _independent_items.push_back(value);
+  _independent_items.insert(value);
   if (std::find(_ordering_vector.begin(), _ordering_vector.end(), value) == _ordering_vector.end())
     _ordering_vector.push_back(value);
+}
+
+template <typename T>
+void
+DependencyResolver<T>::clear()
+{
+  _depends.clear();
+  _independent_items.clear();
+  _ordering_vector.clear();
+  _ordered_items.clear();
+  _ordered_items_vector.clear();
+  _values_vector.clear();
 }
 
 template <typename T>
@@ -233,24 +261,24 @@ DependencyResolver<T>::getSortedValuesSets()
   dep_multimap depends(_depends.begin(), _depends.end(), comp);
 
   // Build up a set of all keys in depends that have nothing depending on them,
-  // and put it in the nodepends set.  These are the leaves of the dependency tree.
+  // and put it in the orphans set.
   std::set<T> nodepends;
-  for (auto i : depends)
-  {
-    T key = i.first;
 
-    bool founditem = false;
-    for (auto i2 : depends)
-    {
-      if (i2.second == key)
-      {
-        founditem = true;
-        break;
-      }
-    }
-    if (!founditem)
-      nodepends.insert(key);
+  std::set<T> all;
+  std::set<T> dependees;
+  for (auto & entry : depends)
+  {
+    dependees.insert(entry.second);
+    all.insert(entry.first);
+    all.insert(entry.second);
   }
+
+  std::set<T> orphans;
+  std::set_difference(all.begin(),
+                      all.end(),
+                      dependees.begin(),
+                      dependees.end(),
+                      std::inserter(orphans, orphans.end()));
 
   // Remove items from _independent_items if they actually appear in depends
   for (auto siter = _independent_items.begin(); siter != _independent_items.end();)
@@ -275,7 +303,7 @@ DependencyResolver<T>::getSortedValuesSets()
   _ordered_items.clear();
 
   // Put the independent items into the first set in _ordered_items
-  std::vector<T> next_set(_independent_items);
+  std::vector<T> next_set(_independent_items.begin(), _independent_items.end());
 
   /* Topological Sort */
   while (!depends.empty())
@@ -316,10 +344,10 @@ DependencyResolver<T>::getSortedValuesSets()
           T key = iter->first;
           depends.erase(iter++); // post increment to maintain a valid iterator
 
-          // If the item is at the end of a dependency chain (by being in nodepends) AND
+          // If the item is at the end of a dependency chain (by being an orphan) AND
           // is not still in the depends map because it still has another unresolved link
           // insert it into the next_set
-          if (nodepends.find(key) != nodepends.end() && depends.find(key) == depends.end())
+          if (orphans.find(key) != orphans.end() && depends.find(key) == depends.end())
             next_set.push_back(key);
         }
         else
@@ -406,6 +434,21 @@ DependencyResolver<T>::dependsOn(const std::vector<T> & keys, const T & value)
     if (dependsOn(key, value))
       return true;
   return false;
+}
+
+template <typename T>
+const std::vector<T> &
+DependencyResolver<T>::getValues(const T & key)
+{
+  _values_vector.clear();
+
+  std::pair<typename std::multimap<T, T>::iterator, typename std::multimap<T, T>::iterator> ret;
+  ret = _depends.equal_range(key);
+
+  for (typename std::multimap<T, T>::iterator it = ret.first; it != ret.second; ++it)
+    _values_vector.push_back(it->second);
+
+  return _values_vector;
 }
 
 template <typename T>

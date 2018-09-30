@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "AddMatAndKernel.h"
 #include "Parser.h"
@@ -32,6 +27,12 @@
 #include "libmesh/string_to_enum.h"
 #include "libmesh/fe.h"
 
+registerMooseAction("MooseTestApp", AddMatAndKernel, "add_kernel");
+
+registerMooseAction("MooseTestApp", AddMatAndKernel, "add_material");
+
+registerMooseAction("MooseTestApp", AddMatAndKernel, "add_variable");
+
 template <>
 InputParameters
 validParams<AddMatAndKernel>()
@@ -50,10 +51,10 @@ AddMatAndKernel::act()
     addVariable(var_name);
   else if (_current_task == "add_kernel")
   {
-    InputParameters params = _factory.getValidParams("MatDiffusion");
+    InputParameters params = _factory.getValidParams("MatDiffusionTest");
     params.set<NonlinearVariableName>("variable") = var_name;
     params.set<MaterialPropertyName>("prop_name") = "prop1";
-    _problem->addKernel("MatDiffusion", "kern1", params);
+    _problem->addKernel("MatDiffusionTest", "kern1", params);
   }
   else if (_current_task == "add_material")
   {

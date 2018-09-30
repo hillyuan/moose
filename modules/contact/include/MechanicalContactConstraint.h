@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef MECHANICALCONTACTCONSTRAINT_H
 #define MECHANICALCONTACTCONSTRAINT_H
@@ -14,6 +16,7 @@
 
 // Forward Declarations
 class MechanicalContactConstraint;
+class ContactLineSearchBase;
 
 template <>
 InputParameters validParams<MechanicalContactConstraint>();
@@ -26,16 +29,16 @@ class MechanicalContactConstraint : public NodeFaceConstraint
 {
 public:
   MechanicalContactConstraint(const InputParameters & parameters);
-  virtual ~MechanicalContactConstraint() {}
 
   virtual void timestepSetup() override;
   virtual void jacobianSetup() override;
+  virtual void residualEnd() override;
 
   virtual bool AugmentedLagrangianContactConverged();
 
   virtual void updateAugmentedLagrangianMultiplier(bool beginning_of_step = false);
 
-  virtual void updateContactSet(bool beginning_of_step = false);
+  virtual void updateContactStatefulData(bool beginning_of_step = false);
 
   virtual Real computeQpSlaveValue() override;
 
@@ -81,10 +84,11 @@ public:
   virtual bool addCouplingEntriesToJacobian() override { return _master_slave_jacobian; }
 
   bool shouldApply() override;
-  void computeContactForce(PenetrationInfo * pinfo);
+  void computeContactForce(PenetrationInfo * pinfo, bool update_contact_set);
 
 protected:
   MooseSharedPointer<DisplacedProblem> _displaced_problem;
+  FEProblem & _fe_problem;
   Real nodalArea(PenetrationInfo & pinfo);
   Real getPenalty(PenetrationInfo & pinfo);
   Real getTangentialPenalty(PenetrationInfo & pinfo);
@@ -101,7 +105,7 @@ protected:
   const Real _capture_tolerance;
   const unsigned int _stick_lock_iterations;
   const Real _stick_unlock_factor;
-  bool _update_contact_set;
+  bool _update_stateful_data;
 
   NumericVector<Number> & _residual_copy;
   //  std::map<Point, PenetrationInfo *> _point_to_info;
@@ -109,6 +113,7 @@ protected:
   const unsigned int _mesh_dimension;
 
   std::vector<unsigned int> _vars;
+  std::vector<MooseVariable *> _var_objects;
 
   MooseVariable * _nodal_area_var;
   SystemBase & _aux_system;
@@ -127,6 +132,13 @@ protected:
   Real _al_incremental_slip_tolerance;
   /// The tolerance of the frictional force for augmented Lagrangian method
   Real _al_frictional_force_tolerance;
+
+  std::shared_ptr<ContactLineSearchBase> _contact_linesearch;
+  std::set<dof_id_type> _current_contact_state;
+  std::set<dof_id_type> _old_contact_state;
+
+  const bool _print_contact_nodes;
+  static Threads::spin_mutex _contact_set_mutex;
 };
 
 #endif

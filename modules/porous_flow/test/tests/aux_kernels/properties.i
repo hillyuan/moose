@@ -268,20 +268,8 @@
     type = PorousFlowTemperature
     temperature = temperature
   [../]
-  [./temperature_nodal]
-    type = PorousFlowTemperature
-    at_nodes = true
-    temperature = temperature
-  [../]
   [./ppss]
     type = PorousFlow2PhasePS
-    phase0_porepressure = pwater
-    phase1_saturation = sgas
-    capillary_pressure = pc
-  [../]
-  [./ppss_nodal]
-    type = PorousFlow2PhasePS
-    at_nodes = true
     phase0_porepressure = pwater
     phase1_saturation = sgas
     capillary_pressure = pc
@@ -290,52 +278,16 @@
     type = PorousFlowMassFraction
     mass_fraction_vars = 'x0_water x0_gas'
   [../]
-  [./massfrac_nodal]
-    type = PorousFlowMassFraction
-    at_nodes = true
-    mass_fraction_vars = 'x0_water x0_gas'
-  [../]
   [./simple_fluid0]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid0
     phase = 0
-    at_nodes = true
   [../]
-  [./simple_fluid0_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid0
-    phase = 0
-  [../]
+
   [./simple_fluid1]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid1
     phase = 1
-    at_nodes = true
-  [../]
-  [./simple_fluid1_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid1
-    phase = 1
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
-  [./dens_qp_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-    at_nodes = false
-  [../]
-  [./visc_all_nodal]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_viscosity_qp
   [../]
   [./permeability]
     type = PorousFlowPermeabilityConst
@@ -343,42 +295,13 @@
   [../]
   [./relperm0]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 2
     phase = 0
   [../]
   [./relperm1]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 3
     phase = 1
-  [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
-  [../]
-  [./relperm0_qp]
-    type = PorousFlowRelativePermeabilityCorey
-    at_nodes = false
-    n = 2
-    phase = 0
-  [../]
-  [./relperm1_qp]
-    type = PorousFlowRelativePermeabilityCorey
-    at_nodes = false
-    n = 3
-    phase = 1
-  [../]
-  [./relperm_all_qp]
-    type = PorousFlowJoiner
-    at_nodes = false
-    material_property = PorousFlow_relative_permeability_qp
-  [../]
-  [./porosity_nodal]
-    type = PorousFlowPorosityConst
-    at_nodes = true
-    porosity = 0.1
   [../]
   [./porosity]
     type = PorousFlowPorosityConst
@@ -386,29 +309,8 @@
   [../]
   [./rock_heat]
     type = PorousFlowMatrixInternalEnergy
-    at_nodes = true
     specific_heat_capacity = 1.0
     density = 125
-  [../]
-  [./energy_all]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_internal_energy_nodal
-  [../]
-  [./energy_all_qp]
-    type = PorousFlowJoiner
-    include_old = true
-    material_property = PorousFlow_fluid_phase_internal_energy_qp
-  [../]
-  [./enthalpy_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_enthalpy_nodal
-  [../]
-  [./enthalpy_all_qp]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_enthalpy_qp
   [../]
 []
 

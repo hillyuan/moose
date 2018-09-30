@@ -75,11 +75,11 @@
   [./constant]
     type = ConstantVectorPostprocessor
     value = '1.2 3.4 9.6'
+    execute_on = initial
   [../]
 []
 
 [Executioner]
-  # Preconditioned JFNK (default)
   type = Steady
   solve_type = PJFNK
   petsc_options_iname = '-pc_type -pc_hypre_type'
@@ -89,4 +89,3 @@
 [Outputs]
   exodus = true
 []
-

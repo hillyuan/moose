@@ -1,23 +1,18 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef FACTORY_H
 #define FACTORY_H
 
 #include <set>
 #include <vector>
-#include <time.h>
+#include <ctime>
 
 // MOOSE includes
 #include "MooseObject.h"
@@ -39,11 +34,14 @@ class InputParameters;
     factory.associateNameToClass(name, stringifyName(obj));                                        \
   } while (0)
 
-#define registerDeprecatedObject(name)                                                             \
-  factory.regDeprecated<name>(stringifyName(name), __FILE__, __LINE__)
+#define registerDeprecatedObject(name, time)                                                       \
+  factory.regDeprecated<name>(stringifyName(name), time, __FILE__, __LINE__)
 
-#define registerDeprecatedObjectWithReplacement(dep_obj, replacement_name)                         \
-  factory.regReplaced<dep_obj>(stringifyName(dep_obj), replacement_name, __FILE__, __LINE__)
+#define registerDeprecatedObjectWithReplacement(dep_obj, replacement_name, time)                   \
+  factory.regReplaced<dep_obj>(stringifyName(dep_obj), replacement_name, time, __FILE__, __LINE__)
+
+#define registerRenamedObject(orig_name, new_obj, time)                                            \
+  factory.renameObject<new_obj>(orig_name, stringifyName(new_obj), time, __FILE__, __LINE__)
 
 // for backward compatibility
 #define registerKernel(name) registerObject(name)
@@ -81,6 +79,7 @@ class InputParameters;
 #define registerOutput(name) registerObject(name)
 #define registerControl(name) registerObject(name)
 #define registerPartitioner(name) registerObject(name)
+#define registerRelationshipManager(name) registerObject(name)
 
 #define registerNamedKernel(obj, name) registerNamedObject(obj, name)
 #define registerNamedNodalKernel(obj, name) registerNamedObject(obj, name)
@@ -116,6 +115,9 @@ class InputParameters;
 #define registerNamedControl(obj, name) registerNamedObject(obj, name)
 #define registerNamedPartitioner(obj, name) registerNamedObject(obj, name)
 
+// Execute on flag registration
+#define registerExecFlag(flag) factory.regExecFlag(flag)
+
 /**
  * alias to wrap shared pointer type
  */
@@ -143,7 +145,7 @@ template <class T>
 MooseObjectPtr
 buildObject(const InputParameters & parameters)
 {
-  return MooseObjectPtr(new T(parameters));
+  return std::make_shared<T>(parameters);
 }
 
 /**
@@ -162,30 +164,18 @@ public:
   template <typename T>
   void reg(const std::string & obj_name, const std::string & file = "", int line = -1)
   {
-
-    /*
-     * If _registerable_objects has been set the user has requested that we only register some
-     * subset
-     * of the objects for a dynamically loaded application. The objects listed in *this*
-     * application's
-     * registerObjects() method will have already been registered before that member was set.
-     *
-     * If _registerable_objects is empty, the factory is unrestricted
-     */
-    if (_registerable_objects.empty() ||
-        _registerable_objects.find(obj_name) != _registerable_objects.end())
-    {
-      if (_name_to_build_pointer.find(obj_name) == _name_to_build_pointer.end())
-      {
-        _name_to_build_pointer[obj_name] = &buildObject<T>;
-        _name_to_params_pointer[obj_name] = &validParams<T>;
-      }
-      else
-        mooseError("Object '" + obj_name + "' already registered.");
-    }
-    _name_to_line.addInfo(obj_name, file, line);
-    // TODO: Possibly store and print information about objects that are skipped here?
+    reg("", obj_name, &buildObject<T>, &validParams<T>, "", "", file, line);
   }
+
+  void reg(const std::string & label,
+           const std::string & obj_name,
+           const buildPtr & build_ptr,
+           const paramsPtr & params_ptr,
+           const std::string & deprecated_time = "",
+           const std::string & replacement_name = "",
+           const std::string & file = "",
+           int line = -1);
+
   /**
    * Gets file and line information where an object was initially registered.
    * @param name Object name
@@ -210,18 +200,18 @@ public:
   /**
    * Register a deprecated object that expires
    * @param obj_name The name of the object to register
-   * @param t_str String containing the expiration date for the object
+   * @param t_str String containing the expiration date for the object in "MM/DD/YYYY HH:MM" format.
+   * Note that the HH:MM is not optional
    *
    * Note: Params file and line are supplied by the macro
    */
   template <typename T>
   void regDeprecated(const std::string & obj_name,
+                     const std::string t_str,
                      const std::string & file,
                      int line)
   {
-    // Register the name
-    reg<T>(obj_name, file, line);
-    deprecateObject(obj_name);
+    reg("", obj_name, &buildObject<T>, &validParams<T>, t_str, "", file, line);
   }
 
   /**
@@ -229,20 +219,51 @@ public:
    * @param dep_obj - The name (type) of the object being registered (the deprecated type)
    * @param replacement_name - The name of the object replacing the deprecated object (new name)
    * @param time_str - Time at which the deprecated message prints as  an error "MM/DD/YYYY HH:MM"
+   * Note that the HH:MM is not optional
    *
    * Note: Params file and line are supplied by the macro
    */
   template <typename T>
   void regReplaced(const std::string & dep_obj,
                    const std::string & replacement_name,
+                   const std::string time_str,
                    const std::string & file,
                    int line)
   {
-    // Register the name
-    regDeprecated<T>(dep_obj, file, line);
+    reg("", dep_obj, &buildObject<T>, &validParams<T>, time_str, replacement_name, file, line);
+  }
+
+  /**
+   * Used when an existing object's name changes
+   *
+   * Template T: The type of the new class
+   *
+   * @param orig_name The name of the original class
+   * @param new_name The name of the new class
+   * @param time_str The date the deprecation will expire
+   *
+   * Note: Params file and line are supplied by the macro
+   */
+  template <typename T>
+  void renameObject(const std::string & orig_name,
+                    const std::string & new_name,
+                    const std::string time_str,
+                    const std::string & file,
+                    int line)
+  {
+    // Deprecate the old name
+    // Store the time
+    _deprecated_time[orig_name] = parseTime(time_str);
 
     // Store the new name
-    deprecateObject(dep_obj, replacement_name);
+    _deprecated_name[orig_name] = new_name;
+
+    // Register the new object with the old name
+    reg<T>(orig_name, __FILE__, __LINE__);
+    associateNameToClass(orig_name, new_name);
+
+    // Register the new object with the new name
+    reg<T>(new_name, file, line);
   }
 
   /**
@@ -314,15 +335,22 @@ public:
    */
   std::vector<std::string> getConstructedObjects() const;
 
-  ///@{
   /**
-   * Allow objects to be deprecated via function call.
+   * Add a new flag to the app.
+   * @param flag The flag to add as available to the app level ExecFlagEnum.
    */
-  void deprecateObject(const std::string & name);
-  void deprecateObject(const std::string & name, const std::string & replacement);
-  ///@}
+  void regExecFlag(const ExecFlagType & flag);
+
+  MooseApp & app() { return _app; }
 
 protected:
+  /**
+   * Parse time string (mm/dd/yyyy HH:MM)
+   * @param t_str String with the object expiration date, this must be in the form mm/dd/yyyy HH:MM
+   * @return A time_t object with the expiration date
+   */
+  std::time_t parseTime(std::string);
+
   /**
    * Show the appropriate message for deprecated objects
    * @param obj_name Name of the deprecated object
@@ -348,11 +376,11 @@ protected:
   /// Object name to class name association
   std::map<std::string, std::string> _name_to_class;
 
-  /// Storage for deprecated objects
-  std::set<std::string> _deprecated;
+  /// Storage for deprecated object experiation dates
+  std::map<std::string, std::time_t> _deprecated_time;
 
   /// Storage for the deprecated objects that have replacements
-  std::map<std::string, std::string> _deprecated_with_replace;
+  std::map<std::string, std::string> _deprecated_name;
 
   /// The list of objects that may be registered
   std::set<std::string> _registerable_objects;
@@ -362,6 +390,11 @@ protected:
 
   /// Constructed Moose Object types
   std::set<std::string> _constructed_types;
+
+  /// set<label/appname, objectname> used to track if an object previously added is being added
+  /// again - which is okay/allowed, while still allowing us to detect/reject cases of duplicate
+  /// object name registration where the label/appname is not identical.
+  std::set<std::pair<std::string, std::string>> _objects_by_label;
 };
 
 #endif /* FACTORY_H */

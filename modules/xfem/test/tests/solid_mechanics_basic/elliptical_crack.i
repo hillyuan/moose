@@ -4,7 +4,6 @@
 []
 
 [XFEM]
-  geometric_cut_userobjects = 'ellip_cut_uo'
   qrule = volfrac
   output_cut_plane = true
 []
@@ -197,7 +196,6 @@
   execute_on = timestep_end
   [./console]
     type = Console
-    perf_log = true
     output_linear = true
   [../]
 []

@@ -1,14 +1,17 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowMassVolumetricExpansion.h"
 
-// MOOSE includes
 #include "MooseVariable.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowMassVolumetricExpansion);
 
 template <>
 InputParameters
@@ -25,7 +28,7 @@ validParams<PorousFlowMassVolumetricExpansion>()
   params.addParam<unsigned int>(
       "fluid_component", 0, "The index corresponding to the component for this kernel");
   params.addRequiredParam<UserObjectName>(
-      "PorousFlowDictator", "The UserObject that holds the list of Porous-Flow variable names.");
+      "PorousFlowDictator", "The UserObject that holds the list of PorousFlow variable names.");
   params.addClassDescription("Component_mass*rate_of_solid_volumetric_expansion");
   return params;
 }
@@ -78,9 +81,7 @@ PorousFlowMassVolumetricExpansion::computeQpResidual()
   unsigned int num_phases = _fluid_density[_i].size();
   mooseAssert(num_phases == _fluid_saturation[_i].size(),
               "PorousFlowMassVolumetricExpansion: Size of fluid density = "
-                  << num_phases
-                  << " size of fluid saturation = "
-                  << _fluid_saturation[_i].size()
+                  << num_phases << " size of fluid saturation = " << _fluid_saturation[_i].size()
                   << " but both these must be equal to the number of phases in the system");
 
   Real mass = 0.0;

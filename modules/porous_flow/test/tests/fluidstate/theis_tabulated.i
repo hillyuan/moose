@@ -108,6 +108,12 @@
     type = PorousFlowCapillaryPressureConst
     pc = 0
   [../]
+  [./fs]
+    type = PorousFlowWaterNCG
+    water_fp = water
+    gas_fp = tabulated
+    capillary_pressure = pc
+  [../]
 []
 
 [Modules]
@@ -129,33 +135,17 @@
 [Materials]
   [./temperature]
     type = PorousFlowTemperature
-    at_nodes = true
-  [../]
-  [./temperature_qp]
-    type = PorousFlowTemperature
   [../]
   [./waterncg]
     type = PorousFlowFluidStateWaterNCG
     gas_porepressure = pgas
     z = zi
-    gas_fp = tabulated
-    water_fp = water
-    at_nodes = true
     temperature_unit = Celsius
     capillary_pressure = pc
-  [../]
-  [./waterncg_qp]
-    type = PorousFlowFluidStateWaterNCG
-    gas_porepressure = pgas
-    z = zi
-    gas_fp = tabulated
-    water_fp = water
-    temperature_unit = Celsius
-    capillary_pressure = pc
+    fluid_state = fs
   [../]
   [./porosity]
     type = PorousFlowPorosityConst
-    at_nodes = true
     porosity = 0.2
   [../]
   [./permeability]
@@ -164,7 +154,6 @@
   [../]
   [./relperm_water]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 2
     phase = 0
     s_res = 0.1
@@ -172,14 +161,8 @@
   [../]
   [./relperm_gas]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 2
     phase = 1
-  [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
   [../]
 []
 
@@ -266,7 +249,7 @@
 
 [Outputs]
   print_linear_residuals = false
-  print_perf_log = true
+  perf_graph = true
   [./csvout]
     type = CSV
     file_base = theis_csvout

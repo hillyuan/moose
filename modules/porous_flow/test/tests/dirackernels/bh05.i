@@ -18,6 +18,14 @@
   PorousFlowDictator = dictator
 []
 
+[Functions]
+  [./dts]
+    type = PiecewiseLinear
+    y = '500 500 1E1'
+    x = '4000 5000 6500'
+  [../]
+[]
+
 [Variables]
   [./pp]
     initial_condition = -2E5
@@ -64,43 +72,28 @@
 [Materials]
   [./temperature]
     type = PorousFlowTemperature
-    at_nodes = true
   [../]
-  [./ppss_nodal]
+  [./ppss]
     type = PorousFlow1PhaseP
-    at_nodes = true
     porepressure = pp
     capillary_pressure = pc
   [../]
   [./ppss_qp]
     type = PorousFlow1PhaseP
+    at_nodes = false
     porepressure = pp
     capillary_pressure = pc
   [../]
   [./massfrac]
     type = PorousFlowMassFraction
-    at_nodes = true
   [../]
   [./simple_fluid]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid
     phase = 0
-    at_nodes = true
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-    include_old = true
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
   [../]
   [./porosity]
     type = PorousFlowPorosityConst
-    at_nodes = true
     porosity = 0.1
   [../]
   [./permeability]
@@ -113,24 +106,18 @@
     m = 2
     phase = 0
   [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
-  [../]
 []
-
 
 [DiracKernels]
   [./bh]
     type = PorousFlowPeacemanBorehole
-    bottom_p_or_t = 0
-    fluid_phase = 0
-    point_file = bh03.bh
-    use_mobility = true
-    SumQuantityUO = borehole_total_outflow_mass
     variable = pp
+    SumQuantityUO = borehole_total_outflow_mass
+    point_file = bh03.bh
+    fluid_phase = 0
+    bottom_p_or_t = 0
     unit_weight = '0 0 0'
+    use_mobility = true
     character = -1
   [../]
 []
@@ -193,8 +180,7 @@
   solve_type = NEWTON
   [./TimeStepper]
     type = FunctionDT
-    time_dt = '500 500 1E1'
-    time_t = '4000 5000 6500'
+    function = dts
   [../]
 []
 

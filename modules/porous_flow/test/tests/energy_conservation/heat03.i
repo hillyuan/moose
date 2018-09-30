@@ -248,11 +248,6 @@
 [Materials]
   [./temperature]
     type = PorousFlowTemperature
-    at_nodes = true
-    temperature = temp
-  [../]
-  [./temperature_qp]
-    type = PorousFlowTemperature
     temperature = temp
   [../]
   [./elasticity_tensor]
@@ -274,67 +269,30 @@
     type = PorousFlowEffectiveFluidPressure
   [../]
   [./porosity]
-    type = PorousFlowPorosityConst
-    at_nodes = true
-    porosity = 0.1
+    type = PorousFlowPorosity
+    porosity_zero = 0.1
   [../]
   [./rock_heat]
     type = PorousFlowMatrixInternalEnergy
-    at_nodes = true
     specific_heat_capacity = 2.2
     density = 0.5
   [../]
   [./ppss]
-    type = PorousFlow1PhaseP
-    at_nodes = true
-    porepressure = pp
-    capillary_pressure = pc
-  [../]
-  [./ppss_qp]
     type = PorousFlow1PhaseP
     porepressure = pp
     capillary_pressure = pc
   [../]
   [./massfrac]
     type = PorousFlowMassFraction
-    at_nodes = true
   [../]
   [./simple_fluid]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid
     phase = 0
-    at_nodes = true
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_viscosity_nodal
-  [../]
-  [./internal_energy_fluids]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_internal_energy_nodal
   [../]
   [./permeability]
     type = PorousFlowPermeabilityConst
     permeability = '0.5 0 0   0 0.5 0   0 0 0.5'
-  [../]
-  [./relperm]
-    type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
-    n = 0 # unimportant in this fully-saturated situation
-    phase = 0
-  [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
   [../]
 []
 

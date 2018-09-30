@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "GeometricCut3DUserObject.h"
 
@@ -31,15 +33,12 @@ validParams<GeometricCut3DUserObject>()
 GeometricCut3DUserObject::GeometricCut3DUserObject(const InputParameters & parameters)
   : GeometricCutUserObject(parameters), _center(), _normal()
 {
-  _cut_time_ranges.push_back(std::make_pair(0.0, 0.0));
 }
-
-bool GeometricCut3DUserObject::active(Real /*time*/) const { return true; }
 
 bool
 GeometricCut3DUserObject::cutElementByGeometry(const Elem * /*elem*/,
-                                               std::vector<CutEdge> & /*cut_edges*/,
-                                               std::vector<CutNode> & /*cut_nodes*/,
+                                               std::vector<Xfem::CutEdge> & /*cut_edges*/,
+                                               std::vector<Xfem::CutNode> & /*cut_nodes*/,
                                                Real /*time*/) const
 {
   mooseError("Invalid method: must use vector of element faces for 3D mesh cutting");
@@ -48,7 +47,7 @@ GeometricCut3DUserObject::cutElementByGeometry(const Elem * /*elem*/,
 
 bool
 GeometricCut3DUserObject::cutElementByGeometry(const Elem * elem,
-                                               std::vector<CutFace> & cut_faces,
+                                               std::vector<Xfem::CutFace> & cut_faces,
                                                Real /*time*/) const
 // TODO: Time evolving cuts not yet supported in 3D (hence the lack of use of the time variable)
 {
@@ -89,12 +88,12 @@ GeometricCut3DUserObject::cutElementByGeometry(const Elem * elem,
     if (cut_edges.size() == 2)
     {
       cut_elem = true;
-      CutFace mycut;
-      mycut.face_id = i;
-      mycut.face_edge.push_back(cut_edges[0]);
-      mycut.face_edge.push_back(cut_edges[1]);
-      mycut.position.push_back(cut_pos[0]);
-      mycut.position.push_back(cut_pos[1]);
+      Xfem::CutFace mycut;
+      mycut._face_id = i;
+      mycut._face_edge.push_back(cut_edges[0]);
+      mycut._face_edge.push_back(cut_edges[1]);
+      mycut._position.push_back(cut_pos[0]);
+      mycut._position.push_back(cut_pos[1]);
       cut_faces.push_back(mycut);
     }
   }
@@ -104,7 +103,7 @@ GeometricCut3DUserObject::cutElementByGeometry(const Elem * elem,
 
 bool
 GeometricCut3DUserObject::cutFragmentByGeometry(std::vector<std::vector<Point>> & /*frag_edges*/,
-                                                std::vector<CutEdge> & /*cut_edges*/,
+                                                std::vector<Xfem::CutEdge> & /*cut_edges*/,
                                                 Real /*time*/) const
 {
   mooseError("Invalid method: must use vector of element faces for 3D mesh cutting");
@@ -113,7 +112,7 @@ GeometricCut3DUserObject::cutFragmentByGeometry(std::vector<std::vector<Point>> 
 
 bool
 GeometricCut3DUserObject::cutFragmentByGeometry(std::vector<std::vector<Point>> & /*frag_faces*/,
-                                                std::vector<CutFace> & /*cut_faces*/,
+                                                std::vector<Xfem::CutFace> & /*cut_faces*/,
                                                 Real /*time*/) const
 {
   // TODO: Need this for branching in 3D

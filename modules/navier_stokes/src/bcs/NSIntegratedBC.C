@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // Navier-Stokes includes
 #include "NS.h"
@@ -36,6 +38,7 @@ validParams<NSIntegratedBC>()
   params.addRequiredCoupledVar(NS::total_energy, "total energy");
   params.addRequiredParam<UserObjectName>("fluid_properties",
                                           "The name of the user object for fluid properties");
+  params.addParam<Real>("specified_pressure", 0.0, "The specified pressure for this boundary");
 
   return params;
 }

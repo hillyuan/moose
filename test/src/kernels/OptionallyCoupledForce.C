@@ -1,18 +1,15 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "OptionallyCoupledForce.h"
+
+registerMooseObject("MooseTestApp", OptionallyCoupledForce);
 
 template <>
 InputParameters
@@ -31,8 +28,8 @@ OptionallyCoupledForce::OptionallyCoupledForce(const InputParameters & parameter
     _v(coupledValue("v")),
     _grad_v(coupledGradient("v")),
     _second_v(coupledSecond("v")),
-    _v_dot(coupledDot("v")),
-    _v_dot_du(coupledDotDu("v")),
+    _v_dot(_is_transient ? coupledDot("v") : _zero),
+    _v_dot_du(_is_transient ? coupledDotDu("v") : _zero),
     _v_coupled(isCoupled("v"))
 {
   if (!_v_coupled && _v_var < 64)

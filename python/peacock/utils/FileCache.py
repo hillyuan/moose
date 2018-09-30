@@ -1,3 +1,12 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from PyQt5.QtCore import QSettings, QStandardPaths
 import os, cPickle
 import uuid
@@ -50,6 +59,7 @@ class FileCache(object):
                 or self.path_data.get("data_version") != self.data_version
                 or self.stat.st_ctime != self.path_data.get("ctime")
                 or self.stat.st_size != self.path_data.get("size")
+                or not os.path.exists(self.path_data.get("pickle_path"))
                 ):
             self.dirty = True
             return
@@ -72,7 +82,7 @@ class FileCache(object):
             return None
 
     @staticmethod
-    def removeCacheFile( path):
+    def removeCacheFile(path):
         try:
             os.remove(path)
         except:
@@ -132,3 +142,4 @@ class FileCache(object):
         for key, val in val.items():
             FileCache.removeCacheFile(val["pickle_path"])
         settings.remove(settings_key)
+        settings.sync()

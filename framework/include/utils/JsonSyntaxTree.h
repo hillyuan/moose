@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef JSONSYNTAXTREE_H
 #define JSONSYNTAXTREE_H
@@ -20,6 +15,7 @@
 #include "json/json.h"
 #include <string>
 #include <vector>
+#include <utility>
 
 /**
  * Holds the syntax in a Json::Value tree
@@ -94,8 +90,17 @@ protected:
   moosecontrib::Json::Value &
   getJson(const std::string & parent, const std::string & path, bool is_type);
   moosecontrib::Json::Value & getJson(const std::string & path);
+  std::pair<std::string, std::string> getObjectLabel(const std::string & obj) const;
+  std::pair<std::string, std::string> getActionLabel(const std::string & action) const;
+
   moosecontrib::Json::Value _root;
   std::string _search;
+
+  ///@{
+  /// Maps storing action/object name to the label and file location
+  std::map<std::string, std::pair<std::string, std::string>> _action_label_map;
+  std::map<std::string, std::pair<std::string, std::string>> _object_label_map;
+  ///@}
 };
 
 #endif // JSONSYNTAXTREE_H

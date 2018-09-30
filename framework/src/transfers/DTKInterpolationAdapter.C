@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "libmesh/libmesh_config.h"
 
@@ -85,17 +80,15 @@ DTKInterpolationAdapter::DTKInterpolationAdapter(Teuchos::RCP<const Teuchos::Mpi
   {
     GlobalOrdinal i = 0;
 
-    MeshBase::const_element_iterator end = mesh.local_elements_end();
-    for (MeshBase::const_element_iterator it = mesh.local_elements_begin(); it != end; ++it)
+    for (const auto & elem : as_range(mesh.local_elements_begin(), mesh.local_elements_end()))
     {
-      const Elem & elem = *(*it);
-      elements[i] = elem.id();
+      elements[i] = elem->id();
 
       for (GlobalOrdinal j = 0; j < n_nodes_per_elem; j++)
-        connectivity[(j * n_local_elem) + i] = elem.node_id(j);
+        connectivity[(j * n_local_elem) + i] = elem->node_id(j);
 
       {
-        Point centroid = elem.centroid();
+        Point centroid = elem->centroid();
         for (GlobalOrdinal j = 0; j < from_dim; j++)
           elem_centroid_coordinates[(j * n_local_elem) + i] = centroid(j) + offset(j);
       }
@@ -342,13 +335,10 @@ DTKInterpolationAdapter::get_element_topology(const Elem * elem)
 void
 DTKInterpolationAdapter::get_semi_local_nodes(std::set<GlobalOrdinal> & semi_local_nodes)
 {
-  MeshBase::const_element_iterator end = mesh.local_elements_end();
-  for (MeshBase::const_element_iterator it = mesh.local_elements_begin(); it != end; ++it)
+  for (const auto & elem : as_range(mesh.local_elements_begin(), mesh.local_elements_end()))
   {
-    const Elem & elem = *(*it);
-
-    for (unsigned int j = 0; j < elem.n_nodes(); j++)
-      semi_local_nodes.insert(elem.node_id(j));
+    for (unsigned int j = 0; j < elem->n_nodes(); j++)
+      semi_local_nodes.insert(elem->node_id(j));
   }
 }
 

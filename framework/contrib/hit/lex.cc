@@ -81,7 +81,8 @@ Token::str()
 }
 
 Lexer::Lexer(const std::string & name, const std::string & input) : _name(name), _input(input) {}
-std::vector<Token>
+
+std::vector<Token> &
 Lexer::tokens()
 {
   return _tokens;
@@ -97,12 +98,35 @@ Lexer::run(LexFunc start)
 }
 
 void
+Lexer::rewind()
+{
+  if (!peek()) // don't do anything if we are at EOF
+    return;
+
+  auto tmp = lastToken();
+  if (tmp >= _start)
+    return;
+
+  // subtract newlines that may have been ignored
+  _line_count -= lineCount(_input.substr(tmp, _start - tmp));
+  _pos = tmp;
+  if (_pos < _start)
+    _start = _pos;
+}
+
+void
 Lexer::emit(TokType type)
 {
   auto substr = _input.substr(_start, _pos - _start);
   _tokens.push_back(Token(type, substr, _start, _line_count));
   _line_count += lineCount(substr);
   _start = _pos;
+}
+
+size_t
+Lexer::lastToken()
+{
+  return _tokens.back().offset + _tokens.back().val.size();
 }
 
 void
@@ -170,7 +194,7 @@ Lexer::peek()
 void
 Lexer::backup()
 {
-  _pos -= _width;
+  _pos = std::max(_start, _pos - _width);
 }
 
 std::string
@@ -237,6 +261,7 @@ consumeWhitespace(Lexer * l)
     if (l->pos() == start)
       break;
   }
+
   l->acceptRun(allspace);
   l->ignore();
   return l->pos() - start;
@@ -257,12 +282,16 @@ consumeToNewline(Lexer * l)
 void
 lexComments(Lexer * l)
 {
-  l->acceptRun(space);
-  l->ignore();
-  if (l->accept("#"))
+  // The first comment in a file can't be an inline comment.
+  if (l->start() > 0 && l->tokens().back().type != TokType::BlankLine)
   {
-    consumeToNewline(l);
-    l->emit(TokType::InlineComment);
+    l->acceptRun(space);
+    l->ignore();
+    if (l->accept("#"))
+    {
+      consumeToNewline(l);
+      l->emit(TokType::InlineComment);
+    }
   }
 
   while (true)
@@ -301,20 +330,6 @@ lexEq(Lexer * l)
 void
 consumeUnquotedString(Lexer * l)
 {
-  // check for dollar substitution syntax
-  if (l->peek() == '$')
-  {
-    while (true)
-    {
-      char c = l->next();
-      // '#' is always a comment outside of quoted string
-      if (c == '\0' || charIn(c, newline + "#"))
-        break;
-    }
-    l->backup();
-    return;
-  }
-
   while (true)
   {
     char c = l->next();
@@ -332,28 +347,43 @@ lexString(Lexer * l)
   l->ignore();
 
   if (!charIn(l->peek(), "'\""))
-    consumeUnquotedString(l);
-  else
   {
-    char quote = 0;
-    if (l->accept("\""))
-      quote = '"';
-    else if (l->accept("'"))
-      quote = '\'';
+    consumeUnquotedString(l);
+    l->emit(TokType::String);
+    return lexHit;
+  }
 
+  std::string quote = "";
+  if (l->peek() == '"')
+    quote = "\"";
+  else if (l->peek() == '\'')
+    quote = "'";
+  else
+    return l->error("the parser is horribly broken");
+
+  // this is a loop in order to enable consecutive string literals to be parsed
+  while (l->accept(quote))
+  {
     char c = l->input()[l->start()];
     char prev;
     while (true)
     {
       prev = c;
       c = l->next();
-      if (c == quote and prev != '\\')
+      if (c == quote[0] && prev != '\\')
         break;
       else if (c == '\0')
         return l->error("unterminated string");
     }
+    l->emit(TokType::String);
+    consumeWhitespace(l);
   }
-  l->emit(TokType::String);
+
+  // unlex the last run of whitespace - we need to skip whitespace between consecutive string
+  // literals, but not the final run of whitespace.  Carefully tracking/handling whitespace
+  // is is important for determining how to place/format comment tokens.
+  l->rewind();
+
   return lexHit;
 }
 
@@ -378,7 +408,7 @@ lexNumber(Lexer * l)
     return lexHit;
   }
 
-  if (!charIn(l->peek(), allspace) && l->peek() != '\0')
+  if (!charIn(l->peek(), allspace + "[") && l->peek() != '\0')
   {
     // fall back to string
     consumeUnquotedString(l);

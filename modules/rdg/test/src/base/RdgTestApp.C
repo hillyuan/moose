@@ -1,3 +1,11 @@
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 #include "RdgTestApp.h"
 #include "RdgApp.h"
 #include "Moose.h"
@@ -12,30 +20,27 @@ validParams<RdgTestApp>()
   return params;
 }
 
+registerKnownLabel("RdgTestApp");
+
 RdgTestApp::RdgTestApp(InputParameters parameters) : MooseApp(parameters)
 {
-  Moose::registerObjects(_factory);
-  RdgApp::registerObjects(_factory);
-
-  Moose::associateSyntax(_syntax, _action_factory);
-  RdgApp::associateSyntax(_syntax, _action_factory);
-
-  bool use_test_objs = getParam<bool>("allow_test_objects");
-  if (use_test_objs)
-  {
-    RdgTestApp::registerObjects(_factory);
-    RdgTestApp::associateSyntax(_syntax, _action_factory);
-  }
+  RdgTestApp::registerAll(
+      _factory, _action_factory, _syntax, getParam<bool>("allow_test_objects"));
 }
 
 RdgTestApp::~RdgTestApp() {}
 
-// External entry point for dynamic application loading
-extern "C" void
-RdgTestApp__registerApps()
+void
+RdgTestApp::registerAll(Factory & f, ActionFactory & af, Syntax & s, bool use_test_objs)
 {
-  RdgTestApp::registerApps();
+  RdgApp::registerAll(f, af, s);
+  if (use_test_objs)
+  {
+    Registry::registerObjectsTo(f, {"RdgTestApp"});
+    Registry::registerActionsTo(af, {"RdgTestApp"});
+  }
 }
+
 void
 RdgTestApp::registerApps()
 {
@@ -43,24 +48,30 @@ RdgTestApp::registerApps()
   registerApp(RdgTestApp);
 }
 
-// External entry point for dynamic object registration
-extern "C" void
-RdgTestApp__registerObjects(Factory & factory)
-{
-  RdgTestApp::registerObjects(factory);
-}
 void
-RdgTestApp::registerObjects(Factory & /*factory*/)
+RdgTestApp::registerObjects(Factory & factory)
+{
+  Registry::registerObjectsTo(factory, {"RdgTestApp"});
+}
+
+void
+RdgTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & action_factory)
+{
+  Registry::registerActionsTo(action_factory, {"RdgTestApp"});
+}
+
+void
+RdgTestApp::registerExecFlags(Factory & /*factory*/)
 {
 }
 
-// External entry point for dynamic syntax association
 extern "C" void
-RdgTestApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
+RdgTestApp__registerAll(Factory & f, ActionFactory & af, Syntax & s)
 {
-  RdgTestApp::associateSyntax(syntax, action_factory);
+  RdgTestApp::registerAll(f, af, s);
 }
-void
-RdgTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
+extern "C" void
+RdgTestApp__registerApps()
 {
+  RdgTestApp::registerApps();
 }

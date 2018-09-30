@@ -1,14 +1,27 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "PorousFlowBasicTHM.h"
 
 #include "FEProblem.h"
 #include "Conversion.h"
 #include "libmesh/string_to_enum.h"
+
+registerMooseAction("PorousFlowApp", PorousFlowBasicTHM, "add_user_object");
+
+registerMooseAction("PorousFlowApp", PorousFlowBasicTHM, "add_kernel");
+
+registerMooseAction("PorousFlowApp", PorousFlowBasicTHM, "add_material");
+
+registerMooseAction("PorousFlowApp", PorousFlowBasicTHM, "add_aux_variable");
+
+registerMooseAction("PorousFlowApp", PorousFlowBasicTHM, "add_aux_kernel");
 
 template <>
 InputParameters
@@ -94,16 +107,18 @@ PorousFlowBasicTHM::act()
   }
 
   // add Materials
-  if (_deps.dependsOn(_objects_to_add, "PorousFlowPS_qp") && _current_task == "add_material")
+  if (_deps.dependsOn(_objects_to_add, "pressure_saturation_qp") && _current_task == "add_material")
   {
     std::string material_type = "PorousFlow1PhaseFullySaturated";
     InputParameters params = _factory.getValidParams(material_type);
     std::string material_name = "PorousFlowBasicTHM_1PhaseP_qp";
     params.set<UserObjectName>("PorousFlowDictator") = _dictator_name;
     params.set<std::vector<VariableName>>("porepressure") = {_pp_var};
+    params.set<bool>("at_nodes") = false;
     _problem->addMaterial(material_type, material_name, params);
   }
-  if (_deps.dependsOn(_objects_to_add, "PorousFlowPS_nodal") && _current_task == "add_material")
+  if (_deps.dependsOn(_objects_to_add, "pressure_saturation_nodal") &&
+      _current_task == "add_material")
   {
     std::string material_type = "PorousFlow1PhaseFullySaturated";
     InputParameters params = _factory.getValidParams(material_type);
@@ -114,14 +129,14 @@ PorousFlowBasicTHM::act()
     _problem->addMaterial(material_type, material_name, params);
   }
 
-  if ((_deps.dependsOn(_objects_to_add, "PorousFlowVolumetricStrain_qp") ||
-       _deps.dependsOn(_objects_to_add, "PorousFlowVolumetricStrain_nodal")) &&
+  if ((_deps.dependsOn(_objects_to_add, "volumetric_strain_qp") ||
+       _deps.dependsOn(_objects_to_add, "volumetric_strain_nodal")) &&
       (_coupling_type == CouplingTypeEnum::HydroMechanical ||
        _coupling_type == CouplingTypeEnum::ThermoHydroMechanical))
     addVolumetricStrainMaterial(_coupled_displacements, false);
 
-  if (_deps.dependsOn(_objects_to_add, "PorousFlowRelativePermeability_qp"))
+  if (_deps.dependsOn(_objects_to_add, "relative_permeability_qp"))
     addRelativePermeabilityCorey(false, 0, 0.0, 0.0, 0.0);
-  if (_deps.dependsOn(_objects_to_add, "PorousFlowRelativePermeability_nodal"))
+  if (_deps.dependsOn(_objects_to_add, "relative_permeability_nodal"))
     addRelativePermeabilityCorey(true, 0, 0.0, 0.0, 0.0);
 }

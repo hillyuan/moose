@@ -1,5 +1,15 @@
-from QueueManager import QueueManager
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import os, re
+from QueueManager import QueueManager
+from TestHarness import util # to execute qsub
 
 ## This Class is responsible for maintaining an interface to the PBS scheduling syntax
 class RunPBS(QueueManager):
@@ -12,153 +22,134 @@ class RunPBS(QueueManager):
     def __init__(self, harness, params):
         QueueManager.__init__(self, harness, params)
         self.params = params
+        self.harness = harness
+        self.options = self.harness.getOptions()
 
-    def postLaunchCommand(self, jobs):
-        """ Release supplied jobs that should be on hold """
-        job_ids = []
-        for job in jobs:
-            job_data = self.getData(job.getUniqueIdentifier(), job_id=True)
-            job_ids.append(job_data['job_id'])
+    def getBadKeyArgs(self):
+        """ arguments we need to remove from sys.argv """
+        return ['--pbs']
 
-        if job_ids:
-            return 'qrls %s' % (' '.join(job_ids))
+    def hasTimedOutOrFailed(self, job_data):
+        """ use qstat and return bool on job failures outside of the TestHarness's control """
+        launch_id = job_data.json_data.get(job_data.job_dir,
+                                           {}).get(job_data.plugin,
+                                                   {}).get('ID', "").split('.')[0]
 
-    def handleJobStatus(self, job, output):
-        """
-        Call appropriate methods depending on current state of QueueManager
-        and return a resulting dictionary of information relevant to PBS
-        """
-        if self.checkStatusState():
-            return self.handleQstatOutput(job, output)
-        else:
-            return self.handleQsubOutput(job, output)
+        # We shouldn't run into a null, but just in case, lets handle it
+        if launch_id:
+            qstat_command_result = util.runCommand('qstat -xf %s' % (launch_id))
 
-    def getQueueCommand(self, job):
-        """ Return appropriate PBS command depending on current QueueManager state """
-        test_unique = job.getUniqueIdentifier()
+            # handle a qstat execution failure for some reason
+            if qstat_command_result.find('ERROR') != -1:
+                # set error for each job contained in group
+                for job in job_data.jobs.getJobs():
+                    job.setOutput('ERROR invoking `qstat`\n%s' % (qstat_command_result))
+                    job.setStatus(job.error, 'QSTAT')
+                return True
 
-        if self.checkStatusState():
-            job = self.getData(test_unique, job_id=True)
-            return 'qstat -xf %s' % (job['job_id'])
-        else:
-            job = self.getData(test_unique, queue_script=True, working_dir=True)
-            return 'qsub -h %s' % (os.path.join(job['working_dir'], job['queue_script']))
+            qstat_job_result = re.findall(r'Exit_status = (\d+)', qstat_command_result)
 
-    def augmentQueueParams(self, job, template):
-        """ Populate QSUB template with relevant PBS information for job """
-        tester = job.getTester()
+            # woops. This job was killed by PBS by exceeding walltime
+            if qstat_job_result and qstat_job_result[0] == "271":
+                for job in job_data.jobs.getJobs():
+                    job.addCaveats('Killed by PBS Exceeded Walltime')
+                return True
 
-        # Discover prereq launch job IDs
-        dag_obj = job.getOriginalDAG()
-        prereqs = dag_obj.predecessors(job)
+            # Capture TestHarness exceptions
+            elif qstat_job_result and qstat_job_result[0] != "0":
 
-        template['prereq'] = ''
-        if prereqs:
-            prereq_job_ids = []
-            for prereq in prereqs:
-                unique = prereq.getUniqueIdentifier()
-                tmp_json = self.getData(unique, job_id=True)
-                prereq_job_ids.append(tmp_json['job_id'])
-            template['prereq'] = '#PBS -W depend=afterany:%s' % (':'.join(prereq_job_ids))
-            template['prereq_ids'] = prereq_job_ids
+                # Try and gather some useful output we can tack on to one of the job objects
+                output_file = job_data.json_data.get(job_data.job_dir, {}).get(job_data.plugin, {}).get('QSUB_OUTPUT', "")
+                if os.path.exists(output_file):
+                    with open(output_file, 'r') as f:
+                        output_string = util.readOutput(f, None, self.options)
+                    job_data.jobs.getJobs()[0].setOutput(output_string)
+
+                # Add a caveat to each job, explaining that one of the jobs caused a TestHarness exception
+                for job in job_data.jobs.getJobs():
+                    job.addCaveats('TESTHARNESS EXCEPTION')
+                return True
+
+    def _augmentTemplate(self, job):
+        """ populate qsub script template with paramaters """
+        template = {}
+
+        # Launch script location
+        template['launch_script'] = os.path.join(job.getTestDir(), job.getTestNameShort() + '.qsub')
+
+        # NCPUS
+        template['mpi_procs'] = job.getMetaData().get('QUEUEING_NCPUS', 1)
 
         # Convert MAX_TIME to hours:minutes for walltime use
-        hours = int(int(tester.specs['max_time']) / 3600)
-        minutes = int(int(tester.specs['max_time']) / 60) % 60
+        max_time = job.getMetaData().get('QUEUEING_MAXTIME', 1)
+        hours = int(int(max_time) / 3600)
+        minutes = int(int(max_time) / 60) % 60
         template['walltime'] = '{0:02d}'.format(hours) + ':' + '{0:02d}'.format(minutes) + ':00'
 
-        # Add PBS project directive
-        if self.options.queue_project:
-            template['pbs_project'] = '#PBS -P %s' % (self.options.queue_project)
+        # Job Name
+        template['job_name'] = job.getTestNameShort()
 
-        # Set node placement
-        template['place'] = 'free'
+        # PBS Project group
+        template['pbs_project'] = '#PBS -P %s' % (self.options.queue_project)
 
-        # Combined stdout and stderr into one stream
-        template['combine_streams'] = '#PBS -j oe'
+        # PBS Queue
+        if self.options.queue_queue:
+            template['pbs_queue'] = '#PBS -q %s' % (self.options.queue_queue)
+        else:
+            template['pbs_queue'] = ''
+
+        # Apply source command
+        if self.options.queue_source_command and os.path.exists(self.options.queue_source_command):
+            template['pre_command'] = 'source %s || exit 1' % (os.path.abspath(self.options.queue_source_command))
+        else:
+            template['pre_command'] = ''
+
+        # Redirect stdout to this location
+        template['output'] = os.path.join(job.getTestDir(), 'qsub.output')
+
+        # Root directory
+        template['working_dir'] = self.harness.base_dir
+
+        # Command
+        template['command'] = ' '.join(self.getRunTestsCommand(job))
 
         return template
 
-    def handleQsubOutput(self, job, output):
-        """
-        Set the job's status and return any relevant information
-        about the launched PBS job we want stored in QueueManager's
-        session storage file.
-        """
-        pattern = re.compile(r'^(\d+)\.[\W\w]+$')
+    def run(self, job):
+        """ execute qsub and return the launch id """
+        template = self._augmentTemplate(job)
         tester = job.getTester()
 
-        job_info = {}
-        if pattern.search(output):
-            job_id = pattern.search(output).group(1)
-            with self.dag_lock:
-                tester.setStatus('LAUNCHED %s' %(str(job_id)), tester.bucket_queued)
-            job_info = { 'job_id' : job_id }
+        self.createQueueScript(job, template)
 
-        # Failed to launch somehow. Set the tester output to command output. Hopefully something
-        # useful in there to display to the user on why we failed
-        else:
-            job.setOutput(output)
-            with self.dag_lock:
-                tester.setStatus('QSUB FAILURE', tester.bucket_fail)
+        command = ' '.join(['qsub', template['launch_script']])
+        launch_results = util.runCommand(command, job.getTestDir())
 
-        return job_info
+        # List of files we need to clean up when we are done
+        dirty_files = [template['launch_script'],
+                       template['output']]
 
-    def handleQstatOutput(self, job, output):
-        """
-        Set the job's status and return any relevant information
-        about the pending PBS job we want stored in QueueManager's
-        session storage file.
-        """
-        tester = job.getTester()
-        job_state = re.search(r'job_state = (\w)', output)
-        job_id = re.search(r'Job Id: (\w+)', output)
+        self.addDirtyFiles(job, dirty_files)
 
-        # Default bucket
-        bucket = tester.bucket_queued
-        job_info = {}
+        if launch_results.find('ERROR') != -1:
+            # The executor job failed (so fail all jobs in this group)
+            job_dag = job.getDAG()
 
-        if job_state and job_id:
-            # Job is finished
-            if job_state.group(1) == 'F':
-                reason = 'WAITING'
+            for other_job in [x for x in job_dag.topological_sort() if x != job]:
+                other_job.clearCaveats()
+                other_tester = other_job.getTester()
+                other_tester.setStatus(other_tester.fail, 'launch failure')
 
-                # Set the std_out path
-                session_data = self.getData(job.getUniqueIdentifier(), job_name=True)
-                job_info['std_out'] = session_data['job_name'] + '.o' + job_id.group(1)
-
-                # Set the bucket that allows processResults to commence
-                bucket = tester.bucket_waiting_processing
-
-            # Job is currently running
-            elif job_state.group(1) == 'R':
-                reason = 'RUNNING'
-
-            # Job is exiting
-            elif job_state.group(1) == 'E':
-                reason = 'EXITING'
-
-            # Job is currently queued
-            elif job_state.group(1) == 'Q':
-                reason = 'QUEUED'
-
-            # Job is waiting for other jobs
-            elif job_state.group(1) == 'H':
-                reason = 'HOLDING'
-
-            # Unknown statuses should be treated as failures
-            else:
-                reason = 'UNKNOWN PBS STATUS'
-                bucket = tester.bucket_fail
-                job.setOutput(output)
+            # This is _only_ to make the failed message more useful
+            tester.specs['test_dir'] = ''
+            tester.specs['command'] = command
+            tester.setStatus(tester.fail, 'QSUB Group Failure')
+            job.setOutput(launch_results)
 
         else:
-            # Job status not available
-            reason = 'INVALID QSTAT RESULTS'
-            bucket = tester.bucket_fail
-            job.setOutput(output)
-
-        with self.dag_lock:
-            tester.setStatus(reason, bucket)
-
-        return job_info
+            job.addMetaData(RunPBS={'ID' : launch_results,
+                                    'QSUB_COMMAND' : command,
+                                    'NCPUS' : template['mpi_procs'],
+                                    'WALLTIME' : template['walltime'],
+                                    'QSUB_OUTPUT' : template['output']})
+            tester.setStatus(tester.no_status, 'LAUNCHING')

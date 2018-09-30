@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef GRAINTRACKER_H
 #define GRAINTRACKER_H
@@ -177,10 +179,10 @@ protected:
   const int _tracking_step;
 
   /// The thickness of the halo surrounding each grain
-  const unsigned int _halo_level;
+  const unsigned short _halo_level;
 
   /// Depth of renumbering recursion (a depth of zero means no recursion)
-  static const unsigned int _max_renumbering_recursion = 4;
+  const unsigned short _max_remap_recursion_depth;
 
   /// The number of reserved order parameters
   const unsigned short _n_reserve_ops;
@@ -195,6 +197,9 @@ protected:
   /// Inidicates whether remapping should be done or not (remapping is independent of tracking)
   const bool _remap;
 
+  /// Indicates whether we should continue after a remap failure (will result in non-physical results)
+  const bool _tolerate_failure;
+
   /// A reference to the nonlinear system (used for retrieving solution vectors)
   NonlinearSystemBase & _nl;
 
@@ -208,6 +213,11 @@ protected:
   const PolycrystalUserObjectBase * _poly_ic_uo;
 
   /**
+   * Verbosity level controlling the amount of information printed to the console.
+   */
+  const short _verbosity_level;
+
+  /**
    * Boolean to indicate the first time this object executes.
    * Note: _tracking_step isn't enough if people skip initial or execute more than once per step.
    */
@@ -218,7 +228,7 @@ protected:
    * This is for simulations where new grains are not expected. Note, this does not impact
    * the initial callback to newGrainCreated() nor does it get triggered for splitting grains.
    */
-  bool _error_on_grain_creation;
+  const bool _error_on_grain_creation;
 
 private:
   /// Holds the first unique grain index when using _reserve_op (all the remaining indices are sequential)
@@ -232,6 +242,13 @@ private:
 
   /// Boolean to indicate whether this is a Steady or Transient solve
   const bool _is_transient;
+
+  /// Timers
+  const PerfID _finalize_timer;
+  const PerfID _remap_timer;
+  const PerfID _track_grains;
+  const PerfID _broadcast_update;
+  const PerfID _update_field_info;
 };
 
 /**

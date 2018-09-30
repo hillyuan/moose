@@ -1,14 +1,17 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef CO2FLUIDPROPERTIES_H
 #define CO2FLUIDPROPERTIES_H
 
 #include "SinglePhaseFluidPropertiesPT.h"
+#include <array>
 
 class CO2FluidProperties;
 
@@ -43,15 +46,15 @@ public:
   CO2FluidProperties(const InputParameters & parameters);
   virtual ~CO2FluidProperties();
 
-  virtual Real rho(Real pressure, Real temperature) const override;
+  virtual Real rho_from_p_T(Real pressure, Real temperature) const override;
 
-  virtual void rho_dpT(
+  virtual void rho_from_p_T(
       Real pressure, Real temperature, Real & rho, Real & drho_dp, Real & drho_dT) const override;
 
-  virtual Real mu(Real pressure, Real temperature) const override;
+  virtual Real mu_from_p_T(Real pressure, Real temperature) const override;
 
-  virtual void
-  mu_dpT(Real pressure, Real temperature, Real & mu, Real & dmu_dp, Real & dmu_dT) const override;
+  virtual void mu_from_p_T(
+      Real pressure, Real temperature, Real & mu, Real & dmu_dp, Real & dmu_dT) const override;
 
   virtual Real mu_from_rho_T(Real density, Real temperature) const override;
 
@@ -62,39 +65,30 @@ public:
                                    Real & dmu_drho,
                                    Real & dmu_dT) const override;
 
+  virtual void rho_mu(Real pressure, Real temperature, Real & rho, Real & mu) const override;
+
+  virtual void rho_mu_dpT(Real pressure,
+                          Real temperature,
+                          Real & rho,
+                          Real & drho_dp,
+                          Real & drho_dT,
+                          Real & mu,
+                          Real & dmu_dp,
+                          Real & dmu_dT) const override;
+
   virtual std::string fluidName() const override;
 
-  Real molarMass() const override;
+  virtual Real molarMass() const override;
 
-  /**
-   * CO2 critical pressure
-   * @return critical pressure (Pa)
-   */
-  Real criticalPressure() const;
+  virtual Real criticalPressure() const override;
 
-  /**
-   * CO2 critical temperature
-   * @return critical temperature (K)
-   */
-  Real criticalTemperature() const;
+  virtual Real criticalTemperature() const override;
 
-  /**
-   * CO2 critical density
-   * @return critical density (kg/m^3)
-   */
-  Real criticalDensity() const;
+  virtual Real criticalDensity() const override;
 
-  /**
-   * CO2 triple point pressure
-   * @return triple point pressure (Pa)
-   */
-  Real triplePointPressure() const;
+  virtual Real triplePointPressure() const override;
 
-  /**
-   * CO2 triple point temperature
-   * @return triple point temperature (K)
-   */
-  Real triplePointTemperature() const;
+  virtual Real triplePointTemperature() const override;
 
   /**
    * Melting pressure. Used to delineate solid and liquid phases
@@ -118,17 +112,7 @@ public:
    */
   Real sublimationPressure(Real temperature) const;
 
-  /**
-   * Vapor pressure. Used to delineate liquid and gas phases.
-   * Valid for temperatures between the triple point temperature
-   * and the critical temperature
-   *
-   * Eq. 3.13, from Span and Wagner (reference above)
-   *
-   * @param temperature CO2 temperature (K)
-   * @return vapor pressure (Pa)
-   */
-  Real vaporPressure(Real temperature) const;
+  virtual Real vaporPressure(Real temperature) const override;
 
   /**
    * Saturated liquid density of CO2
@@ -243,10 +227,10 @@ public:
    */
   Real partialDensity(Real temperature) const;
 
-  virtual Real e(Real pressure, Real temperature) const override;
+  virtual Real e_from_p_T(Real pressure, Real temperature) const override;
 
   virtual void
-  e_dpT(Real pressure, Real temperature, Real & e, Real & de_dp, Real & de_dT) const override;
+  e_from_p_T(Real pressure, Real temperature, Real & e, Real & de_dp, Real & de_dT) const override;
 
   virtual void rho_e_dpT(Real pressure,
                          Real temperature,
@@ -257,27 +241,26 @@ public:
                          Real & de_dp,
                          Real & de_dT) const override;
 
-  virtual Real c(Real pressure, Real temperature) const override;
+  virtual Real c_from_p_T(Real pressure, Real temperature) const override;
 
-  virtual Real cp(Real pressure, Real temperature) const override;
+  virtual Real cp_from_p_T(Real pressure, Real temperature) const override;
 
-  virtual Real cv(Real pressure, Real temperature) const override;
+  virtual Real cv_from_p_T(Real pressure, Real temperature) const override;
 
-  virtual Real k(Real pressure, Real temperature) const override;
+  virtual Real k_from_p_T(Real pressure, Real temperature) const override;
 
   virtual void
-  k_dpT(Real pressure, Real temperature, Real & k, Real & dk_dp, Real & dk_dT) const override;
+  k_from_p_T(Real pressure, Real temperature, Real & k, Real & dk_dp, Real & dk_dT) const override;
 
   virtual Real k_from_rho_T(Real density, Real temperature) const override;
 
-  virtual Real s(Real pressure, Real temperature) const override;
+  virtual Real s_from_p_T(Real pressure, Real temperature) const override;
+  virtual void s_from_p_T(Real p, Real T, Real & s, Real & ds_dp, Real & ds_dT) const override;
 
-  virtual Real h(Real p, Real T) const override;
+  virtual Real h_from_p_T(Real p, Real T) const override;
 
   virtual void
-  h_dpT(Real pressure, Real temperature, Real & h, Real & dh_dp, Real & dh_dT) const override;
-
-  virtual Real beta(Real pressure, Real temperature) const override;
+  h_from_p_T(Real pressure, Real temperature, Real & h, Real & dh_dp, Real & dh_dT) const override;
 
 protected:
   /// Molar mass of CO2 (kg/mol)
@@ -296,49 +279,66 @@ protected:
   const Real _Rco2 = 188.9241;
 
   /// Coefficients for the ideal gas component of the Helmholtz free energy
-  std::vector<Real> _a0{1.99427042, 0.62105248, 0.41195293, 1.04028922, 0.08327678};
-  std::vector<Real> _theta0{3.15163, 6.11190, 6.77708, 11.32384, 27.08792};
+  const std::array<Real, 5> _a0{{1.99427042, 0.62105248, 0.41195293, 1.04028922, 0.08327678}};
+  const std::array<Real, 5> _theta0{{3.15163, 6.11190, 6.77708, 11.32384, 27.08792}};
 
   /// Coefficients for the residual component of the Helmholtz free energy
-  std::vector<Real> _n1{0.38856823203161,
-                        2.9385475942740,
-                        -5.5867188534934,
-                        -0.76753199592477,
-                        0.31729005580416,
-                        0.54803315897767,
-                        0.12279411220335};
-  std::vector<Real> _d1{1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 3.0};
-  std::vector<Real> _t1{0.0, 0.75, 1.0, 2.0, 0.75, 2.0, 0.75};
-  std::vector<Real> _n2{
-      2.1658961543220,      1.5841735109724,    -0.23132705405503,   0.058116916431436,
-      -0.55369137205382,    0.48946615909422,   -0.024275739843501,  0.062494790501678,
-      -0.12175860225246,    -0.37055685270086,  -0.016775879700426,  -0.11960736637987,
-      -0.045619362508778,   0.035612789270346,  -0.0074427727132052, -0.0017395704902432,
-      -0.021810121289527,   0.024332166559236,  -0.037440133423463,  0.14338715756878,
-      -0.13491969083286,    -0.023151225053480, 0.012363125492901,   0.0021058321972940,
-      -0.00033958519026368, 0.0055993651771592, -0.00030335118055646};
-  std::vector<Real> _d2{1.0, 2.0, 4.0, 5.0, 5.0, 5.0, 6.0, 6.0, 6.0, 1.0, 1.0,  4.0, 4.0, 4.0,
-                        7.0, 8.0, 2.0, 3.0, 3.0, 5.0, 5.0, 6.0, 7.0, 8.0, 10.0, 4.0, 8.0};
-  std::vector<Real> _t2{1.5, 1.5, 2.5, 0.0,  1.5,  2.0,  0.0,  1.0,  2.0,  3.0, 6.0, 3.0,  6.0, 8.0,
-                        6.0, 0.0, 7.0, 12.0, 16.0, 22.0, 24.0, 16.0, 24.0, 8.0, 2.0, 28.0, 14.0};
-  std::vector<Real> _c2{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0,
-                        2.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 4.0, 4.0, 4.0, 4.0, 5.0, 6.0};
-  std::vector<Real> _n3{
-      -213.65488688320, 26641.569149272, -24027.212204557, -283.41603423999, 212.47284400179};
-  std::vector<Real> _d3{2.0, 2.0, 2.0, 3.0, 3.0};
-  std::vector<Real> _t3{1.0, 0.0, 1.0, 3.0, 3.0};
-  std::vector<Real> _alpha3{25.0, 25.0, 25.0, 15.0, 20.0};
-  std::vector<Real> _beta3{325.0, 300.0, 300.0, 275.0, 275.0};
-  std::vector<Real> _gamma3{1.16, 1.19, 1.19, 1.25, 1.25};
-  std::vector<Real> _eps3{1.0, 1.0, 1.0, 1.0, 1.0};
-  std::vector<Real> _n4{-0.66642276540751, 0.72608632349897, 0.055068668612842};
-  std::vector<Real> _a4{3.5, 3.5, 3.5};
-  std::vector<Real> _b4{0.875, 0.925, 0.875};
-  std::vector<Real> _beta4{0.3, 0.3, 0.3};
-  std::vector<Real> _A4{0.7, 0.7, 0.7};
-  std::vector<Real> _B4{0.3, 0.3, 1.0};
-  std::vector<Real> _C4{10.0, 10.0, 12.5};
-  std::vector<Real> _D4{275.0, 275.0, 275.0};
+  const std::array<Real, 7> _n1{{0.38856823203161,
+                                 2.9385475942740,
+                                 -5.5867188534934,
+                                 -0.76753199592477,
+                                 0.31729005580416,
+                                 0.54803315897767,
+                                 0.12279411220335}};
+  const std::array<unsigned int, 7> _d1{{1, 1, 1, 1, 2, 2, 3}};
+  const std::array<Real, 7> _t1{{0.0, 0.75, 1.0, 2.0, 0.75, 2.0, 0.75}};
+  const std::array<Real, 27> _n2{
+      {2.1658961543220,      1.5841735109724,    -0.23132705405503,   0.058116916431436,
+       -0.55369137205382,    0.48946615909422,   -0.024275739843501,  0.062494790501678,
+       -0.12175860225246,    -0.37055685270086,  -0.016775879700426,  -0.11960736637987,
+       -0.045619362508778,   0.035612789270346,  -0.0074427727132052, -0.0017395704902432,
+       -0.021810121289527,   0.024332166559236,  -0.037440133423463,  0.14338715756878,
+       -0.13491969083286,    -0.023151225053480, 0.012363125492901,   0.0021058321972940,
+       -0.00033958519026368, 0.0055993651771592, -0.00030335118055646}};
+  const std::array<unsigned int, 27> _d2{
+      {1, 2, 4, 5, 5, 5, 6, 6, 6, 1, 1, 4, 4, 4, 7, 8, 2, 3, 3, 5, 5, 6, 7, 8, 10, 4, 8}};
+  const std::array<Real, 27> _t2{{1.5,  1.5,  2.5,  0.0,  1.5,  2.0, 0.0, 1.0,  2.0,
+                                  3.0,  6.0,  3.0,  6.0,  8.0,  6.0, 0.0, 7.0,  12.0,
+                                  16.0, 22.0, 24.0, 16.0, 24.0, 8.0, 2.0, 28.0, 14.0}};
+  const std::array<unsigned int, 27> _c2{
+      {1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 6}};
+  const std::array<Real, 5> _n3{
+      {-213.65488688320, 26641.569149272, -24027.212204557, -283.41603423999, 212.47284400179}};
+  const std::array<unsigned int, 5> _d3{{2, 2, 2, 3, 3}};
+  const std::array<unsigned int, 5> _t3{{1, 0, 1, 3, 3}};
+  const std::array<Real, 5> _alpha3{{25.0, 25.0, 25.0, 15.0, 20.0}};
+  const std::array<Real, 5> _beta3{{325.0, 300.0, 300.0, 275.0, 275.0}};
+  const std::array<Real, 5> _gamma3{{1.16, 1.19, 1.19, 1.25, 1.25}};
+  const std::array<Real, 5> _eps3{{1.0, 1.0, 1.0, 1.0, 1.0}};
+  const std::array<Real, 3> _n4{{-0.66642276540751, 0.72608632349897, 0.055068668612842}};
+  const std::array<Real, 3> _a4{{3.5, 3.5, 3.5}};
+  const std::array<Real, 3> _b4{{0.875, 0.925, 0.875}};
+  const std::array<Real, 3> _beta4{{0.3, 0.3, 0.3}};
+  const std::array<Real, 3> _A4{{0.7, 0.7, 0.7}};
+  const std::array<Real, 3> _B4{{0.3, 0.3, 1.0}};
+  const std::array<Real, 3> _C4{{10.0, 10.0, 12.5}};
+  const std::array<Real, 3> _D4{{275.0, 275.0, 275.0}};
+
+  /// Coefficients for viscosity
+  const std::array<Real, 5> _mu_a{{0.235156, -0.491266, 5.211155e-2, 5.347906e-2, -1.537102e-2}};
+  const std::array<Real, 5> _mu_d{
+      {0.4071119e-2, 0.7198037e-4, 0.2411697e-16, 0.2971072e-22, -0.1627888e-22}};
+
+  /// Coefficients for the thermal conductivity
+  const std::array<Real, 3> _k_g1{{0.0, 0.0, 1.5}};
+  const std::array<Real, 7> _k_g2{{0.0, 1.0, 1.5, 1.5, 1.5, 3.5, 5.5}};
+  const std::array<unsigned int, 3> _k_h1{{1, 5, 1}};
+  const std::array<unsigned int, 7> _k_h2{{1, 2, 0, 5, 9, 0, 0}};
+  const std::array<Real, 3> _k_n1{{7.69857587, 0.159885811, 1.56918621}};
+  const std::array<Real, 7> _k_n2{
+      {-6.73400790, 16.3890156, 3.69415242, 22.3205514, 66.1420950, -0.171779133, 0.00433043347}};
+  const std::array<Real, 12> _k_a{
+      {3.0, 6.70697, 0.94604, 0.3, 0.3, 0.39751, 0.33791, 0.77963, 0.79857, 0.9, 0.02, 0.2}};
 };
 
 #endif /* CO2FLUIDPROPERTIES_H */

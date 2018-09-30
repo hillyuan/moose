@@ -98,7 +98,6 @@
 []
 
 [Executioner]
-  # Preconditioned JFNK (default)
   type = Transient
   nl_max_its = 15
   scheme = bdf2
@@ -118,5 +117,5 @@
   exodus = true
   interval = 1
   show = bnds
-  print_perf_log = true
+  perf_graph = true
 []

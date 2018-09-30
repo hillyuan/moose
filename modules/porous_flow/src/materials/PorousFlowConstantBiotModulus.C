@@ -1,11 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowConstantBiotModulus.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowConstantBiotModulus);
 
 template <>
 InputParameters
@@ -23,6 +27,7 @@ validParams<PorousFlowConstantBiotModulus>()
                                     "skeleton.  If strain = C * stress, then solid_bulk_compliance "
                                     "= de_ij de_kl C_ijkl.  If the grain bulk modulus is Kg then "
                                     "1/Kg = (1 - biot_coefficient) * solid_bulk_compliance.");
+  params.addPrivateParam<std::string>("pf_material_type", "biot_modulus");
   params.addClassDescription("Computes the Biot Modulus, which is assumed to be constant for all "
                              "time.  Sometimes 1 / BiotModulus is called storativity");
   return params;

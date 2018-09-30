@@ -32,4 +32,17 @@
     type = PythonUnitTest
     input = test_camel_to_space.py
   [../]
+
+  [hit]
+    type = PythonUnitTest
+    input = test_hit_load.py
+  []
+  [yaml_load]
+    type = PythonUnitTest
+    input = test_yaml_load.py
+  []
+  [check_file_size]
+    type = PythonUnitTest
+    input = test_check_file_size.py
+  []
 []

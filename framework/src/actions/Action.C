@@ -1,28 +1,24 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "Action.h"
 #include "ActionWarehouse.h"
 #include "MooseMesh.h"
 #include "MooseApp.h"
+#include "MooseTypes.h"
 #include "MooseUtils.h" // remove when getBaseName is removed
 
 template <>
 InputParameters
 validParams<Action>()
 {
-  InputParameters params;
+  InputParameters params = emptyInputParameters();
 
   /**
    * Add the "active" and "inactive" parameters so that all blocks in the input file can selectively
@@ -51,24 +47,46 @@ validParams<Action>()
 Action::Action(InputParameters parameters)
   : ConsoleStreamInterface(
         *parameters.getCheckedPointerParam<MooseApp *>("_moose_app", "In Action constructor")),
+    PerfGraphInterface(
+        parameters.getCheckedPointerParam<MooseApp *>("_moose_app", "In Action constructor")
+            ->perfGraph(),
+        "Action" +
+            (parameters.get<std::string>("action_type") != ""
+                 ? std::string("::") + parameters.get<std::string>("action_type")
+                 : "") +
+            (parameters.get<std::string>("_action_name") != ""
+                 ? std::string("::") + parameters.get<std::string>("_action_name")
+                 : "") +
+            (parameters.isParamValid("task") && parameters.get<std::string>("task") != ""
+                 ? std::string("::") + parameters.get<std::string>("task")
+                 : "")),
     _pars(parameters),
     _registered_identifier(isParamValid("registered_identifier")
                                ? getParam<std::string>("registered_identifier")
                                : ""),
     _name(getParam<std::string>("_action_name")),
     _action_type(getParam<std::string>("action_type")),
-    _app(*parameters.getCheckedPointerParam<MooseApp *>("_moose_app", "In Action constructor")),
+    _app(*getCheckedPointerParam<MooseApp *>("_moose_app", "In Action constructor")),
     _factory(_app.getFactory()),
     _action_factory(_app.getActionFactory()),
     _specific_task_name(_pars.isParamValid("task") ? getParam<std::string>("task") : ""),
-    _awh(*parameters.getCheckedPointerParam<ActionWarehouse *>("awh")),
+    _awh(*getCheckedPointerParam<ActionWarehouse *>("awh")),
     _current_task(_awh.getCurrentTaskName()),
     _mesh(_awh.mesh()),
     _displaced_mesh(_awh.displacedMesh()),
     _problem(_awh.problemBase()),
-    _executioner(_app.executioner())
+    _act_timer(registerTimedSection("act", 4))
 {
 }
+
+void
+Action::timedAct()
+{
+  TIME_SECTION(_act_timer);
+  act();
+}
+
+void Action::addRelationshipManagers(Moose::RelationshipManagerType) {}
 
 /// DEPRECATED METHODS
 std::string

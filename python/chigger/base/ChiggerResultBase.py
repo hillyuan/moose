@@ -1,17 +1,13 @@
 #pylint: disable=missing-docstring
-#################################################################
-#                   DO NOT MODIFY THIS HEADER                   #
-#  MOOSE - Multiphysics Object Oriented Simulation Environment  #
-#                                                               #
-#            (c) 2010 Battelle Energy Alliance, LLC             #
-#                      ALL RIGHTS RESERVED                      #
-#                                                               #
-#           Prepared by Battelle Energy Alliance, LLC           #
-#             Under Contract No. DE-AC07-05ID14517              #
-#              With the U. S. Department of Energy              #
-#                                                               #
-#              See COPYRIGHT for full restrictions              #
-#################################################################
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import vtk
 from ChiggerObject import ChiggerObject
 
@@ -45,11 +41,14 @@ class ChiggerResultBase(ChiggerObject):
                                      "chigger.RenderWindow is utilized.", vtype=list)
         opt.add('gradient_background', False, "Enable/disable the use of a gradient background.")
         opt.add('camera', "The VTK camera to utilize for viewing the results.", vtype=vtk.vtkCamera)
+        opt.add('light', None, "Add a headlight with the supplied intensity.", vtype=float)
         return opt
 
     def __init__(self, renderer=None, **kwargs):
         super(ChiggerResultBase, self).__init__(**kwargs)
         self._vtkrenderer = renderer if renderer != None else vtk.vtkRenderer()
+        self._vtklight = vtk.vtkLight()
+        self._vtklight.SetLightTypeToHeadlight()
 
     def getVTKRenderer(self):
         """
@@ -88,3 +87,8 @@ class ChiggerResultBase(ChiggerObject):
         # Camera
         if self.isOptionValid('camera'):
             self._vtkrenderer.SetActiveCamera(self.getOption('camera'))
+
+        # Headlight
+        if self.isOptionValid('light'):
+            self._vtklight.SetIntensity(1.5)
+            self._vtkrenderer.AddLight(self._vtklight)

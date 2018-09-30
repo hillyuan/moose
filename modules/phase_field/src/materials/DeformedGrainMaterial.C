@@ -1,5 +1,15 @@
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 #include "DeformedGrainMaterial.h"
 #include "GrainTrackerInterface.h"
+
+registerMooseObject("PhaseFieldApp", DeformedGrainMaterial);
 
 template <>
 InputParameters
@@ -49,7 +59,7 @@ DeformedGrainMaterial::DeformedGrainMaterial(const InputParameters & parameters)
     _JtoeV(6.24150974e18) // Joule to eV conversion
 {
   if (_op_num == 0)
-    mooseError("Model requires op_num > 0");
+    paramError("op_num", "Model requires op_num > 0");
 
   for (unsigned int i = 0; i < _op_num; ++i)
     _vals[i] = &coupledValue("v", i);

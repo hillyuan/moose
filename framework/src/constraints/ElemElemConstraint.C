@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ElemElemConstraint.h"
 
@@ -19,7 +14,7 @@
 #include "ElementPairInfo.h"
 #include "FEProblem.h"
 #include "MooseMesh.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 
 #include "libmesh/quadrature.h"
 
@@ -35,8 +30,11 @@ validParams<ElemElemConstraint>()
 ElemElemConstraint::ElemElemConstraint(const InputParameters & parameters)
   : Constraint(parameters),
     NeighborCoupleableMooseVariableDependencyIntermediateInterface(this, false, false),
-    _fe_problem(*parameters.get<FEProblemBase *>("_fe_problem_base")),
+    NeighborMooseVariableInterface<Real>(
+        this, false, Moose::VarKindType::VAR_NONLINEAR, Moose::VarFieldType::VAR_FIELD_STANDARD),
+    _fe_problem(*getCheckedPointerParam<FEProblemBase *>("_fe_problem_base")),
     _dim(_mesh.dimension()),
+    _interface_id(getParam<unsigned int>("interface_id")),
 
     _current_elem(_assembly.elem()),
 
@@ -45,14 +43,14 @@ ElemElemConstraint::ElemElemConstraint(const InputParameters & parameters)
     _u(_var.sln()),
     _grad_u(_var.gradSln()),
 
-    _phi(_assembly.phi()),
-    _grad_phi(_assembly.gradPhi()),
+    _phi(_assembly.phi(_var)),
+    _grad_phi(_assembly.gradPhi(_var)),
 
     _test(_var.phi()),
     _grad_test(_var.gradPhi()),
 
-    _phi_neighbor(_assembly.phiNeighbor()),
-    _grad_phi_neighbor(_assembly.gradPhiNeighbor()),
+    _phi_neighbor(_assembly.phiNeighbor(_var)),
+    _grad_phi_neighbor(_assembly.gradPhiNeighbor(_var)),
 
     _test_neighbor(_var.phiNeighbor()),
     _grad_test_neighbor(_var.gradPhiNeighbor()),
@@ -60,6 +58,7 @@ ElemElemConstraint::ElemElemConstraint(const InputParameters & parameters)
     _u_neighbor(_var.slnNeighbor()),
     _grad_u_neighbor(_var.gradSlnNeighbor())
 {
+  addMooseVariableDependency(&_var);
 }
 
 void

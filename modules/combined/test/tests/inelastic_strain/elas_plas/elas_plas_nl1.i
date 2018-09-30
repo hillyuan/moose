@@ -285,8 +285,6 @@
     type = IsotropicPlasticityStressUpdate
     yield_stress = 5e6
     hardening_constant = 0.0
-    relative_tolerance = 1e-20
-    absolute_tolerance = 1e-8
   [../]
 []
 
@@ -401,7 +399,6 @@
   csv = true
   [./console]
     type = Console
-    perf_log = true
     output_linear = true
   [../]
 [] # Outputs

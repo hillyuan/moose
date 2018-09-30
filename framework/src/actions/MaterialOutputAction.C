@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "MaterialOutputAction.h"
@@ -18,6 +13,8 @@
 #include "MooseApp.h"
 #include "AddOutputAction.h"
 #include "Material.h"
+#include "RankTwoTensor.h"
+#include "RankFourTensor.h"
 
 // Declare the output helper specializations
 template <>
@@ -33,6 +30,16 @@ template <>
 void
 MaterialOutputAction::materialOutputHelper<RealTensorValue>(const std::string & material_name,
                                                             std::shared_ptr<Material> material);
+
+template <>
+void MaterialOutputAction::materialOutputHelper<RankTwoTensor>(const std::string & material_name,
+                                                               std::shared_ptr<Material> material);
+
+template <>
+void MaterialOutputAction::materialOutputHelper<RankFourTensor>(const std::string & material_name,
+                                                                std::shared_ptr<Material> material);
+
+registerMooseAction("MooseApp", MaterialOutputAction, "setup_material_output");
 
 template <>
 InputParameters
@@ -149,6 +156,12 @@ MaterialOutputAction::buildMaterialOutputObjects(FEProblemBase * problem_ptr)
           else if (hasProperty<RealTensorValue>(name))
             materialOutputHelper<RealTensorValue>(name, mat);
 
+          else if (hasProperty<RankTwoTensor>(name))
+            materialOutputHelper<RankTwoTensor>(name, mat);
+
+          else if (hasProperty<RankFourTensor>(name))
+            materialOutputHelper<RankFourTensor>(name, mat);
+
           else
             mooseWarning("The type for material property '",
                          name,
@@ -218,7 +231,7 @@ MaterialOutputAction::createAction(const std::string & type,
   InputParameters & object_params = action->getObjectParams();
   object_params.set<MaterialPropertyName>("property") = property_name;
   object_params.set<AuxVariableName>("variable") = variable_name;
-  object_params.set<MultiMooseEnum>("execute_on") = "timestep_end";
+  object_params.set<ExecFlagEnum>("execute_on") = EXEC_TIMESTEP_END;
 
   if (material->boundaryRestricted())
     object_params.set<std::vector<BoundaryName>>("boundary") = material->boundaryNames();
@@ -273,4 +286,46 @@ MaterialOutputAction::materialOutputHelper<RealTensorValue>(const std::string & 
       action->getObjectParams().set<unsigned int>("column") = j;
       _awh.addActionBlock(action);
     }
+}
+
+template <>
+void
+MaterialOutputAction::materialOutputHelper<RankTwoTensor>(const std::string & property_name,
+                                                          std::shared_ptr<Material> material)
+{
+  for (unsigned int i = 0; i < LIBMESH_DIM; ++i)
+    for (unsigned int j = 0; j < LIBMESH_DIM; ++j)
+    {
+      std::ostringstream oss;
+      oss << property_name << "_" << i << j;
+
+      std::shared_ptr<MooseObjectAction> action = std::static_pointer_cast<MooseObjectAction>(
+          createAction("MaterialRankTwoTensorAux", property_name, oss.str(), material));
+      action->getObjectParams().set<unsigned int>("i") = i;
+      action->getObjectParams().set<unsigned int>("j") = j;
+      _awh.addActionBlock(action);
+    }
+}
+
+template <>
+void
+MaterialOutputAction::materialOutputHelper<RankFourTensor>(const std::string & property_name,
+                                                           std::shared_ptr<Material> material)
+{
+  for (unsigned int i = 0; i < LIBMESH_DIM; ++i)
+    for (unsigned int j = 0; j < LIBMESH_DIM; ++j)
+      for (unsigned int k = 0; k < LIBMESH_DIM; ++k)
+        for (unsigned int l = 0; l < LIBMESH_DIM; ++l)
+        {
+          std::ostringstream oss;
+          oss << property_name << "_" << i << j << k << l;
+
+          std::shared_ptr<MooseObjectAction> action = std::static_pointer_cast<MooseObjectAction>(
+              createAction("MaterialRankFourTensorAux", property_name, oss.str(), material));
+          action->getObjectParams().set<unsigned int>("i") = i;
+          action->getObjectParams().set<unsigned int>("j") = j;
+          action->getObjectParams().set<unsigned int>("k") = k;
+          action->getObjectParams().set<unsigned int>("l") = l;
+          _awh.addActionBlock(action);
+        }
 }

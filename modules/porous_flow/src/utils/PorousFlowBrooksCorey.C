@@ -1,12 +1,13 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowBrooksCorey.h"
-//#include "libmesh/utility.h"
 
 namespace PorousFlowBrooksCorey
 {
@@ -117,8 +118,7 @@ dRelativePermeabilityNW(Real seff, Real lambda)
   if (seff <= 0.0 || seff >= 1.0)
     return 0.0;
 
-  return seff * (2.0 +
-                 (seff * (2.0 + 3.0 * lambda) - 2.0 * lambda) * std::pow(1.0 - seff, 2.0 / lambda) /
-                     lambda);
+  return seff * (2.0 + (seff * (2.0 + 3.0 * lambda) - 2.0 * lambda) *
+                           std::pow(1.0 - seff, 2.0 / lambda) / lambda);
 }
-}
+} // namespace PorousFlowBrooksCorey

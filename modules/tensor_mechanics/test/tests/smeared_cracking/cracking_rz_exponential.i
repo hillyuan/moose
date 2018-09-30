@@ -66,15 +66,17 @@
   [../]
   [./elastic_stress]
     type = ComputeSmearedCrackingStress
-    cracking_release = exponential
     cracking_stress = 119.3e6
+    softening_models = exponential_softening
+  [../]
+  [./exponential_softening]
+    type = ExponentialSoftening
   [../]
 []
 
 [Executioner]
   type = Transient
 
-  # Preconditioned JFNK (default)
   solve_type = 'PJFNK'
 
   petsc_options_iname = '-ksp_gmres_restart -pc_type'

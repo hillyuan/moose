@@ -1,19 +1,16 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PeriodicDistanceAux.h"
 #include "GeneratedMesh.h"
+
+registerMooseObject("MooseTestApp", PeriodicDistanceAux);
 
 template <>
 InputParameters
@@ -21,6 +18,7 @@ validParams<PeriodicDistanceAux>()
 {
   InputParameters params = validParams<AuxKernel>();
   params.addRequiredParam<Point>("point", "Some point in the domain");
+
   return params;
 }
 
@@ -30,13 +28,12 @@ PeriodicDistanceAux::PeriodicDistanceAux(const InputParameters & parameters)
   // Make sure the point is in the domain
   for (unsigned int i = 0; i < LIBMESH_DIM; ++i)
     if (_point(i) < _mesh.getMinInDimension(i) || _point(i) > _mesh.getMaxInDimension(i))
-    {
-      _console << _mesh.getMinInDimension(i) << "\t" << _mesh.getMaxInDimension(i) << "\n";
-      mooseError("\"point\" is outside of the domain.");
-    }
+      paramError("point",
+                 _mesh.getMinInDimension(i),
+                 "\t",
+                 _mesh.getMaxInDimension(i),
+                 "\n\"point\" is outside of the domain.");
 }
-
-PeriodicDistanceAux::~PeriodicDistanceAux() {}
 
 Real
 PeriodicDistanceAux::computeValue()

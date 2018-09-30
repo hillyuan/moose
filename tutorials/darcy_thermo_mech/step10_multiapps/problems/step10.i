@@ -21,8 +21,7 @@
 
 [AuxVariables]
   [./k_eff]
-    order = CONSTANT
-    family = MONOMIAL
+    initial_condition = 14.362648
   [../]
   [./velocity_x]
     order = CONSTANT
@@ -44,6 +43,7 @@
     # for TensorMechanics in the correct coordinate system (autodetected)
     add_variables = true
     strain = FINITE
+    eigenstrain_names = eigenstrain
   [../]
 []
 
@@ -68,12 +68,6 @@
 []
 
 [AuxKernels]
-  [./keff_initial]
-    type = MaterialRealAux
-    variable = k_eff
-    property = thermal_conductivity
-    execute_on = 'initial'
-  [../]
   [./velocity_x]
     type = DarcyVelocity
     variable = velocity_x
@@ -155,6 +149,13 @@
   [../]
   [./elastic_stress]
     type = ComputeFiniteStrainElasticStress
+  [../]
+  [./thermal_strain]
+    type = ComputeThermalExpansionEigenstrain
+    stress_free_temperature = 300
+    thermal_expansion_coeff = 1e-6
+    eigenstrain_name = eigenstrain
+    temperature = temperature
   [../]
 []
 

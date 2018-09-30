@@ -1,12 +1,16 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowCapillaryPressureVG.h"
 #include "PorousFlowVanGenuchten.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowCapillaryPressureVG);
 
 template <>
 InputParameters
@@ -42,14 +46,14 @@ PorousFlowCapillaryPressureVG::PorousFlowCapillaryPressureVG(const InputParamete
 }
 
 Real
-PorousFlowCapillaryPressureVG::capillaryPressureCurve(Real saturation) const
+PorousFlowCapillaryPressureVG::capillaryPressureCurve(Real saturation, unsigned /*qp*/) const
 {
   const Real seff = effectiveSaturationFromSaturation(saturation) * _s_scale;
   return PorousFlowVanGenuchten::capillaryPressure(seff, _alpha, _m, _pc_max) - _pc_sscale;
 }
 
 Real
-PorousFlowCapillaryPressureVG::dCapillaryPressureCurve(Real saturation) const
+PorousFlowCapillaryPressureVG::dCapillaryPressureCurve(Real saturation, unsigned /*qp*/) const
 {
   const Real seff = effectiveSaturationFromSaturation(saturation) * _s_scale;
   return PorousFlowVanGenuchten::dCapillaryPressure(seff, _alpha, _m, _pc_max) * _dseff_ds *
@@ -57,7 +61,7 @@ PorousFlowCapillaryPressureVG::dCapillaryPressureCurve(Real saturation) const
 }
 
 Real
-PorousFlowCapillaryPressureVG::d2CapillaryPressureCurve(Real saturation) const
+PorousFlowCapillaryPressureVG::d2CapillaryPressureCurve(Real saturation, unsigned /*qp*/) const
 {
   const Real seff = effectiveSaturationFromSaturation(saturation) * _s_scale;
   return PorousFlowVanGenuchten::d2CapillaryPressure(seff, _alpha, _m, _pc_max) * _dseff_ds *
@@ -65,21 +69,21 @@ PorousFlowCapillaryPressureVG::d2CapillaryPressureCurve(Real saturation) const
 }
 
 Real
-PorousFlowCapillaryPressureVG::effectiveSaturation(Real pc) const
+PorousFlowCapillaryPressureVG::effectiveSaturation(Real pc, unsigned /*qp*/) const
 {
   return (1.0 / _s_scale) *
          PorousFlowVanGenuchten::effectiveSaturation(pc - _pc_sscale, _alpha, _m);
 }
 
 Real
-PorousFlowCapillaryPressureVG::dEffectiveSaturation(Real pc) const
+PorousFlowCapillaryPressureVG::dEffectiveSaturation(Real pc, unsigned /*qp*/) const
 {
   return (1.0 / _s_scale) *
          PorousFlowVanGenuchten::dEffectiveSaturation(pc - _pc_sscale, _alpha, _m);
 }
 
 Real
-PorousFlowCapillaryPressureVG::d2EffectiveSaturation(Real pc) const
+PorousFlowCapillaryPressureVG::d2EffectiveSaturation(Real pc, unsigned /*qp*/) const
 {
   return (1.0 / _s_scale) *
          PorousFlowVanGenuchten::d2EffectiveSaturation(pc - _pc_sscale, _alpha, _m);

@@ -1,13 +1,18 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "CLSHPlasticModel.h"
 
 #include "SymmIsotropicElasticityTensor.h"
 #include <cmath>
+
+registerMooseObject("SolidMechanicsApp", CLSHPlasticModel);
 
 template <>
 InputParameters
@@ -69,10 +74,7 @@ CLSHPlasticModel::computeResidual(const Real effectiveTrialStress, const Real sc
     Real xphi = _c_alpha * std::sinh(xflow);
     _xphidp = -3. * _shear_modulus * _c_alpha * _c_beta * std::cosh(xflow);
     _xphir = -_c_alpha * _c_beta * std::cosh(xflow);
-    if (_legacy_return_mapping)
-      residual = xphi - scalar / _dt;
-    else
-      residual = xphi * _dt - scalar;
+    residual = xphi * _dt - scalar;
   }
 
   return residual;
@@ -96,12 +98,7 @@ CLSHPlasticModel::computeDerivative(const Real /*effectiveTrialStress*/, const R
 {
   Real derivative = 1.0;
   if (_yield_condition > 0)
-  {
-    if (_legacy_return_mapping)
-      derivative = _xphidp + _hardening_constant * _xphir - 1.0 / _dt;
-    else
-      derivative = _xphidp * _dt + _hardening_constant * _xphir * _dt - 1.0;
-  }
+    derivative = _xphidp * _dt + _hardening_constant * _xphir * _dt - 1.0;
 
   return derivative;
 }

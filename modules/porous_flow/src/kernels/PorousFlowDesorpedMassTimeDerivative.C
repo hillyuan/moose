@@ -1,16 +1,19 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowDesorpedMassTimeDerivative.h"
 
-// MOOSE includes
 #include "MooseVariable.h"
 
 #include "libmesh/quadrature.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowDesorpedMassTimeDerivative);
 
 template <>
 InputParameters
@@ -18,7 +21,7 @@ validParams<PorousFlowDesorpedMassTimeDerivative>()
 {
   InputParameters params = validParams<TimeKernel>();
   params.addRequiredParam<UserObjectName>(
-      "PorousFlowDictator", "The UserObject that holds the list of Porous-Flow variable names.");
+      "PorousFlowDictator", "The UserObject that holds the list of PorousFlow variable names.");
   params.addRequiredCoupledVar(
       "conc_var", "The variable that represents the concentration of desorped species");
   params.addClassDescription("Desorped component mass derivative wrt time.");

@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from PyQt5.QtWidgets import QWidget, QFileDialog, QMessageBox, QApplication
 from PyQt5.QtCore import pyqtSignal, Qt, QFileSystemWatcher
 import os, shlex
@@ -134,6 +143,7 @@ class ExecuteOptionsPlugin(QWidget, Plugin):
         self._recent_exe_menu = None
         self._recent_working_menu = None
         self._recent_args_menu = None
+        self._force_reload_action = None
         self._exe_watcher = QFileSystemWatcher()
         self._exe_watcher.fileChanged.connect(self.setExecutablePath)
 
@@ -173,6 +183,8 @@ class ExecuteOptionsPlugin(QWidget, Plugin):
             if files:
                 self._exe_watcher.removePaths(files)
             self._exe_watcher.addPath(app_path)
+        if self._force_reload_action:
+            self._force_reload_action.setEnabled(app_info.valid())
         self._updateRecentExe(app_path, not app_info.valid())
         self._loading_dialog.hide()
 
@@ -300,6 +312,9 @@ class ExecuteOptionsPlugin(QWidget, Plugin):
         self._recent_working_menu.updateRecentlyOpened()
         self._recent_exe_menu.updateRecentlyOpened()
 
+    def _reload_syntax(self):
+        self.setExecutablePath(self.exe_line.text())
+
     def addToMenu(self, menu):
         """
         Adds menu entries specific to the Arguments to the menubar.
@@ -328,6 +343,8 @@ class ExecuteOptionsPlugin(QWidget, Plugin):
                 20,
                 )
         self._recent_args_menu.selected.connect(self._setExecutableArgs)
+        self._force_reload_action = WidgetUtils.addAction(menu, "Reload executable syntax", self._reload_syntax)
+        self._force_reload_action.setEnabled(False)
 
     def clearRecentlyUsed(self):
         if self._recent_args_menu:

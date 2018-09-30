@@ -1,4 +1,12 @@
 #!/usr/bin/python
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
 
 from __future__ import print_function
 
@@ -7,7 +15,7 @@ import os, re, time, sys
 try:
     import hit
 except:
-    print('failed to import hit - you may need to (re)build moose.', file=sys.stderr)
+    print('failed to import hit - try running "make hit" in the $MOOSE_DIR/test directory.', file=sys.stderr)
     sys.exit(1)
 
 class DupWalker(object):
@@ -50,7 +58,7 @@ class Parser:
         self.errors = []
         self.fname = ''
 
-    def parse(self, filename):
+    def parse(self, filename, default_values = None):
         with open(filename, 'r') as f:
             data = f.read()
 
@@ -64,10 +72,10 @@ class Parser:
         self.root = root
 
         w = DupWalker(os.path.abspath(filename))
-        root.walk(w, hit.NodeType.All)
+        root.walk(w, hit.NodeType.Field)
         self.errors.extend(w.errors)
 
-        self._parseNode(filename, root)
+        self._parseNode(filename, root, default_values)
 
     def error(self, msg, node=None):
         if node:
@@ -110,11 +118,9 @@ class Parser:
                             elif strict_type != type(value):
                                 self.error("wrong data type for parameter value: '{}=\"{}\"'".format(child.fullpath(), value), node=child)
                                 have_err = True
-                        elif child.kind() == hit.FieldKind.Bool:
+                        else:
                             # Otherwise, just do normal assignment
                             params[key] = child.param()
-                        else:
-                            params[key] = value
             else:
                 self.error('unused parameter "{}"'.format(child.fullpath()), node=child)
 
@@ -127,12 +133,20 @@ class Parser:
         params['have_errors'] = have_err
 
     # private:
-    def _parseNode(self, filename, node):
+    def _parseNode(self, filename, node, default_values):
         if node.find('type'):
             moose_type = node.param('type')
 
             # Get the valid Params for this type
             params = self.factory.validParams(moose_type)
+
+            # Apply any new defaults
+            for key, value in default_values.iterparams():
+                if key in params.keys():
+                    if key == 'cli_args':
+                      params[key].append(value)
+                    else:
+                      params[key] = value
 
             # Extract the parameters from the Getpot node
             self.extractParams(filename, params, node)
@@ -158,7 +172,7 @@ class Parser:
 
         # Loop over the section names and parse them
         for child in node.children(node_type=hit.NodeType.Section):
-            self._parseNode(filename, child)
+            self._parseNode(filename, child, default_values)
 
     # This routine returns a Boolean indicating whether a given block
     # looks like a valid subblock. In the Testing system, a valid subblock

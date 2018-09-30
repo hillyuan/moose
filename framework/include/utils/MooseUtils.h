@@ -1,16 +1,12 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef MOOSEUTILS_H
 #define MOOSEUTILS_H
 
@@ -18,6 +14,7 @@
 #include "HashMap.h"
 #include "MaterialProperty.h" // MaterialProperties
 #include "InfixIterator.h"
+#include "MooseEnumItem.h"
 
 // C++ includes
 #include <string>
@@ -27,6 +24,9 @@
 #include <iterator>
 
 // Forward Declarations
+class InputParameters;
+class ExecFlagEnum;
+
 namespace libMesh
 {
 class Elem;
@@ -35,6 +35,7 @@ namespace Parallel
 class Communicator;
 }
 }
+class MultiMooseEnum;
 
 namespace MooseUtils
 {
@@ -84,21 +85,25 @@ bool checkFileWriteable(const std::string & filename, bool throw_on_unwritable =
  * This function implements a parallel barrier function but writes progress
  * to stdout.
  */
-void parallelBarrierNotify(const libMesh::Parallel::Communicator & comm);
+void parallelBarrierNotify(const libMesh::Parallel::Communicator & comm, bool messaging = true);
 
 /**
  * This function marks the begin of a section of code that is executed in serial
  * rank by rank. The section must be closed with a call to serialEnd.
  * These functions are intended for debugging use to obtain clean terminal output
  * from multiple ranks (use --keep-cout).
+ * @param comm The communicator to use
+ * @param warn Whether or not to warn that something is being serialized
  */
-void serialBegin(const libMesh::Parallel::Communicator & comm);
+void serialBegin(const libMesh::Parallel::Communicator & comm, bool warn = true);
 
 /**
  * Closes a section of code that is executed in serial rank by rank, and that was
  * opened with a call to serialBegin. No MPI communication can happen in this block.
+ * @param comm The communicator to use
+ * @param warn Whether or not to warn that something is being serialized
  */
-void serialEnd(const libMesh::Parallel::Communicator & comm);
+void serialEnd(const libMesh::Parallel::Communicator & comm, bool warn = true);
 
 /**
  * Function tests if the supplied filename as the desired extension
@@ -108,6 +113,12 @@ void serialEnd(const libMesh::Parallel::Communicator & comm);
  * @return True if the filename has the supplied extension
  */
 bool hasExtension(const std::string & filename, std::string ext, bool strip_exodus_ext = false);
+
+/**
+ * Removes any file extension from the fiven string s (i.e. any ".[extension]" suffix of s) and
+ * returns the result.
+ */
+std::string stripExtension(const std::string & s);
 
 /**
  * Function for splitting path and filename
@@ -141,6 +152,11 @@ std::string shortName(const std::string & name);
  * Function for string the information before the final / in a parser block
  */
 std::string baseName(const std::string & name);
+
+/**
+ * Get the hostname the current process is running on
+ */
+std::string hostname();
 
 /**
  * This routine is a simple helper function for searching a map by values instead of keys
@@ -315,6 +331,10 @@ indentMessage(const std::string & prefix, std::string & message, const char * co
  */
 std::string & removeColor(std::string & msg);
 
+std::list<std::string> listDir(const std::string path, bool files_only = false);
+
+bool pathExists(const std::string & path);
+
 /**
  * Retrieves the names of all of the files contained within the list of directories passed into the
  * routine.
@@ -393,6 +413,56 @@ tokenizeAndConvert(const std::string & str,
 }
 
 /**
+ * convert takes a string representation of a number type and converts it to the number.
+ * This method is here to get around deficiencies in the STL stoi and stod methods where they
+ * might successfully convert part of a string to a number when we'd like to throw an error.
+ */
+template <typename T>
+T
+convert(const std::string & str, bool throw_on_failure = false)
+{
+  std::stringstream ss(str);
+  T val;
+  if ((ss >> val).fail() || !ss.eof())
+  {
+    std::string msg =
+        std::string("Unable to convert '") + str + "' to type " + demangle(typeid(T).name());
+
+    if (throw_on_failure)
+      throw std::invalid_argument(msg);
+    else
+      mooseError(msg);
+  }
+
+  return val;
+}
+
+template <>
+short int convert<short int>(const std::string & str, bool throw_on_failure);
+
+template <>
+unsigned short int convert<unsigned short int>(const std::string & str, bool throw_on_failure);
+
+template <>
+int convert<int>(const std::string & str, bool throw_on_failure);
+
+template <>
+unsigned int convert<unsigned int>(const std::string & str, bool throw_on_failure);
+
+template <>
+long int convert<long int>(const std::string & str, bool throw_on_failure);
+
+template <>
+unsigned long int convert<unsigned long int>(const std::string & str, bool throw_on_failure);
+
+template <>
+long long int convert<long long int>(const std::string & str, bool throw_on_failure);
+
+template <>
+unsigned long long int convert<unsigned long long int>(const std::string & str,
+                                                       bool throw_on_failure);
+
+/**
  * Convert supplied string to upper case.
  * @params name The string to convert upper case.
  */
@@ -411,7 +481,7 @@ concatenate(T c1, const T & c2)
 }
 
 /**
- * Returns a vector that contains is teh concatenation of the two passed in vectors.
+ * Returns a vector that contains is the concatenation of the two passed in vectors.
  */
 template <typename T>
 std::vector<T>
@@ -446,6 +516,18 @@ numDigits(const T & num)
 {
   return num > 9 ? static_cast<int>(std::log10(static_cast<double>(num))) + 1 : 1;
 }
-}
+
+/**
+ * Return the default ExecFlagEnum for MOOSE.
+ */
+ExecFlagEnum getDefaultExecFlagEnum();
+
+/**
+ * Robust string to integer conversion that fails for cases such at "1foo".
+ * @param input The string to convert.
+ * @param throw_on_failure Throw an invalid_argument exception instead of mooseError.
+ */
+int stringToInteger(const std::string & input, bool throw_on_failure = false);
+} // MooseUtils namespace
 
 #endif // MOOSEUTILS_H

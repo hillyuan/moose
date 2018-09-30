@@ -15,6 +15,14 @@
   gravity = '0 0 0'
 []
 
+[Functions]
+  [./dts]
+    type = PiecewiseLinear
+    y = '3E-2 5E-1 8E-1'
+    x = '0 1 5'
+  [../]
+[]
+
 [UserObjects]
   [./dictator]
     type = PorousFlowDictator
@@ -52,19 +60,8 @@
 [Materials]
   [./temperature]
     type = PorousFlowTemperature
-    at_nodes = true
-  [../]
-  [./temperature_qp]
-    type = PorousFlowTemperature
   [../]
   [./ppss]
-    type = PorousFlow2PhasePP
-    at_nodes = true
-    phase0_porepressure = pwater
-    phase1_porepressure = poil
-    capillary_pressure = pc
-  [../]
-  [./ppss_qp]
     type = PorousFlow2PhasePP
     phase0_porepressure = pwater
     phase1_porepressure = poil
@@ -72,14 +69,12 @@
   [../]
   [./massfrac]
     type = PorousFlowMassFraction
-    at_nodes = true
     mass_fraction_vars = 'massfrac_ph0_sp0 massfrac_ph1_sp0'
   [../]
   [./water]
     type = PorousFlowSingleComponentFluid
     fp = water
     phase = 0
-    at_nodes = true
     compute_enthalpy = false
     compute_internal_energy = false
   [../]
@@ -87,60 +82,21 @@
     type = PorousFlowSingleComponentFluid
     fp = oil
     phase = 1
-    at_nodes = true
     compute_enthalpy = false
     compute_internal_energy = false
-  [../]
-  [./water_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = water
-    phase = 0
-    compute_enthalpy = false
-    compute_internal_energy = false
-  [../]
-  [./oil_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = oil
-    phase = 1
-    compute_enthalpy = false
-    compute_internal_energy = false
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
-  [./dens_qp_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-    at_nodes = false
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
   [../]
   [./relperm_water]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 1
     phase = 0
   [../]
   [./relperm_oil]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 1
     phase = 1
   [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
-  [../]
   [./porosity]
     type = PorousFlowPorosityConst
-    at_nodes = true
     porosity = 0.25
   [../]
   [./permeability]
@@ -282,8 +238,7 @@
 
   [./TimeStepper]
     type = FunctionDT
-    time_dt = '3E-2 5E-1 8E-1'
-    time_t = '0 1 5'
+    function = dts
   [../]
 []
 

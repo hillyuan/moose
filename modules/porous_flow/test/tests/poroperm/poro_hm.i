@@ -108,18 +108,22 @@
   [../]
   [./eff_fluid_pressure]
     type = PorousFlowEffectiveFluidPressure
+    at_nodes = false
   [../]
   [./vol_strain]
     type = PorousFlowVolumetricStrain
   [../]
   [./ppss]
     type = PorousFlow1PhaseP
+    at_nodes = false
     porepressure = porepressure
     capillary_pressure = pc
   [../]
-
   [./porosity]
-    type = PorousFlowPorosityHM
+    type = PorousFlowPorosity
+    at_nodes = false
+    fluid = true
+    mechanical = true
     ensure_positive = false
     porosity_zero = 0.5
     solid_bulk = 0.3

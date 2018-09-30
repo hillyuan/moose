@@ -1,14 +1,18 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "TricrystalTripleJunctionIC.h"
 #include "MooseRandom.h"
 #include "MooseMesh.h"
 #include "MathUtils.h"
+
+registerMooseObject("PhaseFieldApp", TricrystalTripleJunctionIC);
 
 template <>
 InputParameters
@@ -35,17 +39,10 @@ TricrystalTripleJunctionIC::TricrystalTripleJunctionIC(const InputParameters & p
     _theta2(getParam<Real>("theta2"))
 {
   if (_op_num != 3)
-    mooseError("Tricrystal ICs must have op_num = 3");
+    paramError("op_num", "Tricrystal ICs must have op_num = 3");
 
   if (_theta1 + _theta2 >= 360.0)
-    mooseError("Sum of the angles must total less than 360 degrees");
-
-  // Make sure that _junction is in the domain
-  for (unsigned int i = 0; i < LIBMESH_DIM; ++i)
-  {
-    if ((_mesh.getMinInDimension(i) > _junction(i)) || (_mesh.getMaxInDimension(i) < _junction(i)))
-      mooseError("Triple junction out of bounds");
-  }
+    paramError("theta1", "Sum of the angles theta1 and theta2 must total less than 360 degrees");
 
   // Default junction point is the center
   if (!parameters.isParamValid("junction"))
@@ -55,6 +52,13 @@ TricrystalTripleJunctionIC::TricrystalTripleJunctionIC(const InputParameters & p
   }
   else
     _junction = getParam<Point>("junction");
+
+  // Make sure that _junction is in the domain
+  for (unsigned int i = 0; i < LIBMESH_DIM; ++i)
+  {
+    if ((_mesh.getMinInDimension(i) > _junction(i)) || (_mesh.getMaxInDimension(i) < _junction(i)))
+      paramError("junction", "Triple junction out of bounds");
+  }
 
   // Convert the angles to radians
   _theta1 = _theta1 * libMesh::pi / 180.0;

@@ -1,4 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
 
 import datetime
 import time
@@ -7,6 +15,7 @@ import os
 import os.path
 import sys
 import collections
+import urlparse
 
 # this is a hack to prevent matplotlib from trying to do interactive plot crap with e.g. Qt on
 # remote machines.  See:
@@ -39,7 +48,7 @@ find_moose_python()
 
 def build_args():
     p = argparse.ArgumentParser()
-    p.add_argument('--db', type=str, default='speedtests.sqlite', help='benchmark timings database')
+    p.add_argument('--db', type=str, default=os.environ.get('MOOSE_SPEED_DB', 'speedtests.sqlite'), help='benchmark timings database')
 
     # options for comparing benchmarks
     p.add_argument('--old', type=str, default='', help='compare benchmark runs from the given revision (default prev of most recent)')
@@ -55,6 +64,7 @@ def build_args():
     p.add_argument('--list-revs', action='store_true', help='list all benchmarked revisions in the db')
     p.add_argument('--trends', action='store_true', help='generate plots of historical trends of all benchmarks')
     p.add_argument('--psig', type=float, default=0.01, help='the p-value cutoffused to determine comparison significance')
+    p.add_argument('--baseurl', type=str, default='https://github.com/idaholab/moose/commit/', help='the url prefix for commit links in generated visualization/output')
     return p
 
 def main():
@@ -94,7 +104,7 @@ def main():
             if not os.path.exists(subdir):
                 os.mkdir(subdir)
             benchnames = db.bench_names(method=method)
-            buildpage(os.path.join(subdir, 'index.html'), benchnames, db, args.psig, method=method)
+            buildpage(os.path.join(subdir, 'index.html'), benchnames, db, args.psig, method=method, baseurl=args.baseurl)
             for bname in db.bench_names(method=method):
                 benches, revs = [], []
                 dbrevs, _ = db.revisions(method=method)
@@ -108,7 +118,7 @@ def main():
                 if len(revs) > 25:
                     revs = revs[-25:]
                     benches = benches[-25:]
-                plot(revs, benches, subdir=subdir)
+                plot(revs, benches, subdir=subdir, baseurl=args.baseurl)
 
     else: # compare two benchmarks
         with DB(args.db) as db:
@@ -126,7 +136,7 @@ def main():
                 print(cmp)
             print(BenchComp.footer())
 
-def buildpage(fname, plotnames, db, psig, lastn=60, method='opt'):
+def buildpage(fname, plotnames, db, psig, lastn=60, method='opt', baseurl='https://github.com/idaholab/moose/commit/'):
     figpage = """
 <!DOCTYPE html>
 <meta charset="utf-8">
@@ -201,8 +211,8 @@ def buildpage(fname, plotnames, db, psig, lastn=60, method='opt'):
 
             t1 = datetime.datetime.fromtimestamp(t1).strftime(tformat)
             t2 = datetime.datetime.fromtimestamp(t2).strftime(tformat)
-            link1 = "https://github.com/idaholab/moose/commit/" + rev1
-            link2 = "https://github.com/idaholab/moose/commit/" + rev2
+            link1 = urlparse.urljoin(baseurl, rev1)
+            link2 = urlparse.urljoin(baseurl, rev2)
             c = Comp(rev1, rev2, t1, t2, link1, link2, s)
             comparisons.append(c)
 
@@ -215,8 +225,8 @@ def buildpage(fname, plotnames, db, psig, lastn=60, method='opt'):
             s += '\n' + BenchComp.footer()
 
             t2 = datetime.datetime.fromtimestamp(t2).strftime(tformat)
-            link1 = "https://github.com/idaholab/moose/commit/" + rev1
-            link2 = "https://github.com/idaholab/moose/commit/" + rev2
+            link1 = urlparse.urljoin(baseurl, rev1)
+            link2 = urlparse.urljoin(baseurl, rev2)
             c = Comp(rev1, rev2, t1, t2, link1, link2, s)
             refcomparisons.append(c)
 
@@ -251,12 +261,19 @@ def compare(db, rev1, rev2, psig, method='opt'):
             cmps.append(cmp)
     return cmps
 
-def plot(revisions, benchmarks, subdir='.'):
+def plot(revisions, benchmarks, subdir='.', baseurl='https://github.com/idaholab/moose/commit/'):
     data = []
     labels = []
     for rev, bench in zip(revisions, benchmarks):
         data.append(bench.realruns)
         labels.append(rev[:7])
+
+    median = sorted(data[0])[int(len(data[0])/2)]
+    plt.axhline(y=median*1.05, linestyle='--', linewidth=2, color='red', alpha=.5, label='+5%')
+    plt.axhline(y=median*1.01, linestyle=':', linewidth=2, color='red', label='+1%')
+    plt.axhline(y=median, dashes=[48, 4, 12, 4], color='black', alpha=.5)
+    plt.axhline(y=median*.99, linestyle=':', linewidth=2, color='green', label='-1%')
+    plt.axhline(y=median*.95, linestyle='--', linewidth=2, color='green', alpha=.5, label='-5%')
 
     plt.boxplot(data, labels=labels, whis=1.5)
     plt.xticks(rotation=90)
@@ -267,7 +284,9 @@ def plot(revisions, benchmarks, subdir='.'):
     ax = fig.axes[0]
     labels = ax.get_xticklabels()
     for label in labels:
-        label.set_url("https://github.com/idaholab/moose/commit/" + label.get_text())
+        label.set_url(urlparse.urljoin(baseurl, label.get_text()))
+
+    legend = ax.legend(loc='upper right')
 
     fig.subplots_adjust(bottom=.15)
     fig.savefig(os.path.join(subdir, benchmarks[0].name + '.svg'))
@@ -292,7 +311,12 @@ def read_benchmarks(benchlist):
 
     root = hit.parse(benchlist, data)
     for child in root.find('benchmarks').children():
+        if not child.param('binary'):
+            raise ValueError('missing required "binary" field')
         ex = child.param('binary').strip()
+
+        if not child.param('input'):
+            raise ValueError('missing required "input" field')
         infile = child.param('input').strip()
         args = ''
         if child.find('cli_args'):

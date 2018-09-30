@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "FileMesh.h"
 #include "Parser.h"
@@ -21,6 +16,8 @@
 #include "libmesh/exodusII_io.h"
 #include "libmesh/nemesis_io.h"
 #include "libmesh/parallel_mesh.h"
+
+registerMooseObject("MooseApp", FileMesh);
 
 template <>
 InputParameters
@@ -33,30 +30,35 @@ validParams<FileMesh>()
 }
 
 FileMesh::FileMesh(const InputParameters & parameters)
-  : MooseMesh(parameters), _file_name(getParam<MeshFileName>("file"))
+  : MooseMesh(parameters),
+    _file_name(getParam<MeshFileName>("file")),
+    _read_mesh_timer(registerTimedSection("readMesh", 2))
 {
   getMesh().set_mesh_dimension(getParam<MooseEnum>("dim"));
 }
 
 FileMesh::FileMesh(const FileMesh & other_mesh)
-  : MooseMesh(other_mesh), _file_name(other_mesh._file_name)
+  : MooseMesh(other_mesh),
+    _file_name(other_mesh._file_name),
+    _read_mesh_timer(other_mesh._read_mesh_timer)
 {
 }
 
 FileMesh::~FileMesh() {}
 
-MooseMesh &
-FileMesh::clone() const
+std::unique_ptr<MooseMesh>
+FileMesh::safeClone() const
 {
-  return *(new FileMesh(*this));
+  return libmesh_make_unique<FileMesh>(*this);
 }
 
 void
 FileMesh::buildMesh()
 {
+  TIME_SECTION(_read_mesh_timer);
+
   std::string _file_name = getParam<MeshFileName>("file");
 
-  Moose::perf_log.push("Read Mesh", "Setup");
   if (_is_nemesis)
   {
     // Nemesis_IO only takes a reference to DistributedMesh, so we can't be quite so short here.
@@ -103,8 +105,7 @@ FileMesh::buildMesh()
       // and renumbering, at least at first.
       if (file == "LATEST")
       {
-        std::list<std::string> dir_list(1, path);
-        std::list<std::string> files = MooseUtils::getFilesInDirs(dir_list);
+        std::list<std::string> files = MooseUtils::listDir(path);
 
         // Fill in the name of the LATEST file so we can open it and read it.
         _file_name = MooseUtils::getLatestMeshCheckpointFile(files);
@@ -123,7 +124,8 @@ FileMesh::buildMesh()
         getMesh().allow_renumbering(false);
       }
 
-      MooseUtils::checkFileReadable(_file_name);
+      if (!MooseUtils::pathExists(_file_name))
+        mooseError("cannot locate mesh file '", _file_name, "'");
       getMesh().read(_file_name);
 
       if (restarting)
@@ -133,8 +135,6 @@ FileMesh::buildMesh()
       }
     }
   }
-
-  Moose::perf_log.pop("Read Mesh", "Setup");
 }
 
 void

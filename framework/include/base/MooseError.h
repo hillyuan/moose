@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef MOOSEERROR_H
 #define MOOSEERROR_H
@@ -104,16 +99,31 @@
 template <typename... Args>
 [[noreturn]] void mooseError(Args &&... args);
 
+class MooseVariableFEBase;
+
 namespace moose
 {
 namespace internal
 {
+
+/// Builds and returns a string of the form:
+///
+///     [var1-elemtype],ORDER[var1-order] != [var2-elemtype],ORDER[var2-order]
+///
+/// This is a convenience function to be used when error messages (especially with paramError)
+/// need to report that variable types are incompatible (e.g. with residual save-in).
+std::string incompatVarMsg(MooseVariableFEBase & var1, MooseVariableFEBase & var2);
 
 std::string
 mooseMsgFmt(const std::string & msg, const std::string & title, const std::string & color);
 
 [[noreturn]] void mooseErrorRaw(std::string msg, const std::string prefix = "");
 
+/**
+ * All of the following are not meant to be called directly - they are called by the normal macros
+ * (mooseError(), etc.) down below
+ * @{
+ */
 void mooseStreamAll(std::ostringstream & ss);
 
 template <typename T, typename... Args>
@@ -142,6 +152,19 @@ mooseWarningStream(S & oss, Args &&... args)
 
 template <typename S, typename... Args>
 void
+mooseUnusedStream(S & oss, Args &&... args)
+{
+  std::ostringstream ss;
+  mooseStreamAll(ss, args...);
+  std::string msg = mooseMsgFmt(ss.str(), "*** Warning ***", COLOR_YELLOW);
+  if (Moose::_throw_on_error)
+    throw std::runtime_error(msg);
+
+  oss << msg << std::flush;
+}
+
+template <typename S, typename... Args>
+void
 mooseInfoStream(S & oss, Args &&... args)
 {
   mooseDoOnce({
@@ -154,7 +177,7 @@ mooseInfoStream(S & oss, Args &&... args)
 
 template <typename S, typename... Args>
 void
-mooseDeprecatedStream(S & oss, Args &&... args)
+mooseDeprecatedStream(S & oss, bool expired, Args &&... args)
 {
   if (Moose::_deprecated_is_error)
     mooseError("\n\nDeprecated code:\n", std::forward<Args>(args)...);
@@ -162,14 +185,17 @@ mooseDeprecatedStream(S & oss, Args &&... args)
   mooseDoOnce(std::ostringstream ss; mooseStreamAll(ss, args...);
               std::string msg = mooseMsgFmt(
                   ss.str(),
-                  "*** Warning, This code is deprecated and will be removed in future versions!",
-                  COLOR_YELLOW);
+                  "*** Warning, This code is deprecated and will be removed in future versions!\n",
+                  expired ? COLOR_RED : COLOR_YELLOW);
               oss << msg;
               ss.str("");
               if (libMesh::global_n_processors() == 1) print_trace(ss);
               else libMesh::write_traceout();
               oss << ss.str() << std::endl;);
 }
+/**
+ * @}
+ */
 
 } // namespace internal
 } // namespace moose
@@ -196,12 +222,29 @@ mooseWarning(Args &&... args)
   moose::internal::mooseWarningStream(Moose::out, std::forward<Args>(args)...);
 }
 
+/// Warning message used to notify the users of unused parts of their input files
+/// Really used internally by the parser and shouldn't really be called elsewhere
+template <typename... Args>
+void
+mooseUnused(Args &&... args)
+{
+  moose::internal::mooseUnusedStream(Moose::out, std::forward<Args>(args)...);
+}
+
 /// Emit a deprecated code/feature message with the given stringified, concatenated args.
 template <typename... Args>
 void
 mooseDeprecated(Args &&... args)
 {
-  moose::internal::mooseDeprecatedStream(Moose::out, std::forward<Args>(args)...);
+  moose::internal::mooseDeprecatedStream(Moose::out, false, std::forward<Args>(args)...);
+}
+
+/// Emit a deprecated code/feature message with the given stringified, concatenated args.
+template <typename... Args>
+void
+mooseDeprecationExpired(Args &&... args)
+{
+  moose::internal::mooseDeprecatedStream(Moose::out, true, std::forward<Args>(args)...);
 }
 
 /// Emit an informational message with the given stringified, concatenated args.

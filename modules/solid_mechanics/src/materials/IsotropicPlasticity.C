@@ -1,14 +1,19 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "IsotropicPlasticity.h"
 
 #include "SymmIsotropicElasticityTensor.h"
 
 #include "PiecewiseLinear.h"
+
+registerMooseObject("SolidMechanicsApp", IsotropicPlasticity);
 
 template <>
 InputParameters
@@ -101,13 +106,9 @@ IsotropicPlasticity::computeResidual(const Real effectiveTrialStress, const Real
 
     // The order here is important.  The final term can be small, and we don't want it lost to
     // roundoff.
-    if (_legacy_return_mapping)
-      residual = (effectiveTrialStress - _hardening_variable[_qp] - _yield_stress) -
-                 (3 * _shear_modulus * scalar);
-    else
-      residual = (effectiveTrialStress - _hardening_variable[_qp] - _yield_stress) /
-                     (3.0 * _shear_modulus) -
-                 scalar;
+    residual =
+        (effectiveTrialStress - _hardening_variable[_qp] - _yield_stress) / (3.0 * _shear_modulus) -
+        scalar;
   }
 
   return residual;
@@ -118,12 +119,7 @@ IsotropicPlasticity::computeDerivative(const Real /*effectiveTrialStress*/, cons
 {
   Real derivative(1);
   if (_yield_condition > 0)
-  {
-    if (_legacy_return_mapping)
-      derivative = -3.0 * _shear_modulus - _hardening_slope;
-    else
-      derivative = -1.0 - _hardening_slope / (3.0 * _shear_modulus);
-  }
+    derivative = -1.0 - _hardening_slope / (3.0 * _shear_modulus);
 
   return derivative;
 }

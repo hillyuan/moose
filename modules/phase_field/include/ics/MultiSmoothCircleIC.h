@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef MULTISMOOTHCIRCLEIC_H
 #define MULTISMOOTHCIRCLEIC_H
 
@@ -17,18 +20,21 @@ InputParameters validParams<MultiSmoothCircleIC>();
 
 /**
  * MultismoothCircleIC creates multiple SmoothCircles (number = numbub) that are randomly
- * positioned around the domain, with a minimum spacing equal to bubspac
+ * positioned around the domain with a minimum spacing equal to bubspac. The system attempts to
+ * randomly place bubbles in the domain until the desired number of distinct bubbles are placed.
+ * If the number of attempts exceeds "max_tries", a mooseError will be thrown and the program will
+ * terminate.
  */
 class MultiSmoothCircleIC : public SmoothCircleBaseIC
 {
 public:
   MultiSmoothCircleIC(const InputParameters & parameters);
 
-  virtual void initialSetup();
+  virtual void initialSetup() override;
 
 protected:
-  virtual void computeCircleRadii();
-  virtual void computeCircleCenters();
+  virtual void computeCircleRadii() override;
+  virtual void computeCircleCenters() override;
 
   const unsigned int _numbub;
   const Real _bubspac;

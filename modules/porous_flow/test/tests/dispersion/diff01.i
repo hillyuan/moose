@@ -140,66 +140,21 @@
   [./temperature]
     type = PorousFlowTemperature
   [../]
-  [./temperature_nodal]
-    type = PorousFlowTemperature
-    at_nodes = true
-  [../]
   [./ppss]
     type = PorousFlow1PhaseFullySaturated
-    porepressure = pp
-  [../]
-  [./ppss_nodal]
-    type = PorousFlow1PhaseFullySaturated
-    at_nodes = true
     porepressure = pp
   [../]
   [./massfrac]
     type = PorousFlowMassFraction
     mass_fraction_vars = massfrac0
   [../]
-  [./massfrac_nodal]
-    type = PorousFlowMassFraction
-    at_nodes = true
-    mass_fraction_vars = massfrac0
-  [../]
   [./simple_fluid]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid
     phase = 0
-    at_nodes = true
-  [../]
-  [./simple_fluid_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid
-    phase = 0
-  [../]
-  [./dens_qp_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-    at_nodes = false
-  [../]
-  [./dens_nodal_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-    include_old = true
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_viscosity_qp
-  [../]
-  [./visc_all_nodal]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
   [../]
   [./poro]
     type = PorousFlowPorosityConst
-    porosity = 0.3
-  [../]
-  [./poro_nodal]
-    type = PorousFlowPorosityConst
-    at_nodes = true
     porosity = 0.3
   [../]
   [./diff]
@@ -210,20 +165,6 @@
   [./relp]
     type = PorousFlowRelativePermeabilityConst
     phase = 0
-  [../]
-  [./relp_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_relative_permeability_qp
-  [../]
-  [./relp_nodal]
-    type = PorousFlowRelativePermeabilityConst
-    at_nodes = true
-    phase = 0
-  [../]
-  [./relp_all_nodal]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
   [../]
   [./permeability]
     type = PorousFlowPermeabilityConst

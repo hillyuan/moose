@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef POROUSFLOWCAPILLARYPRESSUREVG_H
 #define POROUSFLOWCAPILLARYPRESSUREVG_H
@@ -26,20 +28,20 @@ class PorousFlowCapillaryPressureVG : public PorousFlowCapillaryPressure
 public:
   PorousFlowCapillaryPressureVG(const InputParameters & parameters);
 
-  virtual Real capillaryPressureCurve(Real saturation) const override;
-  virtual Real dCapillaryPressureCurve(Real saturation) const override;
-  virtual Real d2CapillaryPressureCurve(Real saturation) const override;
+  virtual Real capillaryPressureCurve(Real saturation, unsigned qp = 0) const override;
+  virtual Real dCapillaryPressureCurve(Real saturation, unsigned qp = 0) const override;
+  virtual Real d2CapillaryPressureCurve(Real saturation, unsigned qp = 0) const override;
 
-  virtual Real effectiveSaturation(Real pc) const override;
-  virtual Real dEffectiveSaturation(Real pc) const override;
-  virtual Real d2EffectiveSaturation(Real pc) const override;
+  virtual Real effectiveSaturation(Real pc, unsigned qp = 0) const override;
+  virtual Real dEffectiveSaturation(Real pc, unsigned qp = 0) const override;
+  virtual Real d2EffectiveSaturation(Real pc, unsigned qp = 0) const override;
 
 protected:
   /// van Genuchten exponent m
   const Real _m;
   /// van Genuchten capillary coefficient alpha
   const Real _alpha;
-  /// capillary pressure = f(Seff * s_scale) - pc_sscale, where f is the van Genuchten function.  For almost all simulations s_scale=1 will be appropriate
+  /// Capillary pressure = f(Seff * s_scale) - pc_sscale, where f is the van Genuchten function.  For almost all simulations s_scale=1 will be appropriate
   const Real _s_scale;
   /// pc_sscale = f(s_scale), where f is the van Genuchten function
   const Real _pc_sscale;

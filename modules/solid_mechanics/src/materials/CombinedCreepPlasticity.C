@@ -1,13 +1,18 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "CombinedCreepPlasticity.h"
 
 #include "ReturnMappingModel.h"
 #include "SymmIsotropicElasticityTensor.h"
+
+registerMooseObject("SolidMechanicsApp", CombinedCreepPlasticity);
 
 template <>
 InputParameters
@@ -19,8 +24,9 @@ validParams<CombinedCreepPlasticity>()
                                                     "List of submodel ConstitutiveModels");
 
   params.addParam<unsigned int>("max_its", 30, "Maximum number of submodel iterations");
-  params.addParam<bool>(
-      "output_iteration_info", false, "Set true to output submodel iteration information");
+  params.addParam<bool>("internal_solve_full_iteration_history",
+                        false,
+                        "Set true to output submodel iteration information");
   params.addParam<Real>(
       "relative_tolerance", 1e-5, "Relative convergence tolerance for combined submodel iteration");
   params.addParam<Real>(
@@ -34,7 +40,7 @@ CombinedCreepPlasticity::CombinedCreepPlasticity(const InputParameters & paramet
   : ConstitutiveModel(parameters),
     _submodels(),
     _max_its(parameters.get<unsigned int>("max_its")),
-    _output_iteration_info(getParam<bool>("output_iteration_info")),
+    _internal_solve_full_iteration_history(getParam<bool>("internal_solve_full_iteration_history")),
     _relative_tolerance(parameters.get<Real>("relative_tolerance")),
     _absolute_tolerance(parameters.get<Real>("absolute_tolerance")),
     _matl_timestep_limit(declareProperty<Real>("matl_timestep_limit"))
@@ -98,9 +104,12 @@ CombinedCreepPlasticity::computeStress(const Elem & current_elem,
   // creep_strain = creep_strainOld + creep_strainIncrement
 
   if (_t_step == 0 && !_app.isRestarting())
+  {
+    _matl_timestep_limit[_qp] = std::numeric_limits<Real>::max();
     return;
+  }
 
-  if (_output_iteration_info == true)
+  if (_internal_solve_full_iteration_history == true)
   {
     _console << std::endl
              << "iteration output for CombinedCreepPlasticity solve:"
@@ -153,7 +162,7 @@ CombinedCreepPlasticity::computeStress(const Elem & current_elem,
     }
     stress_new_last = stress_new;
 
-    if (_output_iteration_info == true)
+    if (_internal_solve_full_iteration_history == true)
     {
       _console << "stress_it=" << counter
                << " rel_delS=" << (0 == first_delS ? 0 : delS / first_delS)
@@ -176,7 +185,14 @@ CombinedCreepPlasticity::computeStress(const Elem & current_elem,
   for (unsigned i_rmm(0); i_rmm < num_submodels; ++i_rmm)
     _matl_timestep_limit[_qp] += 1.0 / rmm[i_rmm]->computeTimeStepLimit();
 
-  _matl_timestep_limit[_qp] = 1.0 / _matl_timestep_limit[_qp];
+  if (MooseUtils::absoluteFuzzyEqual(_matl_timestep_limit[_qp], 0.0))
+  {
+    _matl_timestep_limit[_qp] = std::numeric_limits<Real>::max();
+  }
+  else
+  {
+    _matl_timestep_limit[_qp] = 1.0 / _matl_timestep_limit[_qp];
+  }
 }
 
 bool

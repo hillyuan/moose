@@ -1,11 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "FluidPropertiesMaterialPT.h"
+
+registerMooseObject("FluidPropertiesApp", FluidPropertiesMaterialPT);
 
 template <>
 InputParameters
@@ -43,13 +47,13 @@ FluidPropertiesMaterialPT::~FluidPropertiesMaterialPT() {}
 void
 FluidPropertiesMaterialPT::computeQpProperties()
 {
-  _rho[_qp] = _fp.rho(_pressure[_qp], _temperature[_qp]);
-  _mu[_qp] = _fp.mu_from_rho_T(_rho[_qp], _temperature[_qp]);
-  _cp[_qp] = _fp.cp(_pressure[_qp], _temperature[_qp]);
-  _cv[_qp] = _fp.cv(_pressure[_qp], _temperature[_qp]);
-  _k[_qp] = _fp.k_from_rho_T(_rho[_qp], _temperature[_qp]);
-  _h[_qp] = _fp.h(_pressure[_qp], _temperature[_qp]);
-  _e[_qp] = _fp.e(_pressure[_qp], _temperature[_qp]);
-  _s[_qp] = _fp.s(_pressure[_qp], _temperature[_qp]);
-  _c[_qp] = _fp.c(_pressure[_qp], _temperature[_qp]);
+  _rho[_qp] = _fp.rho_from_p_T(_pressure[_qp], _temperature[_qp]);
+  _mu[_qp] = _fp.mu_from_p_T(_pressure[_qp], _temperature[_qp]);
+  _cp[_qp] = _fp.cp_from_p_T(_pressure[_qp], _temperature[_qp]);
+  _cv[_qp] = _fp.cv_from_p_T(_pressure[_qp], _temperature[_qp]);
+  _k[_qp] = _fp.k_from_p_T(_pressure[_qp], _temperature[_qp]);
+  _h[_qp] = _fp.h_from_p_T(_pressure[_qp], _temperature[_qp]);
+  _e[_qp] = _fp.e_from_p_T(_pressure[_qp], _temperature[_qp]);
+  _s[_qp] = _fp.s_from_p_T(_pressure[_qp], _temperature[_qp]);
+  _c[_qp] = _fp.c_from_p_T(_pressure[_qp], _temperature[_qp]);
 }

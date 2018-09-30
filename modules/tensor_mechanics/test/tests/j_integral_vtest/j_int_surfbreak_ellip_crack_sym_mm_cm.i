@@ -42,6 +42,7 @@
   intersecting_boundary = '1 2'
   symmetry_plane = 2
   position_type = angle
+  incremental = true
 []
 
 [Modules/TensorMechanics/Master]
@@ -97,9 +98,6 @@
   [../]
   [./elastic_stress]
     type = ComputeFiniteStrainElasticStress
-  [../]
-  [./eshelby]
-    type = EshelbyTensor
   [../]
 []
 

@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef MOOSEAPP_H
 #define MOOSEAPP_H
@@ -24,6 +19,7 @@
 #include "OutputWarehouse.h"
 #include "RestartableData.h"
 #include "ConsoleStreamInterface.h"
+#include "PerfGraph.h"
 
 #include "libmesh/parallel_object.h"
 
@@ -41,6 +37,7 @@ class MeshModifier;
 class InputParameterWarehouse;
 class SystemInfo;
 class CommandLine;
+class RelationshipManager;
 
 template <>
 InputParameters validParams<MooseApp>();
@@ -69,6 +66,8 @@ public:
    */
   const std::string & name() const { return _name; }
 
+  virtual void checkRegistryLabels();
+
   /**
    * Get printable name of the application.
    */
@@ -86,6 +85,11 @@ public:
    * @return The the type of the object
    */
   const std::string & type() const { return _type; }
+
+  /**
+   * Get the PerfGraph for this app
+   */
+  PerfGraph & perfGraph() { return _perf_graph; }
 
   ///@{
   /**
@@ -141,7 +145,7 @@ public:
   /**
    * Returns the input file name that was set with setInputFileName
    */
-  std::string getInputFileName() { return _input_filename; }
+  std::string getInputFileName() const { return _input_filename; }
 
   /**
    * Override the selection of the output file base name.
@@ -151,7 +155,7 @@ public:
   /**
    * Override the selection of the output file base name.
    */
-  std::string getOutputFileBase();
+  std::string getOutputFileBase() const;
 
   /**
    * Tell the app to output in a specific position.
@@ -159,22 +163,28 @@ public:
   void setOutputPosition(Point p);
 
   /**
-   * Extract all possible checkpoint file names
-   * @param files A Set of checkpoint filenames to populate
+   * Get all checkpoint directories
+   * @return A Set of checkpoint directories
    */
-  std::list<std::string> getCheckpointFiles();
+  std::list<std::string> getCheckpointDirectories() const;
+
+  /**
+   * Extract all possible checkpoint file names
+   * @return A Set of checkpoint filenames
+   */
+  std::list<std::string> getCheckpointFiles() const;
 
   /**
    * Whether or not an output position has been set.
    * @return True if it has
    */
-  bool hasOutputPosition() { return _output_position_set; }
+  bool hasOutputPosition() const { return _output_position_set; }
 
   /**
    * Get the output position.
    * @return The position offset for the output.
    */
-  Point getOutputPosition() { return _output_position; }
+  Point getOutputPosition() const { return _output_position; }
 
   /**
    * Set the starting time for the simulation.  This will override any choice
@@ -187,12 +197,12 @@ public:
   /**
    * @return Whether or not a start time has been programmatically set using setStartTime()
    */
-  bool hasStartTime() { return _start_time_set; }
+  bool hasStartTime() const { return _start_time_set; }
 
   /**
    * @return The start time
    */
-  Real getStartTime() { return _start_time; }
+  Real getStartTime() const { return _start_time; }
 
   /**
    * Each App has it's own local time.  The "global" time of the whole problem might be
@@ -204,7 +214,7 @@ public:
    * Each App has it's own local time.  The "global" time of the whole problem might be
    * different.  This offset is how far off the local App time is from the global time.
    */
-  Real getGlobalTimeOffset() { return _global_time_offset; }
+  Real getGlobalTimeOffset() const { return _global_time_offset; }
 
   /**
    * Return the filename that was parsed
@@ -230,12 +240,23 @@ public:
   /**
    * Retrieve the Executioner for this App
    */
-  Executioner * getExecutioner() { return _executioner.get(); }
+  Executioner * getExecutioner() const { return _executioner.get(); }
 
   /**
-   * Retrieve the Executioner shared pointer for this App
+   * Retrieve the Executioner for this App
    */
-  std::shared_ptr<Executioner> & executioner() { return _executioner; }
+  std::shared_ptr<Executioner> & executioner()
+  {
+    mooseDeprecated("executioner() is deprecated. Use getExecutioner(), this interface will be "
+                    "removed after 10/01/2018");
+
+    return _executioner;
+  }
+
+  /**
+   * Set the Executioner for this App
+   */
+  void setExecutioner(std::shared_ptr<Executioner> && executioner) { _executioner = executioner; }
 
   /**
    * Set a Boolean indicating whether this app will use a Nonlinear or Eigen System.
@@ -252,6 +273,8 @@ public:
    */
   Factory & getFactory() { return _factory; }
 
+  processor_id_type processor_id() { return cast_int<processor_id_type>(_comm->rank()); }
+
   /**
    * Retrieve the ActionFactory associated with this App.
    */
@@ -262,7 +285,7 @@ public:
    * @return The reference to the command line object
    * Setup options based on InputParameters.
    */
-  std::shared_ptr<CommandLine> commandLine() { return _command_line; }
+  std::shared_ptr<CommandLine> commandLine() const { return _command_line; }
 
   /**
    * This method is here so we can determine whether or not we need to
@@ -306,6 +329,16 @@ public:
    * Whether or not this is a "restart" calculation.
    */
   bool isRestarting() const;
+
+  /**
+   * Whether or not this is a split mesh operation.
+   */
+  bool isSplitMesh() const;
+
+  /**
+   * Whether or not we are running with pre-split (distributed mesh)
+   */
+  bool isUseSplit() const;
 
   /**
    * Return true if the recovery file base is set
@@ -382,14 +415,15 @@ public:
    * attempts to load a dynamic library and register it when it is needed. Throws an error if
    * no suitable library is found that contains the app_name in question.
    */
-  void dynamicObjectRegistration(const std::string & app_name,
-                                 Factory * factory,
-                                 std::string library_path);
-  void dynamicAppRegistration(const std::string & app_name, std::string library_path);
-  void dynamicSyntaxAssociation(const std::string & app_name,
-                                Syntax * syntax,
-                                ActionFactory * action_factory,
-                                std::string library_path);
+  void dynamicAllRegistration(const std::string & app_name,
+                              Factory * factory,
+                              ActionFactory * action_factory,
+                              Syntax * syntax,
+                              std::string library_path,
+                              const std::string & library_name);
+  void dynamicAppRegistration(const std::string & app_name,
+                              std::string library_path,
+                              const std::string & library_name);
   ///@}
 
   /**
@@ -423,8 +457,9 @@ public:
    * @param data The actual data object.
    * @param tid The thread id of the object.  Use 0 if the object is not threaded.
    */
-  virtual void
-  registerRestartableData(std::string name, RestartableDataValue * data, THREAD_ID tid);
+  void registerRestartableData(std::string name,
+                               std::unique_ptr<RestartableDataValue> data,
+                               THREAD_ID tid);
 
   /**
    * Return reference to the restatable data object
@@ -439,19 +474,23 @@ public:
   std::set<std::string> & getRecoverableData() { return _recoverable_data; }
 
   /**
-   * Create a Backup from the current App.  A Backup contains all the data necessary to be able
-   * to restore the state of an App.
+   * Create a Backup from the current App. A Backup contains all the data necessary to be able to
+   * restore the state of an App.
+   *
+   * This method should be overridden in external or MOOSE-wrapped applications.
    */
-  std::shared_ptr<Backup> backup();
+  virtual std::shared_ptr<Backup> backup();
 
   /**
-   * Restore a Backup.  This sets the App's state.
+   * Restore a Backup. This sets the App's state.
    *
    * @param backup The Backup holding the data for the app
    * @param for_restart Whether this restoration is explicitly for the first restoration of restart
-   * data
+   * data.
+   *
+   * This method should be overridden in external or MOOSE-wrapped applications.
    */
-  void restore(std::shared_ptr<Backup> backup, bool for_restart = false);
+  virtual void restore(std::shared_ptr<Backup> backup, bool for_restart = false);
 
   /**
    * Returns a string to be printed at the beginning of a simulation
@@ -518,6 +557,33 @@ public:
   /// Returns whether the Application is running in check input mode
   bool checkInput() const { return _check_input; }
 
+  /// Returns whether FPE trapping is turned on (either because of debug or user requested)
+  inline bool getFPTrapFlag() const { return _trap_fpe; }
+
+  /**
+   * WARNING: This is an internal method for MOOSE, if you need the add new ExecFlagTypes then
+   * use the registerExecFlag macro as done in Moose.C/h.
+   *
+   * @param flag The flag to add as available to the app level ExecFlagEnum.
+   */
+  void addExecFlag(const ExecFlagType & flag);
+
+  bool hasRelationshipManager(const std::string & name) const;
+
+  void addRelationshipManager(std::shared_ptr<RelationshipManager> relationship_manager);
+
+  void attachRelationshipManagers(Moose::RelationshipManagerType rm_type);
+
+  /**
+   * Returns the Relationship managers info suitable for printing.
+   */
+  std::vector<std::pair<std::string, std::string>> getRelationshipManagerInfo() const;
+
+  /**
+   * Return the app level ExecFlagEnum, this contains all the available flags for the app.
+   */
+  const ExecFlagEnum & getExecuteOnEnum() const { return _execute_flags; }
+
 protected:
   /**
    * Whether or not this MooseApp has cached a Backup to use for restart / recovery
@@ -543,9 +609,6 @@ protected:
   /// Constructor is protected so that this object is constructed through the AppFactory object
   MooseApp(InputParameters parameters);
 
-  /// Don't run the simulation, just complete all of the mesh preperation steps and exit
-  virtual void meshOnly(std::string mesh_file_name);
-
   /**
    * NOTE: This is an internal function meant for MOOSE use only!
    *
@@ -556,7 +619,7 @@ protected:
    *
    * @param name The full (unique) name.
    */
-  virtual void registerRecoverableData(std::string name);
+  void registerRecoverableData(std::string name);
 
   /**
    * Runs post-initialization error checking that cannot be run correctly unless the simulation
@@ -575,6 +638,9 @@ protected:
 
   /// The MPI communicator this App is going to use
   const std::shared_ptr<Parallel::Communicator> _comm;
+
+  /// The PerfGraph object for this applciation
+  PerfGraph _perf_graph;
 
   /// Input file name used
   std::string _input_filename;
@@ -656,6 +722,15 @@ protected:
   /// Whether or not this is a restart run
   bool _restart;
 
+  /// Whether or not we are performing a split mesh operation (--split-mesh)
+  bool _split_mesh;
+
+  /// Whether or not we are using a (pre-)split mesh (automatically DistributedMesh)
+  const bool _use_split;
+
+  /// Whether or not FPE trapping should be turned on.
+  bool _trap_fpe;
+
   /// The base name to recover from.  If blank then we will find the newest recovery file.
   std::string _recover_base;
 
@@ -670,6 +745,8 @@ protected:
 
   /// true if we want to just check the input file
   bool _check_input;
+
+  std::vector<std::shared_ptr<RelationshipManager>> _relationship_managers;
 
   /// The library, registration method and the handle to the method
   std::map<std::pair<std::string, std::string>, void *> _lib_handles;
@@ -711,8 +788,7 @@ private:
   enum RegistrationType
   {
     APPLICATION,
-    OBJECT,
-    SYNTAX
+    REGALL
   };
 
   /// Level of multiapp, the master is level 0. This used by the Console to indent output
@@ -726,6 +802,21 @@ private:
 
   /// Cache for a Backup to use for restart / recovery
   std::shared_ptr<Backup> _cached_backup;
+
+  /// Execution flags for this App
+  ExecFlagEnum _execute_flags;
+
+  /// Timers
+  PerfID _setup_timer;
+  PerfID _setup_options_timer;
+  PerfID _run_input_file_timer;
+  PerfID _execute_timer;
+  PerfID _execute_executioner_timer;
+  PerfID _restore_timer;
+  PerfID _run_timer;
+  PerfID _execute_mesh_modifiers_timer;
+  PerfID _restore_cached_backup_timer;
+  PerfID _create_minimal_app_timer;
 
   // Allow FEProblemBase to set the recover/restart state, so make it a friend
   friend class FEProblemBase;

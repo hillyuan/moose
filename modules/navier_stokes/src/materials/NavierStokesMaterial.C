@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // Navier-Stokes includes
 #include "NavierStokesMaterial.h"
@@ -280,7 +282,7 @@ NavierStokesMaterial::computeTau(unsigned int qp)
 
   // The speed of sound for an ideal gas, sqrt(gamma * R * T).  Not needed unless
   // we want to use a form of Tau that requires it.
-  // Real soundspeed = _fp.c(_specific_volume[_qp], _internal_energy[_qp]);
+  // Real soundspeed = _fp.c_from_v_e(_specific_volume[_qp], _internal_energy[_qp]);
 
   // If velmag == 0, then _hsupg should be zero as well.  Then tau
   // will have only the time-derivative contribution (or zero, if we

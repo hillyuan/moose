@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import os, sys
 import subprocess
 import json
@@ -99,11 +108,13 @@ class TestJSON(unittest.TestCase):
         self.assertIn("associated_types", f)
         self.assertEquals(["FunctionName"], f["associated_types"])
         self.assertEqual(f["subblock_types"]["ParsedFunction"]["class"], "MooseParsedFunction")
+        self.assertEqual(f["subblock_types"]["ParsedFunction"]["label"], "MooseApp")
 
         a = data["Adaptivity"]
         i = a["subblocks"]["Indicators"]["star"]["subblock_types"]["AnalyticalIndicator"]
         self.assertIn("all", i["parameters"]["outputs"]["reserved_values"])
         self.assertIn("none", i["parameters"]["outputs"]["reserved_values"])
+
 
     def testJson(self):
         """
@@ -116,6 +127,7 @@ class TestJSON(unittest.TestCase):
         self.check_basic_json(data)
         # Make sure the default dump has test objects
         self.assertIn("ApplyInputParametersTest", data)
+        self.assertEqual(data["Functions"]["star"]["subblock_types"]["PostprocessorFunction"]["label"], "MooseTestApp")
 
     def testNoTestObjects(self):
         # Make sure test objects are removed from the output
@@ -147,7 +159,7 @@ class TestJSON(unittest.TestCase):
         self.assertIn("BadKernels", data)
         self.assertIn("Kernels", data)
         diff = data["Kernels"]["star"]["subblock_types"]["Diffusion"]
-        self.assertIn("eigen_kernel", diff["parameters"])
+        self.assertIn("use_displaced_mesh", diff["parameters"])
 
     def getInputFileFormat(self, extra=[]):
         """
@@ -248,13 +260,13 @@ class TestJSON(unittest.TestCase):
         fname = fi.keys()[0]
         # Clang seems to have the full path name for __FILE__
         # gcc seems to just use the path that is given on the command line, which won't include "framework"
-        self.assertTrue(fname.endswith(os.path.join("src", "parser", "MooseSyntax.C")))
+        self.assertTrue(fname.endswith(os.path.join("src", "base", "Moose.C")), 'file "{}" found instead'.format(fname))
         self.assertGreater(fi[fname], 0)
 
         fi = adapt["tasks"]["set_adaptivity_options"]["file_info"]
         self.assertEqual(len(fi.keys()), 1)
         fname = fi.keys()[0]
-        self.assertTrue(fname.endswith(os.path.join("src", "base", "Moose.C")))
+        self.assertTrue(fname.endswith(os.path.join("src", "actions", "SetAdaptivityOptionsAction.C")))
         self.assertGreater(fi[fname], 0)
 
 if __name__ == '__main__':

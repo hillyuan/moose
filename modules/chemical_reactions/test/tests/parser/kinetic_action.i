@@ -21,7 +21,6 @@
 []
 
 [ReactionNetwork]
-  primary_species = 'a b c d'
   [./SolidKineticReactions]
     primary_species = 'a b c d'
     secondary_species = 'm1 m2 m3'
@@ -83,6 +82,6 @@
 [Outputs]
   file_base = kinetic_out
   exodus = true
-  print_perf_log = true
+  perf_graph = true
   print_linear_residuals = true
 []

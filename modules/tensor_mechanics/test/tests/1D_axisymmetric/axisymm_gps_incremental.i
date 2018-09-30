@@ -158,13 +158,13 @@
   [./strain]
     type = ComputeAxisymmetric1DIncrementalStrain
     eigenstrain_names = eigenstrain
+    scalar_out_of_plane_strain = scalar_strain_yy
   [../]
 
   [./thermal_strain]
     type = ComputeThermalExpansionEigenstrain
     thermal_expansion_coeff = 1e-8
     temperature = temp
-    incremental_form = true
     stress_free_temperature = 580
     eigenstrain_name = eigenstrain
   [../]

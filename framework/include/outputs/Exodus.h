@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef EXODUS_H
 #define EXODUS_H
@@ -76,6 +71,13 @@ public:
    * is set to false initially
    */
   virtual void sequence(bool state);
+
+  /**
+   * Force the output dimension programatically
+   *
+   * @param dim The dimension written in the output file
+   */
+  void setOutputDimension(unsigned int dim);
 
 protected:
   /**
@@ -159,6 +161,12 @@ private:
 
   /// Flag for overwriting timesteps
   bool _overwrite;
+
+  /// Enum for the output dimension
+  MooseEnum _output_dimension;
+
+  /// Flag to output discontinuous format in Exodus
+  bool _discontinuous;
 };
 
 #endif /* EXODUS_H */

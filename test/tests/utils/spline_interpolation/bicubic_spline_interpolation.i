@@ -1,6 +1,7 @@
 [Mesh]
   type = GeneratedMesh
-  dim = 2
+  dim = 3
+  nz = 1
   nx = 4
   ny = 4
   xmax = 4

@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "GeometricSearchData.h"
 // Moose includes
@@ -224,7 +219,8 @@ GeometricSearchData::getMortarPenetrationLocator(const BoundaryName & master,
 
   // Generate a new boundary id
   // TODO: Make this better!
-  unsigned int mortar_boundary_id, boundary_id;
+  unsigned int mortar_boundary_id = 0;
+  unsigned int boundary_id = 0;
   switch (side_type)
   {
     case Moose::Master:
@@ -379,6 +375,9 @@ GeometricSearchData::getMortarNearestNodeLocator(const unsigned int master_id,
       mortarboundary_id = MORTAR_BASE_ID + master_id;
       _boundary_to_mortarboundary[master_id] = mortarboundary_id;
       break;
+
+    default:
+      mooseError("Unknown side type");
   }
 
   generateMortarNodes(master_id, slave_id, 1001);
@@ -481,5 +480,15 @@ GeometricSearchData::reinitMortarNodes()
     unsigned int master_id = _mesh.getBoundaryID(iface->_master);
     unsigned int slave_id = _mesh.getBoundaryID(iface->_slave);
     generateMortarNodes(master_id, slave_id, 0);
+  }
+}
+
+void
+GeometricSearchData::updateGhostedElems()
+{
+  for (const auto & nnl_it : _nearest_node_locators)
+  {
+    NearestNodeLocator * nnl = nnl_it.second;
+    nnl->updateGhostedElems();
   }
 }

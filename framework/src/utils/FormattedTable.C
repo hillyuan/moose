@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "FormattedTable.h"
 #include "MooseError.h"
@@ -40,6 +35,7 @@ dataStore(std::ostream & stream, FormattedTable & table, void * context)
   storeHelper(stream, table._align_widths, context);
   storeHelper(stream, table._column_names, context);
   storeHelper(stream, table._output_row_index, context);
+  storeHelper(stream, table._headers_output, context);
 }
 
 template <>
@@ -50,26 +46,23 @@ dataLoad(std::istream & stream, FormattedTable & table, void * context)
   loadHelper(stream, table._align_widths, context);
   loadHelper(stream, table._column_names, context);
   loadHelper(stream, table._output_row_index, context);
-
-  // Don't assume that the stream is open if we've restored.
-  table._stream_open = false;
+  loadHelper(stream, table._headers_output, context);
 }
 
 void
 FormattedTable::close()
 {
-  if (!_stream_open)
+  if (!_output_file.is_open())
     return;
   _output_file.flush();
   _output_file.close();
-  _stream_open = false;
   _output_file_name = "";
 }
 
 void
 FormattedTable::open(const std::string & file_name)
 {
-  if (_stream_open && _output_file_name == file_name)
+  if (_output_file.is_open() && _output_file_name == file_name)
     return;
   close();
   _output_file_name = file_name;
@@ -81,15 +74,17 @@ FormattedTable::open(const std::string & file_name)
   {
     open_flags |= std::ios::trunc;
     _output_row_index = 0;
+    _headers_output = false;
   }
 
   _output_file.open(file_name.c_str(), open_flags);
-  _stream_open = true;
+  if (_output_file.fail())
+    mooseError("Unable to open file ", file_name);
 }
 
 FormattedTable::FormattedTable()
   : _output_row_index(0),
-    _stream_open(false),
+    _headers_output(false),
     _append(false),
     _output_time(true),
     _csv_delimiter(DEFAULT_CSV_DELIMITER),
@@ -101,14 +96,14 @@ FormattedTable::FormattedTable(const FormattedTable & o)
   : _column_names(o._column_names),
     _output_file_name(""),
     _output_row_index(o._output_row_index),
-    _stream_open(o._stream_open),
+    _headers_output(o._headers_output),
     _append(o._append),
     _output_time(o._output_time),
     _csv_delimiter(o._csv_delimiter),
     _csv_precision(o._csv_precision),
     _column_names_unsorted(o._column_names_unsorted)
 {
-  if (_stream_open)
+  if (_output_file.is_open())
     mooseError("Copying a FormattedTable with an open stream is not supported");
 
   for (const auto & it : o._data)
@@ -127,6 +122,28 @@ void
 FormattedTable::append(bool append_existing_file)
 {
   _append = append_existing_file;
+}
+
+void
+FormattedTable::addRow(Real time)
+{
+  _data.emplace_back(time, std::map<std::string, Real>());
+}
+
+void
+FormattedTable::addData(const std::string & name, Real value)
+{
+  if (empty())
+    mooseError("No Data stored in the the FormattedTable");
+
+  auto back_it = _data.rbegin();
+  back_it->second[name] = value;
+
+  if (std::find(_column_names.begin(), _column_names.end(), name) == _column_names.end())
+  {
+    _column_names.push_back(name);
+    _column_names_unsorted = true;
+  }
 }
 
 void
@@ -149,8 +166,10 @@ FormattedTable::addData(const std::string & name, Real value, Real time)
   back_it->second[name] = value;
 
   if (std::find(_column_names.begin(), _column_names.end(), name) == _column_names.end())
+  {
     _column_names.push_back(name);
-  _column_names_unsorted = true;
+    _column_names_unsorted = true;
+  }
 }
 
 void
@@ -169,8 +188,17 @@ FormattedTable::addData(const std::string & name, const std::vector<Real> & vect
   }
 
   if (std::find(_column_names.begin(), _column_names.end(), name) == _column_names.end())
+  {
     _column_names.push_back(name);
-  _column_names_unsorted = true;
+    _column_names_unsorted = true;
+  }
+}
+
+Real
+FormattedTable::getLastTime()
+{
+  mooseAssert(!empty(), "No Data stored in the FormattedTable");
+  return _data.rbegin()->first;
 }
 
 Real &
@@ -247,7 +275,7 @@ FormattedTable::printTable(std::ostream & out,
   else if (suggested_term_width == "AUTO")
     term_width = getTermWidth(false);
   else
-    term_width = suggested_term_width;
+    term_width = MooseUtils::stringToInteger(suggested_term_width);
 
   if (term_width < _min_pps_width)
     term_width = _min_pps_width;
@@ -375,28 +403,27 @@ FormattedTable::printCSV(const std::string & file_name, int interval, bool align
     }
 
     // Output Header
+    if (!_headers_output)
     {
-      bool first = true;
-
       if (_output_time)
       {
         if (align)
           _output_file << std::setw(_align_widths["time"]) << "time";
         else
           _output_file << "time";
-        first = false;
+        _headers_output = true;
       }
 
       for (const auto & col_name : _column_names)
       {
-        if (!first)
+        if (_headers_output)
           _output_file << _csv_delimiter;
 
         if (align)
           _output_file << std::right << std::setw(_align_widths[col_name]) << col_name;
         else
           _output_file << col_name;
-        first = false;
+        _headers_output = true;
       }
       _output_file << "\n";
     }
@@ -487,6 +514,8 @@ FormattedTable::makeGnuplot(const std::string & base_file, const std::string & f
   std::string dat_name = base_file + ".dat";
   std::ofstream datfile;
   datfile.open(dat_name.c_str(), std::ios::trunc | std::ios::out);
+  if (datfile.fail())
+    mooseError("Unable to open file ", dat_name);
 
   datfile << "# time";
   for (const auto & col_name : _column_names)
@@ -510,6 +539,8 @@ FormattedTable::makeGnuplot(const std::string & base_file, const std::string & f
   std::string gp_name = base_file + ".gp";
   std::ofstream gpfile;
   gpfile.open(gp_name.c_str(), std::ios::trunc | std::ios::out);
+  if (gpfile.fail())
+    mooseError("Unable to open file ", gp_name);
 
   gpfile << gnuplot::before_terminal << terminal << gnuplot::before_ext << extension
          << gnuplot::after_ext;
@@ -539,17 +570,6 @@ FormattedTable::makeGnuplot(const std::string & base_file, const std::string & f
 
   gpfile.flush();
   gpfile.close();
-
-  // Run the gnuplot script
-  /* We aren't going to run gnuplot automatically
-
-    if (!system(NULL))
-      mooseError("No way to run gnuplot on this computer");
-
-    std::string command = "gnuplot " + gp_name;
-    if (system(command.c_str()))
-      mooseError("gnuplot command failed");
-  */
 }
 
 void

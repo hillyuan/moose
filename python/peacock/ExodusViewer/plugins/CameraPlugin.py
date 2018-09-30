@@ -1,20 +1,28 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import sys
 import math
 from PyQt5 import QtCore, QtWidgets
-import peacock
 from ExodusPlugin import ExodusPlugin
 
-class CameraPlugin(peacock.base.PeacockCollapsibleWidget, ExodusPlugin):
+class CameraPlugin(QtWidgets.QGroupBox, ExodusPlugin):
     """
     Widget for adjusting the camera.
     """
     windowRequiresUpdate = QtCore.pyqtSignal()
 
-    def __init__(self):
-        super(CameraPlugin, self).__init__()
+    def __init__(self, **kwargs):
+        super(CameraPlugin, self).__init__(**kwargs)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
 
-        self.setTitle('Camera')
-        self.MainLayout = self.collapsibleLayout()
+        self.MainLayout = QtWidgets.QHBoxLayout(self)
 
         self.FillScreenButton = QtWidgets.QPushButton('Fill Screen')
         self.ResetButton = QtWidgets.QPushButton('Reset')
@@ -23,6 +31,20 @@ class CameraPlugin(peacock.base.PeacockCollapsibleWidget, ExodusPlugin):
         self.MainLayout.addWidget(self.FillScreenButton)
         self.MainLayout.addWidget(self.ResetButton)
         self.setup()
+
+        self._result = None
+
+    def onSetupResult(self, result):
+        """
+        Store the current camera.
+        """
+        self._result = result
+
+    def onWindowReset(self):
+        """
+        Remove the stored ExodusResult object.
+        """
+        self._result = None
 
     def _setupFillScreenButton(self, qobject):
         """
@@ -62,7 +84,6 @@ class CameraPlugin(peacock.base.PeacockCollapsibleWidget, ExodusPlugin):
             self._result.setNeedsUpdate(True)
             self.windowRequiresUpdate.emit()
 
-
 def main(size=None):
     """
     Run the CameraPlugin all by its lonesome.
@@ -79,5 +100,7 @@ if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     filename = Testing.get_chigger_input('mug_blocks_out.e')
     widget, window = main()
-    window.onFileChanged(filename)
+    window.onSetFilename(filename)
+    window.onSetVariable("diffused")
+    window.onWindowRequiresUpdate()
     sys.exit(app.exec_())

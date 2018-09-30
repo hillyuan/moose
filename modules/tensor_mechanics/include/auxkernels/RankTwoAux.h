@@ -1,13 +1,16 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef RANKTWOAUX_H
 #define RANKTWOAUX_H
 
-#include "AuxKernel.h"
+#include "NodalPatchRecovery.h"
 #include "RankTwoTensor.h"
 
 class RankTwoAux;
@@ -21,7 +24,7 @@ class RankTwoAux;
 template <>
 InputParameters validParams<RankTwoAux>();
 
-class RankTwoAux : public AuxKernel
+class RankTwoAux : public NodalPatchRecovery
 {
 public:
   RankTwoAux(const InputParameters & parameters);

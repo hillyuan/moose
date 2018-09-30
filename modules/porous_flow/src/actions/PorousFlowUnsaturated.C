@@ -1,14 +1,27 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "PorousFlowUnsaturated.h"
 
 #include "FEProblem.h"
 #include "Conversion.h"
 #include "libmesh/string_to_enum.h"
+
+registerMooseAction("PorousFlowApp", PorousFlowUnsaturated, "add_user_object");
+
+registerMooseAction("PorousFlowApp", PorousFlowUnsaturated, "add_kernel");
+
+registerMooseAction("PorousFlowApp", PorousFlowUnsaturated, "add_material");
+
+registerMooseAction("PorousFlowApp", PorousFlowUnsaturated, "add_aux_variable");
+
+registerMooseAction("PorousFlowApp", PorousFlowUnsaturated, "add_aux_kernel");
 
 template <>
 InputParameters
@@ -162,7 +175,7 @@ PorousFlowUnsaturated::act()
   std::string capillary_pressure_name = "PorousFlowUnsaturated_CapillaryPressureVG";
   addCapillaryPressureVG(_van_genuchten_m, _van_genuchten_alpha, capillary_pressure_name);
 
-  if (_deps.dependsOn(_objects_to_add, "PorousFlowPS_qp") && _current_task == "add_material")
+  if (_deps.dependsOn(_objects_to_add, "pressure_saturation_qp") && _current_task == "add_material")
   {
     std::string material_type = "PorousFlow1PhaseP";
     InputParameters params = _factory.getValidParams(material_type);
@@ -171,9 +184,11 @@ PorousFlowUnsaturated::act()
     params.set<UserObjectName>("PorousFlowDictator") = _dictator_name;
     params.set<std::vector<VariableName>>("porepressure") = {_pp_var};
     params.set<UserObjectName>("capillary_pressure") = capillary_pressure_name;
+    params.set<bool>("at_nodes") = false;
     _problem->addMaterial(material_type, material_name, params);
   }
-  if (_deps.dependsOn(_objects_to_add, "PorousFlowPS_nodal") && _current_task == "add_material")
+  if (_deps.dependsOn(_objects_to_add, "pressure_saturation_nodal") &&
+      _current_task == "add_material")
   {
     std::string material_type = "PorousFlow1PhaseP";
     InputParameters params = _factory.getValidParams(material_type);
@@ -186,14 +201,14 @@ PorousFlowUnsaturated::act()
     _problem->addMaterial(material_type, material_name, params);
   }
 
-  if (_deps.dependsOn(_objects_to_add, "PorousFlowRelativePermeability_qp"))
+  if (_deps.dependsOn(_objects_to_add, "relative_permeability_qp"))
   {
     if (_relperm_type == RelpermTypeChoiceEnum::FLAC)
       addRelativePermeabilityFLAC(false, 0, _relative_permeability_exponent, _s_res, _s_res);
     else
       addRelativePermeabilityCorey(false, 0, _relative_permeability_exponent, _s_res, _s_res);
   }
-  if (_deps.dependsOn(_objects_to_add, "PorousFlowRelativePermeability_nodal"))
+  if (_deps.dependsOn(_objects_to_add, "relative_permeability_nodal"))
   {
     if (_relperm_type == RelpermTypeChoiceEnum::FLAC)
       addRelativePermeabilityFLAC(true, 0, _relative_permeability_exponent, _s_res, _s_res);
@@ -201,8 +216,8 @@ PorousFlowUnsaturated::act()
       addRelativePermeabilityCorey(true, 0, _relative_permeability_exponent, _s_res, _s_res);
   }
 
-  if (_deps.dependsOn(_objects_to_add, "PorousFlowVolumetricStrain_qp") ||
-      _deps.dependsOn(_objects_to_add, "PorousFlowVolumetricStrain_nodal"))
+  if (_deps.dependsOn(_objects_to_add, "volumetric_strain_qp") ||
+      _deps.dependsOn(_objects_to_add, "volumetric_strain_nodal"))
     addVolumetricStrainMaterial(_coupled_displacements, true);
 
   // add relevant AuxVariables and AuxKernels

@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PenetrationLocator.h"
 
@@ -22,6 +17,7 @@
 #include "NearestNodeLocator.h"
 #include "PenetrationThread.h"
 #include "SubProblem.h"
+#include "MooseApp.h"
 
 PenetrationLocator::PenetrationLocator(SubProblem & subproblem,
                                        GeometricSearchData & /*geom_search_data*/,
@@ -30,10 +26,13 @@ PenetrationLocator::PenetrationLocator(SubProblem & subproblem,
                                        const unsigned int slave_id,
                                        Order order,
                                        NearestNodeLocator & nearest_node)
-  : Restartable(Moose::stringify(master_id) + "to" + Moose::stringify(slave_id),
+  : Restartable(subproblem.getMooseApp(),
+                Moose::stringify(master_id) + "to" + Moose::stringify(slave_id),
                 "PenetrationLocator",
-                subproblem,
                 0),
+    PerfGraphInterface(subproblem.getMooseApp().perfGraph(),
+                       "PenetrationLocator_" + Moose::stringify(master_id) + "_" +
+                           Moose::stringify(slave_id)),
     _subproblem(subproblem),
     _mesh(mesh),
     _master_boundary(master_id),
@@ -48,7 +47,11 @@ PenetrationLocator::PenetrationLocator(SubProblem & subproblem,
     _tangential_tolerance(0.0),
     _do_normal_smoothing(false),
     _normal_smoothing_distance(0.0),
-    _normal_smoothing_method(NSM_EDGE_BASED)
+    _normal_smoothing_method(NSM_EDGE_BASED),
+    _patch_update_strategy(_mesh.getPatchUpdateStrategy()),
+    _detect_penetration_timer(registerTimedSection("detectPenetration", 3)),
+    _reinit_timer(registerTimedSection("reinit", 3))
+
 {
   // Preconstruct an FE object for each thread we're going to use and for each lower-dimensional
   // element
@@ -87,15 +90,11 @@ PenetrationLocator::~PenetrationLocator()
 void
 PenetrationLocator::detectPenetration()
 {
-  Moose::perf_log.push("detectPenetration()", "Execution");
+  TIME_SECTION(_detect_penetration_timer);
 
-  // Data structures to hold the element boundary information
-  std::vector<dof_id_type> elem_list;
-  std::vector<unsigned short int> side_list;
-  std::vector<boundary_id_type> id_list;
-
-  // Retrieve the Element Boundary data structures from the mesh
-  _mesh.buildSideList(elem_list, side_list, id_list);
+  // Get list of boundary (elem, side, id) tuples.
+  std::vector<std::tuple<dof_id_type, unsigned short int, boundary_id_type>> bc_tuples =
+      _mesh.buildSideList();
 
   // Grab the slave nodes we need to worry about from the NearestNodeLocator
   NodeIdRange & slave_node_range = _nearest_node.slaveNodeRange();
@@ -115,18 +114,48 @@ PenetrationLocator::detectPenetration()
                        _fe_type,
                        _nearest_node,
                        _mesh.nodeToElemMap(),
-                       elem_list,
-                       side_list,
-                       id_list);
+                       bc_tuples);
 
   Threads::parallel_reduce(slave_node_range, pt);
 
-  Moose::perf_log.pop("detectPenetration()", "Execution");
+  std::vector<dof_id_type> recheck_slave_nodes = pt._recheck_slave_nodes;
+
+  // Update the patch for the slave nodes in recheck_slave_nodes and re-run penetration thread on
+  // these nodes at every nonlinear iteration if patch update strategy is set to "iteration".
+  if (recheck_slave_nodes.size() > 0 && _patch_update_strategy == Moose::Iteration &&
+      _subproblem.currentlyComputingJacobian())
+  {
+    // Update the patch for this subset of slave nodes and calculate the nearest neighbor_nodes
+    _nearest_node.updatePatch(recheck_slave_nodes);
+
+    // Re-run the penetration thread to see if these nodes are in contact with the updated patch
+    NodeIdRange recheck_slave_node_range(recheck_slave_nodes.begin(), recheck_slave_nodes.end(), 1);
+
+    Threads::parallel_reduce(recheck_slave_node_range, pt);
+  }
+
+  if (recheck_slave_nodes.size() > 0 && _patch_update_strategy != Moose::Iteration &&
+      _subproblem.currentlyComputingJacobian())
+    mooseDoOnce(mooseWarning("Warning in PenetrationLocator. Penetration is not "
+                             "detected for one or more slave nodes. This could be because "
+                             "those slave nodes simply do not project to faces on the master "
+                             "surface. However, this could also be because contact should be "
+                             "enforced on those nodes, but the faces that they project to "
+                             "are outside the contact patch, which will give an erroneous "
+                             "result. Use appropriate options for 'patch_size' and "
+                             "'patch_update_strategy' in the Mesh block to avoid this issue. "
+                             "Setting 'patch_update_strategy=iteration' is recommended because "
+                             "it completely avoids this potential issue. Also note that this "
+                             "warning is printed only once, so a similar situation could occur "
+                             "multiple times during the simulation but this warning is printed "
+                             "only at the first occurrence."));
 }
 
 void
 PenetrationLocator::reinit()
 {
+  TIME_SECTION(_reinit_timer);
+
   // Delete the PenetrationInfo objects we own before clearing the
   // map, or we have a memory leak.
   for (auto & it : _penetration_info)

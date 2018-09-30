@@ -1,13 +1,20 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import sys
 import unittest
-import vtk
 from PyQt5 import QtWidgets, QtCore
 
 from peacock.ExodusViewer.ExodusViewer import main
 from peacock.utils import Testing, qtutils
 from mooseutils import message
-
 
 class TestExodusViewer(Testing.PeacockImageTestCase):
     """
@@ -34,12 +41,12 @@ class TestExodusViewer(Testing.PeacockImageTestCase):
         settings.clear()
         settings.sync()
 
-        self._widget = main(size=[400,400])
+        self._widget, self._main_window = main(size=[400,400])
         self._widget.onSetFilenames([self._filename])
 
         # Start with 'diffused' variable
-        self._widget.currentWidget().VariablePlugin.VariableList.setCurrentIndex(2)
-        self._widget.currentWidget().VariablePlugin.VariableList.currentIndexChanged.emit(2)
+        self._widget.currentWidget().FilePlugin.VariableList.setCurrentIndex(2)
+        self._widget.currentWidget().FilePlugin.VariableList.currentIndexChanged.emit(2)
 
 
     def write(self, filename):
@@ -62,8 +69,8 @@ class TestExodusViewer(Testing.PeacockImageTestCase):
         Test clone button works.
         """
         self._widget.cornerWidget().clone.emit()
-        self._widget.currentWidget().VariablePlugin.VariableList.setCurrentIndex(2)
-        self._widget.currentWidget().VariablePlugin.VariableList.currentIndexChanged.emit(2)
+        self._widget.currentWidget().FilePlugin.VariableList.setCurrentIndex(2)
+        self._widget.currentWidget().FilePlugin.VariableList.currentIndexChanged.emit(2)
         self.assertEqual(self._widget.count(), 2)
         self.assertEqual(self._widget.tabText(self._widget.currentIndex()), 'Results (2)')
         self.assertTrue(self._widget.cornerWidget().CloseButton.isEnabled())
@@ -72,11 +79,9 @@ class TestExodusViewer(Testing.PeacockImageTestCase):
             self.assertImage('testInitial.png')
 
         # Change camera on cloned tab
-        camera = vtk.vtkCamera()
-        camera.SetViewUp(-0.7786, 0.2277, 0.5847)
-        camera.SetPosition(9.2960, -0.4218, 12.6685)
-        camera.SetFocalPoint(0.0000, 0.0000, 0.1250)
-        self._widget.currentWidget().VTKWindowPlugin.onCameraChanged(camera)
+        self._widget.currentWidget().VTKWindowPlugin.onCameraChanged((-0.7786, 0.2277, 0.5847),
+                                                                     (9.2960, -0.4218, 12.6685),
+                                                                     (0.0000, 0.0000, 0.1250))
         if sys.platform == 'darwin':
             self.assertImage('testClone.png')
 
@@ -101,7 +106,7 @@ class TestExodusViewer(Testing.PeacockImageTestCase):
         self._widget.onSetFilenames([f0, f1])
         mesh = self._widget.currentWidget().MeshPlugin
         fp = self._widget.currentWidget().FilePlugin
-        fp._callbackAvailableFiles(0)
+        #fp._callbackFileList(0)
         mesh.ViewMeshToggle.setChecked(False)
         mesh.ScaleX.setValue(.9)
         mesh.ScaleY.setValue(.8)
@@ -111,7 +116,7 @@ class TestExodusViewer(Testing.PeacockImageTestCase):
         mesh.DisplacementMagnitude.setValue(2.0)
         self.assertImage('testDiffusion1.png')
 
-        fp._callbackAvailableFiles(1)
+        fp._callbackFileList(1)
         # had a case where switching files that had the same variable name
         # disabled the entire widget. Couldn't reproduce it with just the MeshPlugin
         # unit tests.
@@ -126,10 +131,8 @@ class TestExodusViewer(Testing.PeacockImageTestCase):
         mesh.DisplacementMagnitude.setValue(1.5)
         self.assertImage('testDiffusion2.png')
 
-        fp._callbackAvailableFiles(0)
+        fp._callbackFileList(0)
         self.assertEqual(mesh.isEnabled(), True)
-        self.assertEqual(mesh.ViewMeshToggle.isEnabled(), False) # not enabled for wireframe
-        self.assertEqual(mesh.ViewMeshToggle.isChecked(), False)
         self.assertEqual(mesh.ScaleX.value(), .9)
         self.assertEqual(mesh.ScaleY.value(), .8)
         self.assertEqual(mesh.ScaleZ.value(), .7)
@@ -137,10 +140,8 @@ class TestExodusViewer(Testing.PeacockImageTestCase):
         self.assertEqual(mesh.DisplacementMagnitude.value(), 2.0)
         self.assertImage('testDiffusion1.png')
 
-        fp._callbackAvailableFiles(1)
+        fp._callbackFileList(1)
         self.assertEqual(mesh.isEnabled(), True)
-        self.assertEqual(mesh.ViewMeshToggle.isEnabled(), True)
-        self.assertEqual(mesh.ViewMeshToggle.isChecked(), True)
         self.assertEqual(mesh.ScaleX.value(), .7)
         self.assertEqual(mesh.ScaleY.value(), .9)
         self.assertEqual(mesh.ScaleZ.value(), .8)
@@ -155,14 +156,13 @@ class TestExodusViewer(Testing.PeacockImageTestCase):
         settings.sync()
         self._widget.cornerWidget().clone.emit()
         self.assertEqual(self._widget.preferencesWidget().count(), 6)
-        self.assertEqual(self._widget.currentWidget().VariablePlugin.ColorMapList.currentText(), "magma")
+        self.assertEqual(self._widget.currentWidget().ColorbarPlugin.ColorMapList.currentText(), "magma")
 
         settings.setValue("exodus/defaultColorMap", "default")
         settings.sync()
 
         self._widget.cornerWidget().clone.emit()
-        self.assertEqual(self._widget.currentWidget().VariablePlugin.ColorMapList.currentText(), "default")
-
+        self.assertEqual(self._widget.currentWidget().ColorbarPlugin.ColorMapList.currentText(), "default")
 
 if __name__ == '__main__':
     unittest.main(module=__name__, verbosity=2)

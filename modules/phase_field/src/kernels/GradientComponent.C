@@ -1,10 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "GradientComponent.h"
+
+registerMooseObject("PhaseFieldApp", GradientComponent);
 
 template <>
 InputParameters
@@ -26,7 +31,7 @@ GradientComponent::GradientComponent(const InputParameters & parameters)
     _component(getParam<unsigned int>("component"))
 {
   if (_component >= LIBMESH_DIM)
-    mooseError("Component too large for LIBMESH_DIM");
+    paramError("component", "Component too large for LIBMESH_DIM");
 }
 
 Real

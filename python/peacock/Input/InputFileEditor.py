@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from PyQt5.QtWidgets import QWidget, QSizePolicy
 from PyQt5.QtCore import Qt, pyqtSignal
 from BlockTree import BlockTree
@@ -59,12 +68,17 @@ class InputFileEditor(QWidget, MooseWidget):
         self.block_editor.cloneBlock.connect(self.block_tree.copyBlock)
         self.block_editor.removeBlock.connect(self.block_tree.removeBlock)
         self.block_editor.editingFinished.connect(self.onEditingFinished)
+        self.block_editor.appliedAndClosed.connect(self.onEditorAppliedAndClosed)
         self.block_editor.setWindowFlags(Qt.Window)
         self.block_editor.resize(640, 480)
         self.block_tree.blockSignals(False)
         self.block_editor.updateWatchers()
         self.block_editor.show()
         self.block_editor.raise_()
+
+    def onEditorAppliedAndClosed(self, block):
+        if block:
+            self.block_tree.includeBlock(block, True)
 
     def onEditingFinished(self):
         """

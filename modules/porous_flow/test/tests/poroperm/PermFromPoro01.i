@@ -156,7 +156,6 @@
 []
 
 [Materials]
-  # Permeability
   [./permeability]
     type = PorousFlowPermeabilityKozenyCarman
     k_anisotropy = '1 0 0  0 2 0  0 0 0.1'
@@ -169,16 +168,9 @@
   [./temperature]
     type = PorousFlowTemperature
   [../]
-  [./temperature_nodal]
-    type = PorousFlowTemperature
-    at_nodes = true
-  [../]
   [./massfrac]
     type = PorousFlowMassFraction
-    at_nodes = true
   [../]
-
-  # Fluid pressure
   [./eff_fluid_pressure]
     type = PorousFlowEffectiveFluidPressure
   [../]
@@ -187,57 +179,19 @@
     porepressure = pp
     capillary_pressure = pc
   [../]
-  [./ppss_nodal]
-    type = PorousFlow1PhaseP
-    at_nodes = true
-    porepressure = pp
-    capillary_pressure = pc
-  [../]
-
-  # Fluid properties
   [./simple_fluid]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid
     phase = 0
-    at_nodes = true
   [../]
-  [./simple_fluid_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid
-    phase = 0
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
-  [./dens_all_at_quadpoints]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
-  [../]
-
-  # Porosity
   [./porosity]
-    type = PorousFlowPorosityConst
-    porosity = 0.1
+    type = PorousFlowPorosity
+    porosity_zero = 0.1
   [../]
-
-  # Permeability
   [./relperm]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 0 # unimportant in this fully-saturated situation
     phase = 0
-  [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
   [../]
 []
 
@@ -262,7 +216,6 @@
 []
 
 [Outputs]
-  file_base = PermFromPoro01
   csv = true
-  execute_on = 'initial timestep_end'
+  execute_on = 'timestep_end'
 []

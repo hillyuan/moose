@@ -59,7 +59,6 @@
 []
 
 [ReactionNetwork]
-  primary_species = a
   [./AqueousEquilibriumReactions]
     primary_species = a
     reactions = '2a = pa2 1'
@@ -114,7 +113,7 @@
 [Outputs]
   file_base = 1species_out
   exodus = true
-  print_perf_log = true
+  perf_graph = true
   print_linear_residuals = true
 []
 

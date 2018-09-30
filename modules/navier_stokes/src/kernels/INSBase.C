@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "INSBase.h"
 #include "Assembly.h"
@@ -62,14 +64,14 @@ INSBase::INSBase(const InputParameters & parameters)
     _second_w_vel(coupledSecond("w")),
 
     // time derivatives
-    _u_vel_dot(coupledDot("u")),
-    _v_vel_dot(coupledDot("v")),
-    _w_vel_dot(coupledDot("w")),
+    _u_vel_dot(_is_transient ? coupledDot("u") : _zero),
+    _v_vel_dot(_is_transient ? coupledDot("v") : _zero),
+    _w_vel_dot(_is_transient ? coupledDot("w") : _zero),
 
     // derivatives of time derivatives
-    _d_u_vel_dot_du(coupledDotDu("u")),
-    _d_v_vel_dot_dv(coupledDotDu("v")),
-    _d_w_vel_dot_dw(coupledDotDu("w")),
+    _d_u_vel_dot_du(_is_transient ? coupledDotDu("u") : _zero),
+    _d_v_vel_dot_dv(_is_transient ? coupledDotDu("v") : _zero),
+    _d_w_vel_dot_dw(_is_transient ? coupledDotDu("w") : _zero),
 
     // Variable numberings
     _u_vel_var_number(coupled("u")),

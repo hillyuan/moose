@@ -1,17 +1,13 @@
 #pylint: disable=missing-docstring
-#################################################################
-#                   DO NOT MODIFY THIS HEADER                   #
-#  MOOSE - Multiphysics Object Oriented Simulation Environment  #
-#                                                               #
-#            (c) 2010 Battelle Energy Alliance, LLC             #
-#                      ALL RIGHTS RESERVED                      #
-#                                                               #
-#           Prepared by Battelle Energy Alliance, LLC           #
-#             Under Contract No. DE-AC07-05ID14517              #
-#              With the U. S. Department of Energy              #
-#                                                               #
-#              See COPYRIGHT for full restrictions              #
-#################################################################
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import mooseutils
 from .. import misc
 
@@ -39,6 +35,14 @@ class ExodusColorBar(misc.ColorBar):
         if len(results) not in [1, 2]:
             raise mooseutils.MooseException('One or two ExodusResult objects must be supplied to '
                                             'the ExodusColorBar')
+
+    def getResult(self, index=0):
+        """
+        Return the associated ExodusResult object. The index must be 0 or 1.
+        """
+        if index not in [0, 1]:
+            raise mooseutils.MooseException("The supplied index must be 0 or 1.")
+        return self._results[index]
 
     def setOptions(self, *args, **kwargs):
         """

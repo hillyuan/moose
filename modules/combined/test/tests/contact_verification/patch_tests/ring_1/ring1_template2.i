@@ -280,7 +280,7 @@
   line_search = 'none'
 
   nl_abs_tol = 1e-10
-  nl_rel_tol = 1e-9
+  nl_rel_tol = 1e-8
   l_max_its = 100
   nl_max_its = 200
   dt = 1.0
@@ -307,7 +307,7 @@
 
 [Outputs]
   print_linear_residuals = true
-  print_perf_log = true
+  perf_graph = true
   [./exodus]
     type = Exodus
     elemental_as_nodal = true

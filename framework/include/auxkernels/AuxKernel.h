@@ -1,22 +1,17 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef AUXKERNEL_H
 #define AUXKERNEL_H
 
 #include "MooseObject.h"
-#include "MooseVariable.h" // for name() in mooseError calls
+#include "MooseVariableFE.h"
 #include "SetupInterface.h"
 #include "CoupleableMooseVariableDependencyIntermediateInterface.h"
 #include "MaterialPropertyInterface.h"
@@ -30,9 +25,9 @@
 #include "BlockRestrictable.h"
 #include "BoundaryRestrictable.h"
 #include "Restartable.h"
-#include "ZeroInterface.h"
 #include "MeshChangedInterface.h"
 #include "VectorPostprocessorInterface.h"
+#include "MooseVariableInterface.h"
 
 // forward declarations
 class SubProblem;
@@ -49,6 +44,7 @@ InputParameters validParams<AuxKernel>();
  *
  */
 class AuxKernel : public MooseObject,
+                  public MooseVariableInterface<Real>,
                   public BlockRestrictable,
                   public BoundaryRestrictable,
                   public SetupInterface,
@@ -62,7 +58,6 @@ class AuxKernel : public MooseObject,
                   public RandomInterface,
                   protected GeometricSearchInterface,
                   public Restartable,
-                  public ZeroInterface,
                   public MeshChangedInterface,
                   protected VectorPostprocessorInterface
 {
@@ -121,6 +116,21 @@ public:
   virtual const VectorPostprocessorValue &
   getVectorPostprocessorValueByName(const VectorPostprocessorName &,
                                     const std::string & vector_name) override;
+
+  virtual const VectorPostprocessorValue & getVectorPostprocessorValue(
+      const std::string & name, const std::string & vector_name, bool needs_broadcast) override;
+  virtual const VectorPostprocessorValue &
+  getVectorPostprocessorValueByName(const VectorPostprocessorName &,
+                                    const std::string & vector_name,
+                                    bool needs_broadcast) override;
+
+  virtual const ScatterVectorPostprocessorValue &
+  getScatterVectorPostprocessorValue(const std::string & name,
+                                     const std::string & vector_name) override;
+
+  virtual const ScatterVectorPostprocessorValue &
+  getScatterVectorPostprocessorValueByName(const std::string & name,
+                                           const std::string & vector_name) override;
 
 protected:
   virtual const VariableValue & coupledDot(const std::string & var_name,

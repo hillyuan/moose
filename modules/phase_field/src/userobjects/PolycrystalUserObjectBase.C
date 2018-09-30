@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PolycrystalUserObjectBase.h"
 #include "NonlinearSystemBase.h"
@@ -40,9 +42,9 @@ validParams<PolycrystalUserObjectBase>()
   params.set<bool>("allow_duplicate_execution_on_initial") = true;
 
   // This object should only be executed _before_ the initial condition
-  MultiMooseEnum execute_options(SetupInterface::getExecuteOptions());
-  execute_options = "initial";
-  params.set<MultiMooseEnum>("execute_on") = execute_options;
+  ExecFlagEnum execute_options = MooseUtils::getDefaultExecFlagEnum();
+  execute_options = EXEC_INITIAL;
+  params.set<ExecFlagEnum>("execute_on") = execute_options;
 
   return params;
 }
@@ -116,11 +118,8 @@ PolycrystalUserObjectBase::execute()
    *    the flood routine on the same entity as long as new discoveries are being made. We know
    *    this information from the return value of flood.
    */
-  const auto end = _mesh.getMesh().active_local_elements_end();
-  for (auto el = _mesh.getMesh().active_local_elements_begin(); el != end; ++el)
+  for (const auto & current_elem : _mesh.getMesh().active_local_element_ptr_range())
   {
-    const Elem * current_elem = *el;
-
     // Loop over elements or nodes
     if (_is_elemental)
       while (flood(current_elem, invalid_size_t, nullptr))
@@ -178,6 +177,34 @@ PolycrystalUserObjectBase::finalize()
   }
 
   _colors_assigned = true;
+}
+
+void
+PolycrystalUserObjectBase::mergeSets()
+{
+  /**
+   * With initial conditions we know the grain IDs of every grain (even partial grains). We can use
+   * this information to put all mergeable features adjacent to one and other in the list so that
+   * merging is simply O(n).
+   */
+  _partial_feature_sets[0].sort();
+
+  auto it1 = _partial_feature_sets[0].begin();
+  auto it_end = _partial_feature_sets[0].end();
+  while (it1 != it_end)
+  {
+    auto it2 = it1;
+    if (++it2 == it_end)
+      break;
+
+    if (areFeaturesMergeable(*it1, *it2))
+    {
+      it1->merge(std::move(*it2));
+      _partial_feature_sets[0].erase(it2);
+    }
+    else
+      ++it1; // Only increment if we have a mismatch
+  }
 }
 
 bool
@@ -279,27 +306,46 @@ PolycrystalUserObjectBase::assignOpsToGrains()
 {
   mooseAssert(_is_master, "This routine should only be called on the master rank");
 
-  // Moose::perf_log.push("assignOpsToGrains()", "PolycrystalICTools");
-  //
+  Moose::perf_log.push("assignOpsToGrains()", "PolycrystalICTools");
+
   // Use a simple backtracking coloring algorithm
   if (_coloring_algorithm == "bt")
   {
+    paramInfo("coloring_algorithm",
+              "The backtracking algorithm has exponential complexity. If you are using very few "
+              "order parameters,\nor you have several hundred grains or more, you should use one "
+              "of the PETSc coloring algorithms such as \"jp\".");
+
     if (!colorGraph(0))
-      mooseError("Unable to find a valid grain to op coloring, do you have enough op variables?");
+      paramError("op_num",
+                 "Unable to find a valid grain to op coloring, Make sure you have created enough "
+                 "variables to hold a\nvalid polycrystal initial condition (no grains represented "
+                 "by the same variable should be allowed to\ntouch, ~8 for 2D, ~25 for 3D)?");
   }
   else // PETSc Coloring algorithms
   {
 #ifdef LIBMESH_HAVE_PETSC
     const std::string & ca_str = _coloring_algorithm;
     Real * am_data = _adjacency_matrix->get_values().data();
-    Moose::PetscSupport::colorAdjacencyMatrix(
-        am_data, _feature_count, _vars.size(), _grain_to_op, ca_str.c_str());
+
+    try
+    {
+      Moose::PetscSupport::colorAdjacencyMatrix(
+          am_data, _feature_count, _vars.size(), _grain_to_op, ca_str.c_str());
+    }
+    catch (std::runtime_error & e)
+    {
+      paramError("op_num",
+                 "Unable to find a valid grain to op coloring, Make sure you have created enough "
+                 "variables to hold a\nvalid polycrystal initial condition (no grains represented "
+                 "by the same variable should be allowed to\ntouch, ~8 for 2D, ~25 for 3D)?");
+    }
 #else
     mooseError("Selected coloring algorithm requires PETSc");
 #endif
   }
 
-  //  Moose::perf_log.pop("assignOpsToGrains()", "PolycrystalICTools");
+  Moose::perf_log.pop("assignOpsToGrains()", "PolycrystalICTools");
 }
 
 bool

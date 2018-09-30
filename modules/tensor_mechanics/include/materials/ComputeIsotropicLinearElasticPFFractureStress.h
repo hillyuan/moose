@@ -1,13 +1,21 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef COMPUTEISOTROPICLINEARELASTICPFFRACTURESTRESS_H
 #define COMPUTEISOTROPICLINEARELASTICPFFRACTURESTRESS_H
 
 #include "ComputeStressBase.h"
+
+class ComputeIsotropicLinearElasticPFFractureStress;
+
+template <>
+InputParameters validParams<ComputeIsotropicLinearElasticPFFractureStress>();
 
 /**
  * Phase-field fracture
@@ -32,6 +40,9 @@ protected:
   /// Small number to avoid non-positive definiteness at or near complete damage
   const Real _kdamage;
 
+  /// Use current value of history variable
+  bool _use_current_hist;
+
   /// Material property defining crack width, declared elsewhere
   const MaterialProperty<Real> & _l;
 
@@ -42,8 +53,8 @@ protected:
   MaterialProperty<Real> & _F;
   MaterialProperty<Real> & _dFdc;
   MaterialProperty<Real> & _d2Fdc2;
-  MaterialProperty<RankTwoTensor> & _d2Fdcdstrain;
   MaterialProperty<RankTwoTensor> & _dstress_dc;
+  MaterialProperty<RankTwoTensor> & _d2Fdcdstrain;
 
   /// History variable that prevents crack healing, declared in this material
   MaterialProperty<Real> & _hist;

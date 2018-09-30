@@ -1,11 +1,16 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "ComputeElasticityTensorCP.h"
 #include "RotationTensor.h"
+
+registerMooseObject("TensorMechanicsApp", ComputeElasticityTensorCP);
 
 template <>
 InputParameters
@@ -32,6 +37,10 @@ ComputeElasticityTensorCP::ComputeElasticityTensorCP(const InputParameters & par
   // the base class guarantees constant in time, but in this derived class the
   // tensor will rotate over time once plastic deformation sets in
   revokeGuarantee(_elasticity_tensor_name, Guarantee::CONSTANT_IN_TIME);
+
+  // the base class performs a passive rotation, but the crystal plasticity
+  // materials use active rotation: recover unrotated _Cijkl here
+  _Cijkl.rotate(_R.transpose());
 }
 
 void

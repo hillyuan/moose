@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "DGKernel.h"
 #include "Assembly.h"
@@ -78,15 +73,16 @@ DGKernel::DGKernel(const InputParameters & parameters)
     FunctionInterface(this),
     UserObjectInterface(this),
     NeighborCoupleableMooseVariableDependencyIntermediateInterface(this, false, false),
+    NeighborMooseVariableInterface(
+        this, false, Moose::VarKindType::VAR_NONLINEAR, Moose::VarFieldType::VAR_FIELD_STANDARD),
     TwoMaterialPropertyInterface(this, blockIDs(), boundaryIDs()),
-    Restartable(parameters, "DGKernels"),
-    ZeroInterface(parameters),
+    Restartable(this, "DGKernels"),
     MeshChangedInterface(parameters),
-    _subproblem(*parameters.get<SubProblem *>("_subproblem")),
-    _sys(*parameters.get<SystemBase *>("_sys")),
+    _subproblem(*getCheckedPointerParam<SubProblem *>("_subproblem")),
+    _sys(*getCheckedPointerParam<SystemBase *>("_sys")),
     _tid(parameters.get<THREAD_ID>("_tid")),
     _assembly(_subproblem.assembly(_tid)),
-    _var(_sys.getVariable(_tid, parameters.get<NonlinearVariableName>("variable"))),
+    _var(*mooseVariable()),
     _mesh(_subproblem.mesh()),
 
     _current_elem(_assembly.elem()),
@@ -107,16 +103,16 @@ DGKernel::DGKernel(const InputParameters & parameters)
     _u(_is_implicit ? _var.sln() : _var.slnOld()),
     _grad_u(_is_implicit ? _var.gradSln() : _var.gradSlnOld()),
 
-    _phi(_assembly.phiFace()),
-    _grad_phi(_assembly.gradPhiFace()),
+    _phi(_assembly.phiFace(_var)),
+    _grad_phi(_assembly.gradPhiFace(_var)),
 
     _test(_var.phiFace()),
     _grad_test(_var.gradPhiFace()),
 
     _normals(_var.normals()),
 
-    _phi_neighbor(_assembly.phiFaceNeighbor()),
-    _grad_phi_neighbor(_assembly.gradPhiFaceNeighbor()),
+    _phi_neighbor(_assembly.phiFaceNeighbor(_var)),
+    _grad_phi_neighbor(_assembly.gradPhiFaceNeighbor(_var)),
 
     _test_neighbor(_var.phiFaceNeighbor()),
     _grad_test_neighbor(_var.gradPhiFaceNeighbor()),
@@ -127,21 +123,27 @@ DGKernel::DGKernel(const InputParameters & parameters)
     _save_in_strings(parameters.get<std::vector<AuxVariableName>>("save_in")),
     _diag_save_in_strings(parameters.get<std::vector<AuxVariableName>>("diag_save_in"))
 {
+  addMooseVariableDependency(mooseVariable());
+
   _save_in.resize(_save_in_strings.size());
   _diag_save_in.resize(_diag_save_in_strings.size());
 
   for (unsigned int i = 0; i < _save_in_strings.size(); i++)
   {
-    MooseVariable * var = &_subproblem.getVariable(_tid, _save_in_strings[i]);
+    MooseVariableFEBase * var = &_subproblem.getVariable(_tid,
+                                                         _save_in_strings[i],
+                                                         Moose::VarKindType::VAR_AUXILIARY,
+                                                         Moose::VarFieldType::VAR_FIELD_STANDARD);
 
     if (_sys.hasVariable(_save_in_strings[i]))
       mooseError("Trying to use solution variable " + _save_in_strings[i] +
                  " as a save_in variable in " + name());
 
     if (var->feType() != _var.feType())
-      mooseError("Error in " + name() + ". When saving residual values in an Auxiliary variable "
-                                        "the AuxVariable must be the same type as the nonlinear "
-                                        "variable the object is acting on.");
+      paramError(
+          "save_in",
+          "saved-in auxiliary variable is incompatible with the object's nonlinear variable: ",
+          moose::internal::incompatVarMsg(*var, _var));
 
     _save_in[i] = var;
     var->sys().addVariableToZeroOnResidual(_save_in_strings[i]);
@@ -152,16 +154,20 @@ DGKernel::DGKernel(const InputParameters & parameters)
 
   for (unsigned int i = 0; i < _diag_save_in_strings.size(); i++)
   {
-    MooseVariable * var = &_subproblem.getVariable(_tid, _diag_save_in_strings[i]);
+    MooseVariableFEBase * var = &_subproblem.getVariable(_tid,
+                                                         _diag_save_in_strings[i],
+                                                         Moose::VarKindType::VAR_NONLINEAR,
+                                                         Moose::VarFieldType::VAR_FIELD_STANDARD);
 
     if (_sys.hasVariable(_diag_save_in_strings[i]))
       mooseError("Trying to use solution variable " + _diag_save_in_strings[i] +
                  " as a diag_save_in variable in " + name());
 
     if (var->feType() != _var.feType())
-      mooseError("Error in " + name() + ". When saving diagonal Jacobian values in an Auxiliary "
-                                        "variable the AuxVariable must be the same type as the "
-                                        "nonlinear variable the object is acting on.");
+      paramError(
+          "diag_save_in",
+          "saved-in auxiliary variable is incompatible with the object's nonlinear variable: ",
+          moose::internal::incompatVarMsg(*var, _var));
 
     _diag_save_in[i] = var;
     var->sys().addVariableToZeroOnJacobian(_diag_save_in_strings[i]);

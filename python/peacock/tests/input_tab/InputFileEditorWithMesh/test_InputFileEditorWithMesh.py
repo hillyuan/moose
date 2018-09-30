@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from peacock.Input.InputFileEditorWithMesh import InputFileEditorWithMesh
 from PyQt5.QtWidgets import QMainWindow, QMessageBox, QApplication
 from peacock.Input.ExecutableInfo import ExecutableInfo
@@ -15,13 +24,20 @@ class BaseTests(Testing.PeacockTester):
         self.highlight_all = "meshrender_highlight_all.png"
         self.highlight_block = "meshrender_highlight_block.png"
         self.highlight_nodes = "meshrender_highlight_nodes.png"
+        self.highlight_dup = "meshrender_highlight_dup.png"
         self.basic_mesh = "meshrender_basic.png"
+        self.mesh_toggle = "meshrender_toggle.png"
+        self.mesh_toggle_disable = "meshrender_toggle_disable.png"
+
         Testing.remove_file(self.highlight_all)
         Testing.remove_file(self.highlight_right)
         Testing.remove_file(self.highlight_left)
         Testing.remove_file(self.highlight_block)
         Testing.remove_file(self.highlight_nodes)
+        Testing.remove_file(self.highlight_dup)
         Testing.remove_file(self.basic_mesh)
+        Testing.remove_file(self.mesh_toggle)
+        Testing.remove_file(self.mesh_toggle_disable)
         Testing.clean_files()
         self.num_time_steps = None
         self.time_step_changed_count = 0
@@ -212,8 +228,10 @@ class Tests(BaseTests):
 
         b = tree.getBlockInfo("/AuxVariables")
         self.assertNotEqual(b, None)
+        self.assertEqual(b.included, False)
         self.assertFalse(b.wantsToSave())
         w.InputFileEditorPlugin.block_tree.copyBlock(b)
+        self.assertEqual(b.included, True)
         self.assertTrue(b.wantsToSave())
         self.assertEqual(w.InputFileEditorPlugin.has_changed, True)
         self.assertEqual(w.canClose(), False)
@@ -221,10 +239,7 @@ class Tests(BaseTests):
         mock_q.return_value = QMessageBox.Yes # The user wants to ignore changes
         self.assertEqual(w.canClose(), True)
 
-        new_block = "[AuxVariables]\n  [./New_0]\n  [../]\n[]\n\n"
-        s = tree.getInputFileString()
-        self.assertEqual("inactive = 'AuxVariables'\n%s" % new_block, s) # AuxVariables is inactive
-        b.included = True
+        new_block = "[AuxVariables]\n  [New_0]\n  []\n[]\n"
         s = tree.getInputFileString()
         self.assertEqual(new_block, s)
 
@@ -253,6 +268,82 @@ class Tests(BaseTests):
         bh.NodesetSelector.Options.setCurrentText("left")
         w.vtkwin.onWrite(self.highlight_nodes)
         self.assertFalse(Testing.gold_diff(self.highlight_nodes))
+
+    def testBlockHighlightDup(self):
+        """
+        Make sure we don't regress https://github.com/idaholab/moose/issues/11404
+        """
+        main_win, w = self.newWidget()
+        tree = w.InputFileEditorPlugin.tree
+        Testing.set_window_size(w.vtkwin)
+        mesh = tree.getBlockInfo("/Mesh")
+        mesh.setBlockType("GeneratedMesh")
+        mesh.setParamValue("dim", "3")
+        mesh.included = True
+        w.blockChanged(mesh)
+        Testing.process_events(t=1)
+        w.blockChanged(mesh) # We need to do it again to trigger the original bug
+        bh = w.BlockHighlighterPlugin
+        bh.SidesetSelector.Options.setCurrentText("bottom")
+
+        w.MeshViewerPlugin.onCameraChanged((-0.7786, 0.2277, 0.5847), (-2, -2, -1), (0, 0, 0))
+        w.vtkwin.onWrite(self.highlight_dup)
+        self.assertFalse(Testing.gold_diff(self.highlight_dup))
+
+    def testMeshToggle(self):
+        main_win, w = self.newWidget()
+        w.setInputFile(self.input_file)
+        tree = w.InputFileEditorPlugin.tree
+        b = tree.getBlockInfo("/Mesh")
+        self.assertNotEqual(b, None)
+        self.assertTrue(b.included)
+        w.blockChanged(b)
+
+        w.vtkwin.onWrite(self.mesh_toggle)
+        self.assertFalse(Testing.gold_diff(self.mesh_toggle))
+
+        b.included = False
+        self.assertFalse(b.included)
+        w.blockChanged(b)
+        w.vtkwin.onWrite(self.mesh_toggle_disable)
+        self.assertFalse(Testing.gold_diff(self.mesh_toggle_disable))
+
+        b.included = True
+        self.assertTrue(b.included)
+        w.blockChanged(b)
+        w.vtkwin.onWrite(self.mesh_toggle)
+        self.assertFalse(Testing.gold_diff(self.mesh_toggle))
+
+    def testMeshCameraWithChangedInputFiles(self):
+        """
+        Previously we always wrote out the temporary mesh file to the same
+        filename. This caused problems with changing input files when the camera
+        had changed on one of them. The camera wouldn't reset so the new mesh
+        could potentially be in a weird position.
+        """
+        main_win, w = self.newWidget()
+        sdiffusion = "simple_diffusion.i"
+        w.setInputFile(sdiffusion)
+        w.MeshViewerPlugin.onCameraChanged((-0.7786, 0.2277, 0.5847), (-2, -2, -1), (0, 0, 0))
+        sdiffusion_image = "meshrender_camera_moved.png"
+        Testing.set_window_size(w.vtkwin)
+        w.vtkwin.onWrite(sdiffusion_image)
+        self.assertFalse(Testing.gold_diff(sdiffusion_image, .98))
+
+        other = "spherical_average.i"
+        w.setInputFile(other)
+        other_image = "meshrender_3d.png"
+        w.MeshViewerPlugin.onCameraChanged((0.2, 0.5, 0.8), (-30, 10, -20), (0, 5, 0))
+        w.vtkwin.onWrite(other_image)
+        self.assertFalse(Testing.gold_diff(other_image, .98))
+
+        w.setInputFile(sdiffusion)
+        w.vtkwin.onWrite(sdiffusion_image)
+        self.assertFalse(Testing.gold_diff(sdiffusion_image, .98))
+
+        w.setInputFile(other)
+        w.vtkwin.onWrite(other_image)
+        self.assertFalse(Testing.gold_diff(other_image, .98))
 
 if __name__ == '__main__':
     Testing.run_tests()

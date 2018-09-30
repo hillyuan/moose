@@ -3,7 +3,7 @@
 ###############################################################################
 #
 # Optional Environment variables
-# MOOSE_DIR        - Root directory of the MOOSE project 
+# MOOSE_DIR        - Root directory of the MOOSE project
 # MODULE_DIR       - Location of the MOOSE modules directory
 # FRAMEWORK_DIR    - Location of the MOOSE framework
 #
@@ -11,6 +11,7 @@
 MODULE_DIR         ?= $(shell dirname `pwd`)
 MOOSE_DIR          ?= $(shell dirname $(MODULE_DIR))
 FRAMEWORK_DIR      ?= $(MOOSE_DIR)/framework
+ADDITIONAL_CPPFLAGS += -Wall -Wextra
 ###############################################################################
 
 # framework
@@ -21,7 +22,7 @@ include $(FRAMEWORK_DIR)/moose.mk
 APPLICATION_DIR    := $(MODULE_DIR)/richards
 APPLICATION_NAME   := richards
 BUILD_EXEC         := yes
-DEP_APPS           := $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLICATION_NAME))
+GEN_REVISION       := no
 include            $(FRAMEWORK_DIR)/app.mk
 
 ###############################################################################

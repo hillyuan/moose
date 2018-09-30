@@ -1,4 +1,13 @@
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 #include "XFEMTestApp.h"
+#include "XFEMAppTypes.h"
 #include "XFEMApp.h"
 #include "Moose.h"
 #include "AppFactory.h"
@@ -12,32 +21,27 @@ validParams<XFEMTestApp>()
   return params;
 }
 
+registerKnownLabel("XFEMTestApp");
+
 XFEMTestApp::XFEMTestApp(InputParameters parameters) : MooseApp(parameters)
 {
-  Moose::registerObjects(_factory);
-  XFEMApp::registerObjectDepends(_factory);
-  XFEMApp::registerObjects(_factory);
-
-  Moose::associateSyntax(_syntax, _action_factory);
-  XFEMApp::associateSyntaxDepends(_syntax, _action_factory);
-  XFEMApp::associateSyntax(_syntax, _action_factory);
-
-  bool use_test_objs = getParam<bool>("allow_test_objects");
-  if (use_test_objs)
-  {
-    XFEMTestApp::registerObjects(_factory);
-    XFEMTestApp::associateSyntax(_syntax, _action_factory);
-  }
+  XFEMTestApp::registerAll(
+      _factory, _action_factory, _syntax, getParam<bool>("allow_test_objects"));
 }
 
 XFEMTestApp::~XFEMTestApp() {}
 
-// External entry point for dynamic application loading
-extern "C" void
-XFEMTestApp__registerApps()
+void
+XFEMTestApp::registerAll(Factory & f, ActionFactory & af, Syntax & s, bool use_test_objs)
 {
-  XFEMTestApp::registerApps();
+  XFEMApp::registerAll(f, af, s);
+  if (use_test_objs)
+  {
+    Registry::registerObjectsTo(f, {"XFEMTestApp"});
+    Registry::registerActionsTo(af, {"XFEMTestApp"});
+  }
 }
+
 void
 XFEMTestApp::registerApps()
 {
@@ -45,24 +49,30 @@ XFEMTestApp::registerApps()
   registerApp(XFEMTestApp);
 }
 
-// External entry point for dynamic object registration
-extern "C" void
-XFEMTestApp__registerObjects(Factory & factory)
-{
-  XFEMTestApp::registerObjects(factory);
-}
 void
-XFEMTestApp::registerObjects(Factory & /*factory*/)
+XFEMTestApp::registerObjects(Factory & factory)
+{
+  Registry::registerObjectsTo(factory, {"XFEMTestApp"});
+}
+
+void
+XFEMTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & action_factory)
+{
+  Registry::registerActionsTo(action_factory, {"XFEMTestApp"});
+}
+
+void
+XFEMTestApp::registerExecFlags(Factory & /*factory*/)
 {
 }
 
-// External entry point for dynamic syntax association
 extern "C" void
-XFEMTestApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
+XFEMTestApp__registerAll(Factory & f, ActionFactory & af, Syntax & s)
 {
-  XFEMTestApp::associateSyntax(syntax, action_factory);
+  XFEMTestApp::registerAll(f, af, s);
 }
-void
-XFEMTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
+extern "C" void
+XFEMTestApp__registerApps()
 {
+  XFEMTestApp::registerApps();
 }

@@ -133,19 +133,8 @@
 [Materials]
   [./temperature]
     type = PorousFlowTemperature
-    at_nodes = true
-  [../]
-  [./temperature_qp]
-    type = PorousFlowTemperature
   [../]
   [./ppss]
-    type = PorousFlow2PhasePS
-    at_nodes = true
-    phase0_porepressure = ppwater
-    phase1_saturation = sgas
-    capillary_pressure = pc
-  [../]
-  [./ppss_qp]
     type = PorousFlow2PhasePS
     phase0_porepressure = ppwater
     phase1_saturation = sgas
@@ -153,16 +142,9 @@
   [../]
   [./massfrac]
     type = PorousFlowMassFraction
-    at_nodes = true
     mass_fraction_vars = 'massfrac_ph0_sp0 massfrac_ph1_sp0'
   [../]
   [./simple_fluid0]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid0
-    phase = 0
-    at_nodes = true
-  [../]
-  [./simple_fluid0_qp]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid0
     phase = 0
@@ -171,32 +153,9 @@
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid1
     phase = 1
-    at_nodes = true
-  [../]
-  [./simple_fluid1_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid1
-    phase = 1
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    include_old = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
-  [./dens_qp_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-    at_nodes = false
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
   [../]
   [./porosity]
     type = PorousFlowPorosityConst
-    at_nodes = true
     porosity = 0.1
   [../]
   [./permeability]
@@ -205,34 +164,13 @@
   [../]
   [./relperm_water]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 2
     phase = 0
   [../]
   [./relperm_gas]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 2
     phase = 1
-  [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
-  [../]
-  [./relperm_water_qp]
-    type = PorousFlowRelativePermeabilityCorey
-    n = 2
-    phase = 0
-  [../]
-  [./relperm_gas_qp]
-    type = PorousFlowRelativePermeabilityCorey
-    n = 2
-    phase = 1
-  [../]
-  [./relperm_all_qp]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_relative_permeability_qp
   [../]
 []
 
@@ -272,6 +210,6 @@
   execute_on = 'initial timestep_end'
   file_base = grav02e
   exodus = true
-  print_perf_log = true
+  perf_graph = true
   csv = false
 []

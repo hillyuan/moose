@@ -1,22 +1,19 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef ACTION_H
 #define ACTION_H
 
 #include "InputParameters.h"
 #include "ConsoleStreamInterface.h"
+#include "Registry.h"
+#include "PerfGraphInterface.h"
 
 #include <string>
 #include <ostream>
@@ -36,14 +33,28 @@ InputParameters validParams<Action>();
 /**
  * Base class for actions.
  */
-class Action : public ConsoleStreamInterface
+class Action : public ConsoleStreamInterface, public PerfGraphInterface
 {
 public:
   Action(InputParameters parameters);
 
   virtual ~Action() {}
 
-  virtual void act() = 0;
+  /**
+   * The method called externally that causes the action to act()
+   */
+  void timedAct();
+
+  /**
+   * Method to add a relationship manager for the objects being added to the system. Relationship
+   * managers have to be added relatively early. In many cases before the Action::act() method
+   * is called.
+   * @param when_type The parameter indicating the normal time for adding either Geometric or
+   *        Algebraic RelationshipManagers. It may not always be possible to add your
+   *        RelationshipManager as early as you'd like. In these cases, your DistributedMesh may
+   *        consume more memory during the problem setup.
+   */
+  virtual void addRelationshipManagers(Moose::RelationshipManagerType when_type);
 
   /**
    * The name of the action
@@ -77,11 +88,72 @@ public:
   const T & getParam(const std::string & name) const;
   ///@}
 
+  /**
+   * Verifies that the requested parameter exists and is not NULL and returns it to the caller.
+   * The template parameter must be a pointer or an error will be thrown.
+   */
+  template <typename T>
+  T getCheckedPointerParam(const std::string & name, const std::string & error_string = "") const
+  {
+    return parameters().getCheckedPointerParam<T>(name, error_string);
+  }
+
   inline bool isParamValid(const std::string & name) const { return _pars.isParamValid(name); }
 
   void appendTask(const std::string & task) { _all_tasks.insert(task); }
 
+  /**
+   * Emits an error prefixed with the file and line number of the given param (from the input
+   * file) along with the full parameter path+name followed by the given args as the message.
+   * If this object's parameters were not created directly by the Parser, then this function falls
+   * back to the normal behavior of mooseError - only printing a message using the given args.
+   */
+  template <typename... Args>
+  [[noreturn]] void paramError(const std::string & param, Args... args)
+  {
+    auto prefix = param + ": ";
+    if (!_pars.inputLocation(param).empty())
+      prefix = _pars.inputLocation(param) + ": (" + _pars.paramFullpath(param) + "):\n";
+    mooseError(prefix, args...);
+  }
+
+  /**
+   * Emits a warning prefixed with the file and line number of the given param (from the input
+   * file) along with the full parameter path+name followed by the given args as the message.
+   * If this object's parameters were not created directly by the Parser, then this function falls
+   * back to the normal behavior of mooseWarning - only printing a message using the given args.
+   */
+  template <typename... Args>
+  void paramWarning(const std::string & param, Args... args)
+  {
+    auto prefix = param + ": ";
+    if (!_pars.inputLocation(param).empty())
+      prefix = _pars.inputLocation(param) + ": (" + _pars.paramFullpath(param) + "):\n";
+    mooseWarning(prefix, args...);
+  }
+
+  /**
+   * Emits an informational message prefixed with the file and line number of the given param
+   * (from the input file) along with the full parameter path+name followed by the given args as
+   * the message.  If this object's parameters were not created directly by the Parser, then this
+   * function falls back to the normal behavior of mooseInfo - only printing a message using
+   * the given args.
+   */
+  template <typename... Args>
+  void paramInfo(const std::string & param, Args... args)
+  {
+    auto prefix = param + ": ";
+    if (!_pars.inputLocation(param).empty())
+      prefix = _pars.inputLocation(param) + ": (" + _pars.paramFullpath(param) + "):\n";
+    mooseInfo(prefix, args...);
+  }
+
 protected:
+  /**
+   * Method to add objects to the simulation or perform other setup tasks.
+   */
+  virtual void act() = 0;
+
   /// Input parameters for the action
   InputParameters _pars;
 
@@ -130,8 +202,8 @@ protected:
   /// Convenience reference to a problem this action works on
   std::shared_ptr<FEProblemBase> & _problem;
 
-  /// Convenience reference to an executioner
-  std::shared_ptr<Executioner> & _executioner;
+  /// Timers
+  PerfID _act_timer;
 };
 
 template <typename T>

@@ -1,20 +1,26 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ComputeReducedOrderEigenstrain.h"
 
 #include "MooseMesh.h"
 #include "libmesh/quadrature.h"
 
+registerMooseObject("TensorMechanicsApp", ComputeReducedOrderEigenstrain);
+
 template <>
 InputParameters
 validParams<ComputeReducedOrderEigenstrain>()
 {
   InputParameters params = validParams<ComputeEigenstrainBase>();
+  params.addClassDescription("accepts eigenstrains and computes a reduced order eigenstrain for "
+                             "consistency in the order of strain and eigenstrains.");
   params.addRequiredParam<std::vector<MaterialPropertyName>>(
       "input_eigenstrain_names", "List of eigenstrains to be applied in this strain calculation");
   return params;
@@ -25,7 +31,6 @@ ComputeReducedOrderEigenstrain::ComputeReducedOrderEigenstrain(const InputParame
     _input_eigenstrain_names(
         getParam<std::vector<MaterialPropertyName>>("input_eigenstrain_names")),
     _eigenstrains(_input_eigenstrain_names.size()),
-    _eigenstrains_old(_input_eigenstrain_names.size()),
     _subproblem(*parameters.get<SubProblem *>("_subproblem")),
     _ncols(1 + _subproblem.mesh().dimension()),
     _second_order(_subproblem.mesh().hasSecondOrderElements()),
@@ -42,8 +47,6 @@ ComputeReducedOrderEigenstrain::ComputeReducedOrderEigenstrain(const InputParame
   {
     _input_eigenstrain_names[i] = _base_name + _input_eigenstrain_names[i];
     _eigenstrains[i] = &getMaterialProperty<RankTwoTensor>(_input_eigenstrain_names[i]);
-    if (_incremental_form)
-      _eigenstrains_old[i] = &getMaterialPropertyOld<RankTwoTensor>(_input_eigenstrain_names[i]);
   }
 }
 

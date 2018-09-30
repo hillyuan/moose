@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "SolutionUserObject.h"
 
@@ -18,9 +13,10 @@
 #include "MooseError.h"
 #include "MooseMesh.h"
 #include "MooseUtils.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 #include "RotationMatrix.h"
 
+// libMesh includes
 #include "libmesh/equation_systems.h"
 #include "libmesh/mesh_function.h"
 #include "libmesh/numeric_vector.h"
@@ -29,6 +25,9 @@
 #include "libmesh/parallel_mesh.h"
 #include "libmesh/serial_mesh.h"
 #include "libmesh/exodusII_io.h"
+#include "libmesh/enum_xdr_mode.h"
+
+registerMooseObject("MooseApp", SolutionUserObject);
 
 template <>
 InputParameters
@@ -378,7 +377,7 @@ SolutionUserObject::directValue(const Elem * elem, const std::string & var_name)
 
   // Get the element id and associated dof
   dof_id_type elem_id = elem->id();
-  dof_id_type dof_id = _system->get_mesh().elem(elem_id)->dof_number(sys_num, var_num, 0);
+  dof_id_type dof_id = _system->get_mesh().elem_ptr(elem_id)->dof_number(sys_num, var_num, 0);
 
   // Return the desired value
   return directValue(dof_id);
@@ -415,16 +414,12 @@ SolutionUserObject::initialSetup()
   if (_initialized)
     return;
 
-  // Several aspects of SolutionUserObject won't work if the FEProblemBase's MooseMesh is
-  // a DistributedMesh:
+  // Create a libmesh::Mesh object for storing the loaded data.
+  // Several aspects of SolutionUserObject won't work with a DistributedMesh:
   // .) ExodusII_IO::copy_nodal_solution() doesn't work in parallel.
   // .) We don't know if directValue will be used, which may request
   //    a value on a Node we don't have.
-  _fe_problem.mesh().errorIfDistributedMesh("SolutionUserObject");
-
-  // Create a libmesh::Mesh object for storing the loaded data.  Since
-  // SolutionUserObject is restricted to only work with ReplicatedMesh
-  // (see above) we can force the Mesh used here to be a ReplicatedMesh.
+  // We force the Mesh used here to be a ReplicatedMesh.
   _mesh = libmesh_make_unique<ReplicatedMesh>(_communicator);
 
   // ExodusII mesh file supplied
@@ -538,7 +533,7 @@ SolutionUserObject::updateExodusTimeInterpolation(Real time)
       for (const auto & var_name : _system_variables)
       {
         if (_local_variable_nodal[var_name])
-          _exodusII_io->copy_nodal_solution(*_system, var_name, _exodus_index1 + 1);
+          _exodusII_io->copy_nodal_solution(*_system, var_name, var_name, _exodus_index1 + 1);
         else
           _exodusII_io->copy_elemental_solution(*_system, var_name, var_name, _exodus_index1 + 1);
       }
@@ -550,7 +545,7 @@ SolutionUserObject::updateExodusTimeInterpolation(Real time)
       for (const auto & var_name : _system_variables)
       {
         if (_local_variable_nodal[var_name])
-          _exodusII_io->copy_nodal_solution(*_system2, var_name, _exodus_index2 + 1);
+          _exodusII_io->copy_nodal_solution(*_system2, var_name, var_name, _exodus_index2 + 1);
         else
           _exodusII_io->copy_elemental_solution(*_system2, var_name, var_name, _exodus_index2 + 1);
       }
@@ -634,10 +629,15 @@ SolutionUserObject::pointValueWrapper(Real t,
   // first check if the FE type is continuous because in that case the value is
   // unique and we can take a short cut, the default weighting_type found_first also
   // shortcuts out
+  auto family =
+      _fe_problem
+          .getVariable(
+              _tid, var_name, Moose::VarKindType::VAR_ANY, Moose::VarFieldType::VAR_FIELD_STANDARD)
+          .feType()
+          .family;
+
   if (weighting_type == 1 ||
-      (_fe_problem.getVariable(_tid, var_name).feType().family != L2_LAGRANGE &&
-       _fe_problem.getVariable(_tid, var_name).feType().family != MONOMIAL &&
-       _fe_problem.getVariable(_tid, var_name).feType().family != L2_HIERARCHIC))
+      (family != L2_LAGRANGE && family != MONOMIAL && family != L2_HIERARCHIC))
     return pointValue(t, p, var_name);
 
   // the shape function is discontinuous so we need to compute a suitable unique value

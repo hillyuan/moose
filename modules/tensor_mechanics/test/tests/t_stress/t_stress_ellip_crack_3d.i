@@ -45,6 +45,7 @@
   disp_x = disp_x
   disp_y = disp_y
   disp_z = disp_z
+  incremental = true
 []
 
 [Modules/TensorMechanics/Master]
@@ -100,9 +101,6 @@
   [../]
   [./elastic_stress]
     type = ComputeFiniteStrainElasticStress
-  [../]
-  [./eshelby]
-    type = EshelbyTensor
   [../]
 []
 

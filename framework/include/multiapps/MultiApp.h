@@ -1,22 +1,20 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef MULTIAPP_H
 #define MULTIAPP_H
 
 #include "MooseObject.h"
 #include "SetupInterface.h"
 #include "Restartable.h"
+
+#include "libmesh/communicator.h"
 
 class MultiApp;
 class UserObject;
@@ -36,7 +34,7 @@ class BoundingBox;
 }
 template <typename T>
 class NumericVector;
-}
+} // namespace libMesh
 
 template <>
 InputParameters validParams<MultiApp>();
@@ -64,6 +62,11 @@ public:
   virtual void preExecute() {}
 
   virtual void postExecute();
+
+  /**
+   * Called just after construction to allow derived classes to set _positions;
+   */
+  void setupPositions();
 
   virtual void initialSetup() override;
 
@@ -96,12 +99,29 @@ public:
   virtual bool solveStep(Real dt, Real target_time, bool auto_advance = true) = 0;
 
   /**
-   * Actually advances time and causes output.
-   *
-   * If auto_advance=true was used in solveStep() then this function
-   * will do nothing.
+   * Advances the multi-apps time step which is important for dt selection.
+   * (Note this does not advance the *time*. That is done in Transient::endStep,
+   * which is called either directly from solveStep() for loose coupling cases
+   * or through finishStep() for Picard coupling cases)
    */
-  virtual void advanceStep() = 0;
+  virtual void incrementTStep() {}
+
+  /**
+   * Deprecated method. Use finishStep
+   */
+  virtual void advanceStep()
+  {
+    mooseDeprecated("advanceStep() is deprecated; please use finishStep() instead");
+    finishStep();
+  }
+
+  /**
+   * Calls multi-apps executioners' endStep and postStep methods which creates output and advances
+   * time (not the time step; see incrementTStep()) among other things. This method is only called
+   * for Picard calculations because for loosely coupled calculations the executioners' endStep and
+   * postStep methods are called from solveStep().
+   */
+  virtual void finishStep() {}
 
   /**
    * Save off the state of every Sub App
@@ -137,8 +157,9 @@ public:
    * the size it would be if the geometry were 3D (ie if you were to revolve
    * the geometry around the axis to create the 3D geometry).
    * @param app The global app number you want to get the bounding box for
+   * @param displaced_mesh True if the bounding box is retrieved for the displaced mesh, other false
    */
-  virtual BoundingBox getBoundingBox(unsigned int app);
+  virtual BoundingBox getBoundingBox(unsigned int app, bool displaced_mesh);
 
   /**
    * Get the FEProblemBase this MultiApp is part of.
@@ -328,11 +349,14 @@ protected:
   /// The number of the first app on this processor
   unsigned int _first_local_app;
 
-  /// The comm that was passed to us specifying our pool of processors
-  MPI_Comm _orig_comm;
+  /// The original comm handle
+  const MPI_Comm & _orig_comm;
+
+  /// The communicator object that holds the MPI_Comm that we're going to use
+  libMesh::Parallel::Communicator _my_communicator;
 
   /// The MPI communicator this object is going to use.
-  MPI_Comm _my_comm;
+  MPI_Comm & _my_comm;
 
   /// The number of processors in the original comm
   int _orig_num_procs;
@@ -349,8 +373,17 @@ protected:
   /// Pointers to each of the Apps
   std::vector<std::shared_ptr<MooseApp>> _apps;
 
+  /// Flag if this multi-app computed its bounding box (valid only for non-displaced meshes)
+  std::vector<bool> _has_bounding_box;
+
+  /// This multi-app's bounding box
+  std::vector<BoundingBox> _bounding_box;
+
   /// Relative bounding box inflation
   Real _inflation;
+
+  /// Additional padding added to the bounding box, useful for 1D meshes
+  Point _bounding_box_padding;
 
   /// Maximum number of processors to give to each app
   unsigned int _max_procs_per_app;

@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 //  Rogers-Stallybrass-Clements version of effective saturation of oil (gas) phase
 //  valid for residual saturations = 0, and viscosityOil = 2*viscosityWater.  (the "2" is important
@@ -13,6 +15,8 @@
 // Applications 7 (1983) 785--799.
 //
 #include "RichardsSeff2gasRSC.h"
+
+registerMooseObject("RichardsApp", RichardsSeff2gasRSC);
 
 template <>
 InputParameters

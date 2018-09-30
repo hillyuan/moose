@@ -1,19 +1,16 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PiecewiseMultilinear.h"
 #include "GriddedData.h"
+
+registerMooseObject("MooseApp", PiecewiseMultilinear);
 
 template <>
 InputParameters
@@ -29,7 +26,7 @@ validParams<PiecewiseMultilinear>()
       "must be a space-separated line of real numbers which define the grid along the specified "
       "axis.  These data must be monotonically increasing.  After all the axes and their grids "
       "have been specified, there must be a line that is DATA.  Following that line, function "
-      "values are given in the correct order (they may be on indivicual lines, or be "
+      "values are given in the correct order (they may be on individual lines, or be "
       "space-separated on a number of lines).  When the function is evaluated, f[i,j,k,l] "
       "corresponds to the i + j*Ni + k*Ni*Nj + l*Ni*Nj*Nk data value.  Here i>=0 corresponding to "
       "the index along the first AXIS, j>=0 corresponding to the index along the second AXIS, etc, "

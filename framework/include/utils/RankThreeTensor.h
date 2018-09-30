@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef RANKTHREETENSOR_H
 #define RANKTHREETENSOR_H
 
@@ -89,9 +92,6 @@ public:
   /// b_i = r_ijk * a_jk
   RealVectorValue operator*(const RankTwoTensor & a) const;
 
-  /// r_ijk*a_kl
-  // RealTensorValue operator*(const RealTensorValue & a) const;
-
   /// r_ijk*a
   RankThreeTensor operator*(const Real a) const;
 
@@ -134,12 +134,6 @@ public:
    * r_ijk = R_im R_in R_ko r_mno
    */
   void rotate(const RealTensorValue & R);
-
-  /**
-   * Rotate the tensor using
-   * r_ijk = R_im R_in R_ko R_lp r_mno
-   */
-  void rotate(const RankTwoTensor & R);
 
   /// Static method for use in validParams for getting the "fill_method"
   static MooseEnum fillMethodEnum();

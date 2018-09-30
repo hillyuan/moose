@@ -1,14 +1,17 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowFullySaturatedDarcyBase.h"
 
-// MOOSE includes
 #include "MooseVariable.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowFullySaturatedDarcyBase);
 
 template <>
 InputParameters
@@ -51,10 +54,10 @@ PorousFlowFullySaturatedDarcyBase::PorousFlowFullySaturatedDarcyBase(
         "dPorousFlow_grad_porepressure_qp_dgradvar")),
     _dgrad_p_dvar(getMaterialProperty<std::vector<std::vector<RealGradient>>>(
         "dPorousFlow_grad_porepressure_qp_dvar")),
-    _porousflow_dictator(getUserObject<PorousFlowDictator>("PorousFlowDictator")),
+    _dictator(getUserObject<PorousFlowDictator>("PorousFlowDictator")),
     _gravity(getParam<RealVectorValue>("gravity"))
 {
-  if (_porousflow_dictator.numPhases() != 1)
+  if (_dictator.numPhases() != 1)
     mooseError("PorousFlowFullySaturatedDarcyBase should not be used for multi-phase scenarios as "
                "it does no upwinding and does not include relative-permeability effects");
 }
@@ -78,11 +81,11 @@ PorousFlowFullySaturatedDarcyBase::computeQpJacobian()
 Real
 PorousFlowFullySaturatedDarcyBase::computeQpOffDiagJacobian(unsigned int jvar)
 {
-  if (_porousflow_dictator.notPorousFlowVariable(jvar))
+  if (_dictator.notPorousFlowVariable(jvar))
     return 0.0;
 
   const unsigned ph = 0;
-  const unsigned pvar = _porousflow_dictator.porousFlowVariableNum(jvar);
+  const unsigned pvar = _dictator.porousFlowVariableNum(jvar);
 
   const Real mob = mobility();
   const Real dmob = dmobility(pvar) * _phi[_j][_qp];

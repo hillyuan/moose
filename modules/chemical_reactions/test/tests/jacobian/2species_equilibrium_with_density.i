@@ -45,7 +45,6 @@
 []
 
 [ReactionNetwork]
-  primary_species = 'a b'
   [./AqueousEquilibriumReactions]
     primary_species = 'a b'
     reactions = '2a = pa2     2
@@ -106,7 +105,7 @@
 []
 
 [Outputs]
-  print_perf_log = true
+  perf_graph = true
 []
 
 [Preconditioning]

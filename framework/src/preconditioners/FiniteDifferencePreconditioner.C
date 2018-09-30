@@ -1,25 +1,22 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "FiniteDifferencePreconditioner.h"
 
 // MOOSE includes
 #include "FEProblem.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 #include "NonlinearSystem.h"
 
 #include "libmesh/coupling_matrix.h"
+
+registerMooseObjectAliased("MooseApp", FiniteDifferencePreconditioner, "FDP");
 
 template <>
 InputParameters
@@ -60,7 +57,8 @@ FiniteDifferencePreconditioner::FiniteDifferencePreconditioner(const InputParame
     _finite_difference_type(getParam<MooseEnum>("finite_difference_type"))
 {
   if (n_processors() > 1)
-    mooseError("Can't use the Finite Difference Preconditioner in parallel yet!");
+    mooseWarning("Finite differencing to assemble the Jacobian is MUCH MUCH slower than forming "
+                 "the Jacobian by hand, so don't complain about performance if you use it!");
 
   NonlinearSystemBase & nl = _fe_problem.getNonlinearSystemBase();
   unsigned int n_vars = nl.nVariables();

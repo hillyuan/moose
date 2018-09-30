@@ -63,7 +63,13 @@
     # This test relies on number of residuals being the same, so run it serially
     max_parallel = 1
     max_threads = 1
-    recover = false #no. of iterations is not recoverable
+    # no. of iterations is not recoverable
+    recover = false
+    # This test requires a different number of residual evaluations in older PETScs
+    # due to the changes in 3061bbd5d.
+    petsc_version = '>=3.5.0'
+    petsc_version_release = true
+    compiler = '!INTEL'
   [../]
   [./exodus_inline]
     # Test the output of linear and nonlinear iterations to Exodus with inline start times
@@ -84,5 +90,23 @@
     # This test relies on number of residuals being the same, so run it serially
     max_parallel = 1
     max_threads = 1
+  [../]
+  [./output_step_window]
+    # Test that outputs are done during the specified window
+    type = 'Exodiff'
+    input = 'output_step_window.i'
+    exodiff = 'output_step_window_out.e'
+  [../]
+  [./output_start_step]
+    # Test that outputs are done during following a specified step
+    type = 'Exodiff'
+    input = 'output_start_step.i'
+    exodiff = 'output_start_step_out.e'
+  [../]
+  [./output_end_step]
+    # Test that outputs stop at a specified step
+    type = 'Exodiff'
+    input = 'output_end_step.i'
+    exodiff = 'output_end_step_out.e'
   [../]
 []

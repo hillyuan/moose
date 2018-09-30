@@ -1,15 +1,16 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef SLOPELIMITINGBASE_H
 #define SLOPELIMITINGBASE_H
 
 #include "ElementLoopUserObject.h"
-#include "SlopeReconstructionBase.h"
 
 // Forward Declarations
 class SlopeLimitingBase;
@@ -42,13 +43,10 @@ protected:
   virtual void deserialize(std::vector<std::string> & serialized_buffers);
 
   /// store the updated slopes into this map indexed by element ID
-  std::map<dof_id_type, std::vector<RealGradient>> _lslope;
+  std::map<dof_id_type, std::vector<RealGradient>> & _lslope;
 
   /// option whether to include BCs
-  bool _include_bc;
-
-  /// slope reconstruction user object
-  const SlopeReconstructionBase & _rslope;
+  const bool _include_bc;
 
   /// required data for face assembly
   const MooseArray<Point> & _q_point_face;

@@ -47,8 +47,15 @@
   [../]
 []
 
+[Postprocessors]
+  [./elem_average_value]
+    type = ElementAverageValue
+    variable = v
+    execute_on = 'initial timestep_end'
+  [../]
+[]
+
 [Executioner]
-  # Preconditioned JFNK (default)
   type = Transient
   num_steps = 2
   dt = 0.1

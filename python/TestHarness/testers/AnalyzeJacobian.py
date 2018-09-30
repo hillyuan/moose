@@ -1,12 +1,21 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import os, sys
 from TestHarness import util
-from Tester import Tester
+from FileTester import FileTester
 
-class AnalyzeJacobian(Tester):
+class AnalyzeJacobian(FileTester):
 
     @staticmethod
     def validParams():
-        params = Tester.validParams()
+        params = FileTester.validParams()
         params.addRequiredParam('input',  "The input file to use for this test.")
         params.addParam('test_name',      "The name of the test - populated automatically")
         params.addParam('expect_out',     "A regular expression that must occur in the input in order for the test to be considered passing.")
@@ -16,19 +25,26 @@ class AnalyzeJacobian(Tester):
 
         return params
 
-
     def __init__(self, name, params):
-        Tester.__init__(self, name, params)
+        FileTester.__init__(self, name, params)
 
+    def getOutputFiles(self):
+        # analizejacobian.py outputs files prefixed with the input file name
+        return [self.specs['input']]
+
+    def prepare(self, options):
+        # We do not know what file(s) analizejacobian.py produces
+        return
 
     # Check if numpy is available
     def checkRunnable(self, options):
         try:
             import numpy
             assert numpy # silence pyflakes warning
-            return (True, '')
+            return True
         except Exception:
-            return (False, 'skipped (no numpy)')
+            self.addCaveats('skipped (no numpy)')
+            return False
 
 
     def getCommand(self, options):
@@ -68,10 +84,7 @@ class AnalyzeJacobian(Tester):
             if self.exit_code != 0 :
                 reason = 'CRASH'
 
-        # populate status bucket
         if reason != '':
-            self.setStatus(reason, self.bucket_fail)
-        else:
-            self.setStatus(self.success_message, self.bucket_success)
+            self.setStatus(self.fail, reason)
 
         return output

@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef ADAPTIVITY_H
 #define ADAPTIVITY_H
@@ -23,6 +18,7 @@
 #include "MooseError.h"
 #include "ConsoleStreamInterface.h"
 #include "MooseTypes.h"
+#include "PerfGraphInterface.h"
 
 // libMesh
 #include "libmesh/mesh_refinement.h"
@@ -30,7 +26,10 @@
 class FEProblemBase;
 class MooseMesh;
 class DisplacedProblem;
-class MooseVariable;
+template <typename>
+class MooseVariableFE;
+typedef MooseVariableFE<Real> MooseVariable;
+typedef MooseVariableFE<VectorValue<Real>> VectorMooseVariable;
 class MooseEnum;
 
 // Forward declare classes in libMesh
@@ -45,7 +44,7 @@ class ErrorEstimator;
  * Takes care of everything related to mesh adaptivity
  *
  */
-class Adaptivity : public ConsoleStreamInterface
+class Adaptivity : public ConsoleStreamInterface, public PerfGraphInterface
 {
 public:
   Adaptivity(FEProblemBase & subproblem);
@@ -300,6 +299,12 @@ protected:
 
   /// Stores pointers to ErrorVectors associated with indicator field names
   std::map<std::string, std::unique_ptr<ErrorVector>> _indicator_field_to_error_vector;
+
+  /// Timers
+  PerfID _adapt_mesh_timer;
+  PerfID _uniform_refine_timer;
+  PerfID _uniform_refine_with_projection;
+  PerfID _update_error_vectors;
 };
 
 template <typename T>

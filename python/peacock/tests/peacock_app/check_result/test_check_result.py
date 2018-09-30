@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from peacock.utils import Testing
 from PyQt5.QtCore import Qt
 from PyQt5 import QtWidgets
@@ -21,6 +30,7 @@ class Tests(Testing.PeacockTester):
         app.main_widget.setTab(exe_plugin.tabName())
         exe_plugin.ExecuteOptionsPlugin.setWorkingDir(self.starting_directory)
         exe_plugin.ExecuteRunnerPlugin.runClicked()
+        app.main_widget.setTab(result_plugin.tabName())
 
         vtkwin = result_plugin.currentWidget().VTKWindowPlugin
         Testing.set_window_size(vtkwin)

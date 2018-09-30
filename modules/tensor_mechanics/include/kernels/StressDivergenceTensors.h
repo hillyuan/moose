@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef STRESSDIVERGENCETENSORS_H
 #define STRESSDIVERGENCETENSORS_H
 
@@ -30,7 +33,8 @@ public:
   StressDivergenceTensors(const InputParameters & parameters);
 
   virtual void computeJacobian() override;
-  virtual void computeOffDiagJacobian(unsigned int jvar) override;
+  virtual void computeOffDiagJacobian(MooseVariableFEBase & jvar) override;
+  using Kernel::computeOffDiagJacobian;
 
 protected:
   virtual void initialSetup() override;
@@ -63,11 +67,14 @@ protected:
   std::vector<unsigned int> _disp_var;
 
   const bool _temp_coupled;
-
   const unsigned int _temp_var;
 
   /// d(strain)/d(temperature), if computed by ComputeThermalExpansionEigenstrain
   const MaterialProperty<RankTwoTensor> * const _deigenstrain_dT;
+
+  const bool _out_of_plane_strain_coupled;
+  const unsigned int _out_of_plane_strain_var;
+  const unsigned int _out_of_plane_direction;
 
   /// Gradient of test function averaged over the element. Used in volumetric locking correction calculation.
   std::vector<std::vector<Real>> _avg_grad_test;

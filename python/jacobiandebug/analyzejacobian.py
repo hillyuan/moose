@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from __future__ import print_function
 import sys
 import os
@@ -9,19 +18,12 @@ import numpy as np
 import subprocess
 
 from optparse import OptionParser
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from TestHarness import util
 
 
 # These kernels have guaranteed correct Jacobians
 whitelisted_kernels = ['Diffusion', 'TimeDerivative']
-
-
-# regular expressions to parse the PETSc debug output
-MfdRE = re.compile("^Finite[ -]difference Jacobian \(user-defined state\)")
-MhcRE = re.compile("^Hand-coded Jacobian \(user-defined state\)")
-MdiffRE = re.compile("^Hand-coded minus finite[ -]difference Jacobian \(user-defined state\)")
-rowRE = re.compile("row (\d+): ")
-valRE = re.compile(" \((\d+), ([+.e\d-]+)\)")
-
 
 # Get the real path of jacobian analyzer
 if(os.path.islink(sys.argv[0])):
@@ -30,6 +32,20 @@ else:
     pathname = os.path.dirname(sys.argv[0])
     pathname = os.path.abspath(pathname)
 
+class REStruct(object):
+    def __init__(self, new_petsc):
+        self.MfdRE = "Finite[ -]difference Jacobian"
+        self.MhcRE = "Hand-coded Jacobian"
+        self.MdiffRE = "Hand-coded minus finite[ -]difference Jacobian"
+        self.rowRE = re.compile("row (\d+):")
+        self.valRE = re.compile(" \((\d+), ([+.e\d-]+)\)")
+        if not new_petsc:
+            additional_string = " \(user-defined state\)"
+        else:
+            additional_string = ""
+        self.MfdRE, self.MhcRE, self.MdiffRE = (re.compile(item + additional_string) for item in
+                                                (self.MfdRE, self.MhcRE, self.MdiffRE))
+        self.new_petsc = new_petsc
 
 # Borrowed from Peacock
 def recursiveFindFile(current_path, p, executable):
@@ -195,8 +211,15 @@ def saveMatrixToFile(M, dofs, filename) :
 #
 # Simple state machine parser for the MOOSE output
 #
-def parseOutput(output, dofdata) :
+def parseOutput(output, dofdata, re_struct) :
     global options
+
+    if re_struct.new_petsc:
+        first_re = re_struct.MhcRE
+        second_re = re_struct.MfdRE
+    else:
+        first_re = re_struct.MfdRE
+        second_re = re_struct.MhcRE
 
     write_matrices = options.write_matrices
     dofs = dofdata['ndof']
@@ -213,39 +236,45 @@ def parseOutput(output, dofdata) :
         if state == 0 :
             Mfd = np.zeros((dofs, dofs))
             Mhc = np.zeros((dofs, dofs))
+            if re_struct.new_petsc:
+                first_matrix = Mhc
+                second_matrix = Mfd
+            else:
+                first_matrix = Mfd
+                second_matrix = Mhc
             Mdiff = np.zeros((dofs, dofs))
             state = 1
 
         if state == 1 :
-            m = MfdRE.match(line)
+            m = first_re.search(line)
             if m :
                 state = 2
                 continue
 
         if state == 2 :
-            m = MhcRE.match(line)
+            m = second_re.search(line)
             if m :
                 state = 3
                 continue
 
         if state == 3 :
-            m = MdiffRE.match(line)
+            m = re_struct.MdiffRE.search(line)
             if m :
                 state = 4
                 continue
 
         # read data
         if state >= 2 and state <= 4 :
-            m = rowRE.match(line)
-            vals = valRE.findall(line)
+            m = re_struct.rowRE.match(line)
+            vals = re_struct.valRE.findall(line)
             if m :
                 row = int(m.group(1))
 
                 for pair in vals :
                     if state == 2 :
-                        Mfd[row, int(pair[0])] = float(pair[1])
+                        first_matrix[row, int(pair[0])] = float(pair[1])
                     if state == 3 :
-                        Mhc[row, int(pair[0])] = float(pair[1])
+                        second_matrix[row, int(pair[0])] = float(pair[1])
                     if state == 4 :
                         Mdiff[row, int(pair[0])] = float(pair[1])
 
@@ -320,7 +349,7 @@ if __name__ == '__main__':
     dofmapfilename = basename + '_' + dofoutname + '.json'
     if not options.noauto :
         mooseparams = moosebaseparams[:]
-        mooseparams.extend(['Problem/solve=false', 'BCs/active=', 'Outputs/' + dofoutname+ '/type=DOFMap', 'Outputs/active=' + dofoutname, 'Outputs/file_base=' + basename + '_' + dofoutname])
+        mooseparams.extend(['Problem/solve=false', 'BCs/active=', 'Outputs/' + dofoutname+ '/type=DOFMap', 'Outputs/active=' + dofoutname, 'Outputs/file_base=' + basename + '_' + dofoutname, '--no-gdb-backtrace'])
         if options.cli_args != None:
             mooseparams.extend([options.cli_args])
         if options.debug :
@@ -376,11 +405,27 @@ if __name__ == '__main__':
     #for kernels in combination_dofs :
     #   print kernels
 
+    moose_dir = os.environ.get('MOOSE_DIR',
+                               os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                                            '../..')))
+    if os.environ.has_key("LIBMESH_DIR"):
+        libmesh_dir = os.environ['LIBMESH_DIR']
+    else:
+        libmesh_dir = os.path.join(moose_dir, 'libmesh', 'installed')
+    new_petsc = util.getPetscVersion(libmesh_dir) >= '3.9'
 
     # build the parameter list for the jacobian debug run
     mooseparams = moosebaseparams[:]
     if not options.noauto :
-        mooseparams.extend([ '-snes_type', 'test', '-snes_test_display', '-mat_fd_type', 'ds', 'Executioner/solve_type=NEWTON', 'BCs/active=', 'Outputs/exodus=false', 'Outputs/csv=false', 'Outputs/active='])
+        if new_petsc:
+            petsc_test_options = ['-snes_test_jacobian', '-snes_test_jacobian_view', '-snes_type', 'ksponly',
+                                  '-ksp_type', 'preonly', '-pc_type', 'none', '-snes_convergence_test', 'skip']
+        else:
+            petsc_test_options = ['-snes_type', 'test', '-snes_test_display']
+
+        mooseparams.extend(petsc_test_options + ['-mat_fd_type', 'ds',
+                                                 'BCs/active=', 'Outputs/exodus=false', 'Outputs/csv=false',
+                                                 'Outputs/active=', 'Executioner/solve_type=NEWTON', '--no-gdb-backtrace'])
     if options.cli_args != None:
         mooseparams.extend([options.cli_args])
 
@@ -397,8 +442,7 @@ if __name__ == '__main__':
         if child.returncode == -11 :
             print("The moose application crashed with a segmentation fault (try recompiling)")
             sys.exit(1)
-        elif child.returncode != 1 :
-            # MOOSE failed with an unexpected error
+        elif (not new_petsc and child.returncode != 1) or (new_petsc and child.returncode != 0):
             print(data)
             print("Application quit with an unexpected return code")
             sys.exit(1)
@@ -406,8 +450,9 @@ if __name__ == '__main__':
         print('Error executing moose based application\n')
         sys.exit(1)
 
+    re_struct = REStruct(new_petsc)
     # parse the raw output, which contains the PETSc debug information
-    if parseOutput(data, dofdata) == 0:
+    if parseOutput(data, dofdata, re_struct) == 0:
         print(data)
         print('Error executing moose based application\n')
         sys.exit(1)

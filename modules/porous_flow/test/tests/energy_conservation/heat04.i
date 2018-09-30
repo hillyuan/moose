@@ -282,6 +282,7 @@
   [../]
   [./temperature_qp]
     type = PorousFlowTemperature
+    at_nodes = false
     temperature = temp
   [../]
   [./elasticity_tensor]
@@ -301,25 +302,27 @@
   [../]
   [./eff_fluid_pressure]
     type = PorousFlowEffectiveFluidPressure
-    at_nodes = true
-  [../]
-  [./eff_fluid_pressure_qp]
-    type = PorousFlowEffectiveFluidPressure
   [../]
   [./porosity]
-    type = PorousFlowPorosityTHM
+    type = PorousFlowPorosity
+    thermal = true
+    fluid = true
+    mechanical = true
     ensure_positive = false
-    at_nodes = true
     biot_coefficient = 1.0
     porosity_zero = 0.5
     thermal_expansion_coeff = 0.25
     solid_bulk = 2
   [../]
   [./porosity_qp]
-    type = PorousFlowPorosityTHM
+    type = PorousFlowPorosity
+    at_nodes = false
+    thermal = true
+    fluid = true
+    mechanical = true
     ensure_positive = false
-    porosity_zero = 0.5
     biot_coefficient = 1.0
+    porosity_zero = 0.5
     thermal_expansion_coeff = 0.25
     solid_bulk = 2
   [../]
@@ -331,40 +334,16 @@
   [../]
   [./ppss]
     type = PorousFlow1PhaseFullySaturated
-    at_nodes = true
-    porepressure = pp
-  [../]
-  [./ppss_qp]
-    type = PorousFlow1PhaseFullySaturated
     porepressure = pp
   [../]
   [./massfrac]
     type = PorousFlowMassFraction
-    at_nodes = true
   [../]
   [./simple_fluid]
     type = PorousFlowSingleComponentFluid
-    at_nodes = true
     temperature_unit = Kelvin
     fp = the_simple_fluid
     phase = 0
-  [../]
-  [./simple_fluid_qp]
-    type = PorousFlowSingleComponentFluid
-    temperature_unit = Kelvin
-    fp = the_simple_fluid
-    phase = 0
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
-  [./internal_energy_fluids]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_internal_energy_nodal
   [../]
 []
 

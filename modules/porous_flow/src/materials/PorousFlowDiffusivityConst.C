@@ -1,11 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowDiffusivityConst.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowDiffusivityConst);
 
 template <>
 InputParameters
@@ -25,14 +29,15 @@ PorousFlowDiffusivityConst::PorousFlowDiffusivityConst(const InputParameters & p
 {
   // Check that the number of tortuosities entered is equal to the number of phases
   if (_input_tortuosity.size() != _num_phases)
-    mooseError("The number of tortuosity values entered is not equal to the number of phases "
+    paramError("tortuosity",
+               "The number of tortuosity values entered is not equal to the number of phases "
                "specified in the Dictator");
 
   // Check that all tortuosities are (0, 1]
   for (unsigned int i = 0; i < _num_phases; ++i)
     if (_input_tortuosity[i] <= 0.0 || _input_tortuosity[i] > 1)
-      mooseError("All tortuosities must be greater than zero and less than (or equal to) one in ",
-                 _name,
+      paramError("tortuosity",
+                 "All tortuosities must be greater than zero and less than (or equal to) one"
                  ".\nNote: the definition of tortuosity used is l/le, where l is the straight line "
                  "length and le is the effective flow length");
 }

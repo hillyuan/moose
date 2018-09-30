@@ -16,6 +16,34 @@
     csvdiff = 'grain_tracker_advanced_op_out.csv'
     recover = false # No solve
     max_parallel = 1
+
+    requirement = "The PolycrystalVoronoi object shall create a valid coloring for a given number of grains and order parameters."
+    design = "PolycrystalICs.md"
+  [../]
+
+  [./test_advanced_op_assignment_bt_error]
+    type = 'RunException'
+    input = 'grain_tracker_advanced_op.i'
+    expect_err = "Unable to find a valid grain to op coloring"
+    recover = false # No solve
+    cli_args = 'GlobalParams/op_num=4 Outputs/csv=false'
+
+    requirement = "The PolycrystalUserObject base class shall error when a valid coloring cannot be found "
+                  "when using the simple back-tracking algorithm."
+    design = "PolycrystalICs.md"
+  [../]
+
+  [./test_advanced_op_assignment_petsc_error]
+    type = 'RunException'
+    input = 'grain_tracker_advanced_op.i'
+    expect_err = "Unable to find a valid grain to op coloring"
+    recover = false # No solve
+    cli_args = 'UserObjects/voronoi/coloring_algorithm=jp GlobalParams/op_num=7 Outputs/csv=false'
+
+    requirement = "The PolycrystalUserObject base class shall error when a valid coloring cannot be found "
+                  "when using the built-in PETSc based stochastic algorithms."
+    issues = '#8804'
+    design = "PolycrystalICs.md"
   [../]
 
   [./test_halo_periodic_bc]
@@ -36,12 +64,27 @@
     max_time = 500
   [../]
 
+  [./test_remapping_serial]
+    type = 'CSVDiff'
+    input = 'grain_tracker_remapping_test.i'
+    csvdiff = 'grain_tracker_remapping_test_out.csv'
+    method = '!DBG' # slow test
+    valgrind = 'NONE' # Exact same test used elsewhere
+    # This test uses a coloring algorithm that requires PETSc >= 3.5.0.
+    petsc_version = '>=3.5.0'
+  [../]
+
   [./test_remapping_parallel]
     type = 'CSVDiff'
     input = 'grain_tracker_remapping_test.i'
     csvdiff = 'grain_tracker_remapping_test_out.csv'
     method = '!DBG' # slow test
     valgrind = 'HEAVY'
+    # This test uses a coloring algorithm that requires PETSc >= 3.5.0.
+    petsc_version = '>=3.5.0'
+    prereq = 'test_remapping_serial'
+
+    min_parallel = 8 # Test distributed merge work with grain tracker
   [../]
 
   [./remapping_with_reserve]
@@ -75,6 +118,29 @@
     max_time = 500
     method = '!DBG' # slow test
     valgrind ='HEAVY'
+    # This test uses a coloring algorithm that requires PETSc >= 3.5.0.
+    petsc_version = '>=3.5.0'
+  [../]
+
+  [./changing_avg_volume]
+    type = 'CSVDiff'
+    input = 'grain_tracker_volume_changing.i'
+    csvdiff = 'grain_tracker_volume_changing_out.csv'
+    method = '!DBG' # slow test
+    valgrind = 'HEAVY'
+    # This test uses a coloring algorithm that requires PETSc >= 3.5.0.
+    petsc_version = '>=3.5.0'
+  [../]
+
+  [./tolerate_remap_failure]
+    type = 'RunApp'
+    input = 'grain_tracker_remapping_test.i'
+    cli_args = 'UserObjects/grain_tracker/tolerate_failure=true UserObjects/voronoi/grain_num=15 Executioner/num_steps=6 UserObjects/voronoi/coloring_algorithm=bt Outputs/exodus=false Outputs/csv=false'
+    expect_out = "Unable to find any suitable order parameters for remapping"
+    allow_warnings = true
+    valgrind = 'NONE'
+    method = '!DBG' # slow test
+    min_parallel = 2
   [../]
 
   ###################################################
@@ -106,6 +172,9 @@
     input = 'grain_tracker_volume.i'
     csvdiff = 'grain_tracker_volume_out_grain_volumes_0000.csv grain_tracker_volume_out.csv'
     rel_err = 1.e-3
+
+    # Lots of adaptivity, slower test
+    min_parallel = 6
   [../]
 
   [./grain_tracker_volume_single]
@@ -113,6 +182,9 @@
     input = 'grain_tracker_volume_single.i'
     csvdiff = 'grain_tracker_volume_single_out_grain_volumes_0000.csv'
     rel_err = 1.e-3
+
+    # Lots of adaptivity, slower test
+    min_parallel = 6
   [../]
 
   # This test should work the same with the FeatureFloodCount object
@@ -123,5 +195,8 @@
     csvdiff = 'grain_tracker_volume_out_grain_volumes_0000.csv grain_tracker_volume_out.csv'
     prereq = grain_tracker_volume
     rel_err = 1.e-3
+
+    # Lots of adaptivity, slower test
+    min_parallel = 6
   [../]
 []

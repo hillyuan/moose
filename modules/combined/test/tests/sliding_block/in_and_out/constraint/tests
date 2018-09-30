@@ -27,6 +27,23 @@
     min_parallel = 4
     abs_zero = 1e-7
     max_time = 800
+    custom_cmp = 'frictionless_kinematic_out.cmp'
+  [../]
+  [./frictionless_kinematic_scaled]
+    type = 'Exodiff'
+    input = 'frictionless_kinematic.i'
+    exodiff = 'frictionless_kinematic_out.e'
+    heavy = true
+    min_parallel = 4
+    abs_zero = 1e-7
+    max_time = 800
+    cli_args = 'Variables/disp_x/scaling=1e-6 Variables/disp_y/scaling=1e-6'
+    prereq = 'frictionless_kinematic'
+    custom_cmp = 'frictionless_kinematic_out.cmp'
+    requirement = "Kinematic contact shall produce the same results regardless of whether
+                   variable scaling is used or not"
+    design = 'MechanicalContactConstraint.md'
+    issues = '#11601'
   [../]
   [./frictionless_penalty]
     type = 'Exodiff'
@@ -37,5 +54,17 @@
     min_parallel = 4
     abs_zero = 1e-7
     max_time = 800
+  [../]
+  [./frictionless_penalty_contact_line_search]
+    type = 'Exodiff'
+    input = 'frictionless_penalty_contact_line_search.i'
+    exodiff = 'frictionless_penalty_contact_line_search_exodus.e'
+    heavy = true
+    superlu = true
+    min_parallel = 4
+    abs_zero = 1e-7
+    max_time = 800
+    # The linesearch used by this test requires PETSc >= 3.6.0.
+    petsc_version = '>=3.6.0'
   [../]
 []

@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ComputeRSphericalFiniteStrain.h"
 #include "Assembly.h"
@@ -11,6 +13,8 @@
 #include "MooseMesh.h"
 
 #include "libmesh/quadrature.h"
+
+registerMooseObject("TensorMechanicsApp", ComputeRSphericalFiniteStrain);
 
 template <>
 InputParameters
@@ -30,6 +34,8 @@ ComputeRSphericalFiniteStrain::ComputeRSphericalFiniteStrain(const InputParamete
 void
 ComputeRSphericalFiniteStrain::initialSetup()
 {
+  ComputeIncrementalStrainBase::initialSetup();
+
   const auto & subdomainIDs = _mesh.meshSubdomains();
   for (auto subdomainID : subdomainIDs)
     if (_fe_problem.getCoordSystem(subdomainID) != Moose::COORD_RSPHERICAL)

@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "NSWeakStagnationBaseBC.h"
 
 // FluidProperties includes
@@ -49,7 +52,7 @@ NSWeakStagnationBaseBC::staticValues(Real & T_s, Real & p_s, Real & rho_s)
         std::pow(_stagnation_temperature / T_s, -_fp.gamma() / (_fp.gamma() - 1.));
 
   // Compute static rho from static pressure and temperature using equation of state.
-  rho_s = _fp.rho(p_s, T_s);
+  rho_s = _fp.rho_from_p_T(p_s, T_s);
 }
 
 Real

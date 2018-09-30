@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef POLYCRYSTALVORONOIVOIDIC_H
 #define POLYCRYSTALVORONOIVOIDIC_H
 
@@ -34,12 +37,14 @@ protected:
   const MooseEnum _structure_type;
 
   const unsigned int _op_num;
-  const unsigned int _grain_num;
+  unsigned int _grain_num;
   const unsigned int _op_index;
 
   const unsigned int _rand_seed;
 
   const bool _columnar_3D;
+
+  const FileName _file_name;
 
   virtual void computeCircleCenters() override;
 

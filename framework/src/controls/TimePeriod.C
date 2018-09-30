@@ -1,22 +1,19 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "TimePeriod.h"
 #include "Function.h"
 #include "Transient.h"
 #include "MooseUtils.h"
+
+registerMooseObject("MooseApp", TimePeriod);
 
 template <>
 InputParameters
@@ -61,7 +58,7 @@ TimePeriod::TimePeriod(const InputParameters & parameters)
   if (isParamValid("start_time"))
     _start_time = getParam<std::vector<Real>>("start_time");
   else
-    _start_time = {_app.executioner()->getParam<Real>("start_time")};
+    _start_time = {_app.getExecutioner()->getParam<Real>("start_time")};
 
   // Set end time
   if (isParamValid("end_time"))

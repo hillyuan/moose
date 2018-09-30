@@ -13,6 +13,14 @@
   PorousFlowDictator = dictator
 []
 
+[Functions]
+  [./dts]
+    type = PiecewiseLinear
+    y = '1E-2 1 10 500 5000 50000'
+    x = '0 10 100 1000 10000 500000'
+  [../]
+[]
+
 [UserObjects]
   [./dictator]
     type = PorousFlowDictator
@@ -42,68 +50,28 @@
 [Materials]
   [./massfrac]
     type = PorousFlowMassFraction
-    at_nodes = true
   [../]
   [./temperature]
-    type = PorousFlowTemperature
-    at_nodes = true
-  [../]
-  [./temperature_qp]
     type = PorousFlowTemperature
   [../]
   [./simple_fluid]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid
     phase = 0
-    at_nodes = true
-  [../]
-  [./simple_fluid_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid
-    phase = 0
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
-  [./dens_qp_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-    at_nodes = false
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
   [../]
   [./ppss]
-    type = PorousFlow1PhaseP
-    at_nodes = true
-    porepressure = pressure
-    capillary_pressure = pc
-  [../]
-  [./ppss_qp]
     type = PorousFlow1PhaseP
     porepressure = pressure
     capillary_pressure = pc
   [../]
   [./relperm]
     type = PorousFlowRelativePermeabilityVG
-    at_nodes = true
     m = 0.336
     seff_turnover = 0.99
     phase = 0
   [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
-  [../]
   [./porosity]
     type = PorousFlowPorosityConst
-    at_nodes = true
     porosity = 0.33
   [../]
   [./permeability]
@@ -187,8 +155,7 @@
 
   [./TimeStepper]
     type = FunctionDT
-    time_dt = '1E-2 1 10 500 5000 50000'
-    time_t = '0 10 100 1000 10000 500000'
+    function = dts
   [../]
 []
 

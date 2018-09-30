@@ -73,7 +73,7 @@
     variable = pab
     v = 'a b'
     sto_v = '1 1'
-    log_k = '-2 -2'
+    log_k = -2
   [../]
 []
 
@@ -115,28 +115,22 @@
   [./a1eq]
     type = CoupledBEEquilibriumSub
     variable = a
-    v = ''
     log_k = 2
     weight = 2
-    sto_v = ''
     sto_u = 2
   [../]
   [./a1diff]
     type = CoupledDiffusionReactionSub
     variable = a
-    v = ''
     log_k = 2
     weight = 2
-    sto_v = ''
     sto_u = 2
   [../]
   [./a1conv]
     type = CoupledConvectionReactionSub
     variable = a
-    v = ''
     log_k = 2
     weight = 2
-    sto_v = ''
     sto_u = 2
     p = pressure
   [../]
@@ -245,7 +239,7 @@
 [Outputs]
   file_base = 2species_out
   exodus = true
-  print_perf_log = true
+  perf_graph = true
   print_linear_residuals = true
 []
 

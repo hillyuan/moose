@@ -1,4 +1,13 @@
-import re, os, time
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
+import re, os
 from Tester import Tester
 from TestHarness import util
 
@@ -28,10 +37,13 @@ class RunApp(Tester):
         params.addParam('min_parallel',    1, "Minimum number of MPI processes that this test can be run with (Default: 1)")
         params.addParam('max_threads',    16, "Max number of threads (Default: 16)")
         params.addParam('min_threads',     1, "Min number of threads (Default: 1)")
-        params.addParam('allow_warnings',   False, "If the test harness is run --error warnings become errors, setting this to true will disable this an run the test without --error");
         params.addParam('redirect_output',  False, "Redirect stdout to files. Neccessary when expecting an error when using parallel options")
 
-        params.addParamWithType('allow_deprecated_until', type(time.localtime()), "A test that only runs if current date is less than specified date")
+        params.addParam('allow_warnings',   True, "Whether or not warnings are allowed.  If this is False then a warning will be treated as an error.  Can be globally overridden by setting 'allow_warnings = False' in the testroot file.");
+        params.addParam('allow_unused',   True, "Whether or not unused parameters are allowed in the input file.  Can be globally overridden by setting 'allow_unused = False' in the testroot file.");
+        params.addParam('allow_override', True, "Whether or not overriding a parameter/block in the input file generates an error.  Can be globally overridden by setting 'allow_override = False' in the testroot file.");
+        params.addParam('allow_deprecated', True, "Whether or not deprecated warnings are allowed.  Setting to False will cause deprecation warnings to be treated as test failures.  We do NOT recommend you globally set this permanently to False!  Deprecations are a part of the normal development flow and _SHOULD_ be allowed!")
+        params.addParam('no_error_deprecated', False, "Don't pass --error-deprecated on the command line even when running the TestHarness with --error-deprecated")
 
         # Valgrind
         params.addParam('valgrind', 'NORMAL', "Set to (NONE, NORMAL, HEAVY) to determine which configurations where valgrind will run.")
@@ -47,10 +59,6 @@ class RunApp(Tester):
             self.mpi_command = 'mpiexec'
             self.force_mpi = False
 
-        # Handle the special allow_deprecated_until parameter
-        if params.isValid('allow_deprecated_until') and params['allow_deprecated_until'] > time.localtime():
-            self.specs['cli_args'].append('--allow-deprecated')
-
         # Make sure that either input or command is supplied
         if not (params.isValid('input') or params.isValid('command')):
             raise Exception('Either "input" or "command" must be supplied for a RunApp test')
@@ -64,12 +72,20 @@ class RunApp(Tester):
     def checkRunnable(self, options):
         if options.enable_recover:
             if self.specs.isValid('expect_out') or self.specs.isValid('absent_out') or self.specs['should_crash'] == True:
-                self.setStatus('expect_out RECOVER', self.bucket_skip)
+                self.addCaveats('expect_out RECOVER')
+                self.setStatus(self.skip)
                 return False
 
         if self.specs.isValid('executable_pattern') and re.search(self.specs['executable_pattern'], self.specs['executable']) == None:
-            self.setStatus('EXECUTABLE PATTERN', self.bucket_skip)
+            self.addCaveats('EXECUTABLE PATTERN')
+            self.setStatus(self.skip)
             return False
+
+        if self.specs.isValid('min_threads') or self.specs.isValid('max_threads'):
+            if 'NONE' in options._checks['threading'] and self.getThreads(options) > 1:
+                self.addCaveats('threading_model=None')
+                self.setStatus(self.skip)
+                return False
 
         return True
 
@@ -78,6 +94,12 @@ class RunApp(Tester):
         nthreads = max(options.nthreads, int(self.specs['min_threads']))
         #Set number of threads to be used upper bound
         nthreads = min(nthreads, int(self.specs['max_threads']))
+
+        if nthreads > options.nthreads:
+            self.addCaveats('min_threads=' + str(nthreads))
+        elif nthreads < options.nthreads:
+            self.addCaveats('max_threads=' + str(nthreads))
+
         return nthreads
 
     def getProcs(self, options):
@@ -90,6 +112,12 @@ class RunApp(Tester):
         ncpus = max(default_ncpus, int(self.specs['min_parallel']))
         # Lower the ceiling
         ncpus = min(ncpus, int(self.specs['max_parallel']))
+
+        if ncpus > default_ncpus:
+            self.addCaveats('min_cpus=' + str(ncpus))
+        elif ncpus < default_ncpus:
+            self.addCaveats('max_cpus=' + str(ncpus))
+
         return ncpus
 
     def getCommand(self, options):
@@ -104,7 +132,7 @@ class RunApp(Tester):
 
         # Check for built application
         if not options.dry_run and not os.path.exists(specs['executable']):
-            self.setStatus('Application not found', self.bucket_fail)
+            self.setStatus(self.fail, 'Application not found')
             return ''
 
         if (options.parallel_mesh or options.distributed_mesh) and ('--parallel-mesh' not in cli_args or '--distributed-mesh' not in cli_args):
@@ -112,24 +140,24 @@ class RunApp(Tester):
             # and it is NOT supplied already in the cli-args option
             cli_args.append('--distributed-mesh')
 
-        if options.error and '--error' not in cli_args and not specs["allow_warnings"]:
-            # The user has passed the error option to the test harness
-            # and it is NOT supplied already in the cli-args option\
+        if '--error' not in cli_args and (not specs["allow_warnings"] or options.error):
             cli_args.append('--error')
 
-        if options.error_unused and '--error-unused' not in cli_args and '--warn-unused' not in cli_args and not specs["allow_warnings"]:
-            # The user has passed the error-unused option to the test harness
-            # and it is NOT supplied already in the cli-args option
-            # also, neither is the conflicting option "warn-unused"
+        if '--error-unused' not in cli_args and (not specs["allow_unused"] or options.error_unused):
             cli_args.append('--error-unused')
+
+        if '--error-override' not in cli_args and not specs["allow_override"]:
+            cli_args.append('--error-override')
+
+        if '--error-deprecated' not in cli_args and not specs["no_error_deprecated"] and (not specs["allow_deprecated"] or options.error_deprecated):
+            cli_args.append('--error-deprecated')
 
         if self.getCheckInput():
             cli_args.append('--check-input')
 
-        timing_string = ' '
-        if options.timing:
+        if options.timing and specs["timing"]:
             cli_args.append('--timing')
-            cli_args.append('Outputs/print_perf_log=true')
+            cli_args.append('Outputs/perf_graph=true')
 
         if options.colored == False:
             cli_args.append('--color off')
@@ -148,34 +176,17 @@ class RunApp(Tester):
         ncpus = self.getProcs(options)
         nthreads = self.getThreads(options)
 
-        if options.parallel == None:
-            default_ncpus = 1
-        else:
-            default_ncpus = options.parallel
-
         if specs['redirect_output'] and ncpus > 1:
             cli_args.append('--keep-cout --redirect-output ' + self.name())
 
-        caveats = []
-        if nthreads > options.nthreads:
-            caveats.append('min_threads=' + str(nthreads))
-        elif nthreads < options.nthreads:
-            caveats.append('max_threads=' + str(nthreads))
-        # TODO: Refactor this caveats business
-        if ncpus > default_ncpus:
-            caveats.append('min_cpus=' + str(ncpus))
-        elif ncpus < default_ncpus:
-            caveats.append('max_cpus=' + str(ncpus))
+        command = specs['executable'] + ' ' + specs['input_switch'] + ' ' + specs['input'] + ' ' + ' '.join(cli_args)
+        if options.valgrind_mode.upper() == specs['valgrind'].upper() or options.valgrind_mode.upper() == 'HEAVY' and specs['valgrind'].upper() == 'NORMAL':
+            command = 'valgrind --suppressions=' + os.path.join(specs['moose_dir'], 'python', 'TestHarness', 'suppressions', 'errors.supp') + ' --leak-check=full --tool=memcheck --dsymutil=yes --track-origins=yes --demangle=yes -v ' + command
+        elif nthreads > 1:
+            command = command + ' --n-threads=' + str(nthreads)
 
-        if len(caveats) > 0:
-            self.specs['caveats'] = caveats
-
-        if self.force_mpi or options.parallel or ncpus > 1 or nthreads > 1:
-            command = self.mpi_command + ' -n ' + str(ncpus) + ' ' + specs['executable'] + ' --n-threads=' + str(nthreads) + ' ' + specs['input_switch'] + ' ' + specs['input'] + ' ' +  ' '.join(cli_args)
-        elif options.valgrind_mode.upper() == specs['valgrind'].upper() or options.valgrind_mode.upper() == 'HEAVY' and specs['valgrind'].upper() == 'NORMAL':
-            command = 'valgrind --suppressions=' + os.path.join(specs['moose_dir'], 'python', 'TestHarness', 'suppressions', 'errors.supp') + ' --leak-check=full --tool=memcheck --dsymutil=yes --track-origins=yes --demangle=yes -v ' + specs['executable'] + ' ' + specs['input_switch'] + ' ' + specs['input'] + ' ' + ' '.join(cli_args)
-        else:
-            command = specs['executable'] + timing_string + specs['input_switch'] + ' ' + specs['input'] + ' ' + ' '.join(cli_args)
+        if self.force_mpi or options.parallel or ncpus > 1:
+            command = self.mpi_command + ' -n ' + str(ncpus) + ' ' + command
 
         return command
 
@@ -184,17 +195,23 @@ class RunApp(Tester):
         reason = ''
         specs = self.specs
         if specs.isValid('expect_out'):
+            mode = ""
             if specs['match_literal']:
                 have_expected_out = util.checkOutputForLiteral(output, specs['expect_out'])
+                mode = 'literal'
             else:
                 have_expected_out = util.checkOutputForPattern(output, specs['expect_out'])
+                mode = 'pattern'
+
             if (not have_expected_out):
                 reason = 'EXPECTED OUTPUT MISSING'
+                output += "#"*80 + "\n\nUnable to match the following " + mode + " against the program's output:\n\n" + specs['expect_out'] + "\n"
 
         if reason == '' and specs.isValid('absent_out'):
             have_absent_out = util.checkOutputForPattern(output, specs['absent_out'])
             if (have_absent_out):
                 reason = 'OUTPUT NOT ABSENT'
+                output += "#"*80 + "\n\nMatched the following pattern, which we did NOT expect:\n\n" + specs['absent_out'] + "\n"
 
         if reason == '':
             # We won't pay attention to the ERROR strings if EXPECT_ERR is set (from the derived class)
@@ -211,26 +228,22 @@ class RunApp(Tester):
                 reason = 'MEMORY ERROR'
 
         if reason != '':
-            self.setStatus(reason, self.bucket_fail)
+            self.setStatus(self.fail, reason)
 
-        return reason
+        return output
 
     def processResults(self, moose_dir, options, output):
         """
         Wrapper method for testFileOutput.
 
         testFileOutput does not set a success status, while processResults does.
-        For testers that are RunApp types, they would call this method. While
-        all other tester types (like exodiff) will call testFileOutput. This is
-        to prevent derived testers from having a successful status set, before
-        actually running their derived processResults method.
+        For testers that are RunApp types, they will call this method (processResults).
+
+        Other tester types (like exodiff) will call testFileOutput. This is to prevent
+        derived testers from having a successfull status set, before actually running
+        the derived processResults method.
+
+        # TODO: because RunParallel is now setting every successful status message,
+                refactor testFileOutput and processResults.
         """
-        reason = self.testFileOutput(moose_dir, options, output)
-
-        # Populate the bucket
-        if reason != '':
-            self.setStatus(reason, self.bucket_fail)
-        else:
-            self.setStatus(self.success_message, self.bucket_success)
-
-        return output
+        return self.testFileOutput(moose_dir, options, output)

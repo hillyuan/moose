@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef TABLESOUTPUTBASE_H
 #define TABLESOUTPUTBASE_H
@@ -43,6 +38,8 @@ public:
    * Class constructor.
    */
   TableOutput(const InputParameters & parameters);
+
+  void clear();
 
 protected:
   /**
@@ -81,11 +78,14 @@ protected:
   /// Table containing postprocessor values and scalar aux variables
   FormattedTable & _all_data_table;
 
+  /// Tolerance used when deciding whether or not to add a new row to the table
+  const Real _new_row_tol;
+
   /// Enable/disable VecptorPostprocessor time data file.
-  bool _time_data;
+  const bool _time_data;
 
   /// Enable/disable output of time column for Postprocessors
-  bool _time_column;
+  const bool _time_column;
 };
 
 #endif /* TABLEOUTPUT_H */

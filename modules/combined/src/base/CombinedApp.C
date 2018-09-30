@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "CombinedApp.h"
 #include "Factory.h"
@@ -14,19 +16,19 @@
 #include "ChemicalReactionsApp.h"
 #include "ContactApp.h"
 #include "FluidPropertiesApp.h"
+#include "FunctionalExpansionToolsApp.h"
 #include "HeatConductionApp.h"
+#include "LevelSetApp.h"
 #include "MiscApp.h"
 #include "NavierStokesApp.h"
 #include "PhaseFieldApp.h"
+#include "PorousFlowApp.h"
+#include "RdgApp.h"
 #include "RichardsApp.h"
 #include "SolidMechanicsApp.h"
 #include "StochasticToolsApp.h"
 #include "TensorMechanicsApp.h"
-#include "WaterSteamEOSApp.h"
 #include "XFEMApp.h"
-#include "PorousFlowApp.h"
-#include "RdgApp.h"
-#include "LevelSetApp.h"
 
 template <>
 InputParameters
@@ -36,79 +38,117 @@ validParams<CombinedApp>()
   return params;
 }
 
+registerKnownLabel("CombinedApp");
+
 CombinedApp::CombinedApp(const InputParameters & parameters) : MooseApp(parameters)
 {
-  Moose::registerObjects(_factory);
-  CombinedApp::registerObjects(_factory);
-
-  Moose::associateSyntax(_syntax, _action_factory);
-  CombinedApp::associateSyntax(_syntax, _action_factory);
+  CombinedApp::registerAll(_factory, _action_factory, _syntax);
 }
 
 CombinedApp::~CombinedApp() {}
 
-// External entry point for dynamic application loading
-extern "C" void
-CombinedApp__registerApps()
-{
-  CombinedApp::registerApps();
-}
 void
 CombinedApp::registerApps()
 {
   registerApp(CombinedApp);
 }
 
-// External entry point for dynamic object registration
-extern "C" void
-CombinedApp__registerObjects(Factory & factory)
+void
+CombinedApp::registerAll(Factory & f, ActionFactory & af, Syntax & s)
 {
-  CombinedApp::registerObjects(factory);
+  Registry::registerObjectsTo(f, {"CombinedApp"});
+  Registry::registerActionsTo(af, {"CombinedApp"});
+
+  ChemicalReactionsApp::registerAll(f, af, s);
+  ContactApp::registerAll(f, af, s);
+  FluidPropertiesApp::registerAll(f, af, s);
+  FunctionalExpansionToolsApp::registerAll(f, af, s);
+  HeatConductionApp::registerAll(f, af, s);
+  LevelSetApp::registerAll(f, af, s);
+  MiscApp::registerAll(f, af, s);
+  NavierStokesApp::registerAll(f, af, s);
+  PhaseFieldApp::registerAll(f, af, s);
+  PorousFlowApp::registerAll(f, af, s);
+  RdgApp::registerAll(f, af, s);
+  RichardsApp::registerAll(f, af, s);
+  SolidMechanicsApp::registerAll(f, af, s);
+  StochasticToolsApp::registerAll(f, af, s);
+  TensorMechanicsApp::registerAll(f, af, s);
+  XFEMApp::registerAll(f, af, s);
 }
+
 void
 CombinedApp::registerObjects(Factory & factory)
 {
+  mooseDeprecated("use registerAll instead of registerObjects");
   ChemicalReactionsApp::registerObjects(factory);
   ContactApp::registerObjects(factory);
   FluidPropertiesApp::registerObjects(factory);
+  FunctionalExpansionToolsApp::registerObjects(factory);
   HeatConductionApp::registerObjects(factory);
+  LevelSetApp::registerObjects(factory);
   MiscApp::registerObjects(factory);
   NavierStokesApp::registerObjects(factory);
   PhaseFieldApp::registerObjects(factory);
+  PorousFlowApp::registerObjects(factory);
+  RdgApp::registerObjects(factory);
   RichardsApp::registerObjects(factory);
   SolidMechanicsApp::registerObjects(factory);
   StochasticToolsApp::registerObjects(factory);
   TensorMechanicsApp::registerObjects(factory);
-  WaterSteamEOSApp::registerObjects(factory);
   XFEMApp::registerObjects(factory);
-  PorousFlowApp::registerObjects(factory);
-  RdgApp::registerObjects(factory);
-  LevelSetApp::registerObjects(factory);
 }
 
-// External entry point for dynamic syntax association
-extern "C" void
-CombinedApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
-{
-  CombinedApp::associateSyntax(syntax, action_factory);
-}
 void
 CombinedApp::associateSyntax(Syntax & syntax, ActionFactory & action_factory)
 {
+  mooseDeprecated("use registerAll instead of associateSyntax");
   ChemicalReactionsApp::associateSyntax(syntax, action_factory);
   ContactApp::associateSyntax(syntax, action_factory);
   FluidPropertiesApp::associateSyntax(syntax, action_factory);
+  FunctionalExpansionToolsApp::associateSyntax(syntax, action_factory);
   HeatConductionApp::associateSyntax(syntax, action_factory);
+  LevelSetApp::associateSyntax(syntax, action_factory);
   MiscApp::associateSyntax(syntax, action_factory);
   NavierStokesApp::associateSyntax(syntax, action_factory);
   PhaseFieldApp::associateSyntax(syntax, action_factory);
+  PorousFlowApp::associateSyntax(syntax, action_factory);
+  RdgApp::associateSyntax(syntax, action_factory);
   RichardsApp::associateSyntax(syntax, action_factory);
   SolidMechanicsApp::associateSyntax(syntax, action_factory);
   StochasticToolsApp::associateSyntax(syntax, action_factory);
   TensorMechanicsApp::associateSyntax(syntax, action_factory);
-  WaterSteamEOSApp::associateSyntax(syntax, action_factory);
   XFEMApp::associateSyntax(syntax, action_factory);
-  PorousFlowApp::associateSyntax(syntax, action_factory);
-  RdgApp::associateSyntax(syntax, action_factory);
-  LevelSetApp::associateSyntax(syntax, action_factory);
+}
+
+void
+CombinedApp::registerExecFlags(Factory & factory)
+{
+  mooseDeprecated("use registerAll instead of registerExecFlags");
+  ChemicalReactionsApp::registerExecFlags(factory);
+  ContactApp::registerExecFlags(factory);
+  FluidPropertiesApp::registerExecFlags(factory);
+  HeatConductionApp::registerExecFlags(factory);
+  MiscApp::registerExecFlags(factory);
+  NavierStokesApp::registerExecFlags(factory);
+  PhaseFieldApp::registerExecFlags(factory);
+  RichardsApp::registerExecFlags(factory);
+  SolidMechanicsApp::registerExecFlags(factory);
+  StochasticToolsApp::registerExecFlags(factory);
+  TensorMechanicsApp::registerExecFlags(factory);
+  XFEMApp::registerExecFlags(factory);
+  PorousFlowApp::registerExecFlags(factory);
+  RdgApp::registerExecFlags(factory);
+  LevelSetApp::registerExecFlags(factory);
+}
+
+extern "C" void
+CombinedApp__registerAll(Factory & f, ActionFactory & af, Syntax & s)
+{
+  CombinedApp::registerAll(f, af, s);
+}
+extern "C" void
+CombinedApp__registerApps()
+{
+  CombinedApp::registerApps();
 }

@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef FEATUREFLOODCOUNT_H
 #define FEATUREFLOODCOUNT_H
 
@@ -11,7 +14,7 @@
 #include "GeneralPostprocessor.h"
 #include "InfixIterator.h"
 #include "MooseVariableDependencyInterface.h"
-#include "ZeroInterface.h"
+#include "BoundaryRestrictable.h"
 
 #include <iterator>
 #include <list>
@@ -27,7 +30,6 @@
 // Forward Declarations
 class FeatureFloodCount;
 class MooseMesh;
-class MooseVariable;
 
 template <>
 InputParameters validParams<FeatureFloodCount>();
@@ -43,7 +45,7 @@ InputParameters validParams<FeatureFloodCount>();
 class FeatureFloodCount : public GeneralPostprocessor,
                           public Coupleable,
                           public MooseVariableDependencyInterface,
-                          public ZeroInterface
+                          public BoundaryRestrictable
 {
 public:
   FeatureFloodCount(const InputParameters & parameters);
@@ -57,11 +59,17 @@ public:
   virtual void finalize() override;
   virtual Real getValue() override;
 
+  /// Return the number of active features
+  std::size_t getNumberActiveFeatures() const;
+
   /// Returns the total feature count (active and inactive ids, useful for sizing vectors)
   virtual std::size_t getTotalFeatureCount() const;
 
   /// Returns a Boolean indicating whether this feature intersects _any_ boundary
   virtual bool doesFeatureIntersectBoundary(unsigned int feature_id) const;
+
+  /// Returns the centroid of the designated feature (only suppored without periodic boundaries)
+  virtual Point featureCentroid(unsigned int feature_id) const;
 
   /**
    * Returns a list of active unique feature ids for a particular element. The vector is indexed by
@@ -84,6 +92,9 @@ public:
 
   /// Returns a const vector to the coupled variable pointers
   const std::vector<MooseVariable *> & getCoupledVars() const { return _vars; }
+
+  /// Returns a const vector to the coupled MooseVariableFEBase pointers
+  const std::vector<MooseVariableFEBase *> & getFECoupledVars() const { return _fe_vars; }
 
   enum class FieldType
   {
@@ -113,6 +124,16 @@ public:
   class FeatureData
   {
   public:
+    /**
+     * The primary underlying container type used to hold the data in each FeatureData.
+     * Supported types are std::set<dof_id_type> (with minor adjustmnets)
+     * or std::vector<dof_id_type>.
+     *
+     * Note: Testing has shown that the vector container is nearly 10x faster. There's really
+     * no reason to use sets.
+     */
+    using container_type = std::set<dof_id_type>;
+
     FeatureData() : FeatureData(std::numeric_limits<std::size_t>::max(), Status::INACTIVE) {}
 
     FeatureData(std::size_t var_index,
@@ -140,8 +161,8 @@ public:
 
     ///@{
     // Default Move constructors
-    FeatureData(FeatureData && f) = default;
-    FeatureData & operator=(FeatureData && f) = default;
+    FeatureData(FeatureData && /* f */) = default;
+    FeatureData & operator=(FeatureData && /* f */) = default;
     ///@}
 
     ///@{
@@ -170,6 +191,16 @@ public:
      */
     bool mergeable(const FeatureData & rhs) const;
 
+    /**
+     * This routine indicates whether two features can be consolidated, that is, one feature is
+     * reasonably expected to be part of another. This is different than mergable in that a portion
+     * of the feature is expected to be completely identical. This happens in the distributed work
+     * scenario when a feature that is partially owned by a processor is merged on a different
+     * processor (where local entities are not sent or available). However, later that feature
+     * ends back up on the original processor and just needs to be consolidated.
+     */
+    bool canConsolidate(const FeatureData & rhs) const;
+
     ///@{
     /**
      * Determine if one of this FeaturesData's member sets intersects
@@ -191,6 +222,11 @@ public:
      * in an inconsistent state.
      */
     void merge(FeatureData && rhs);
+
+    /**
+     * Consolidates features, i.e. merges local entities but leaves everything else untouched.
+     */
+    void consolidate(FeatureData && rhs);
 
     // TODO: Doco
     void clear();
@@ -215,20 +251,20 @@ public:
     friend std::ostream & operator<<(std::ostream & out, const FeatureData & feature);
 
     /// Holds the ghosted ids for a feature (the ids which will be used for stitching
-    std::set<dof_id_type> _ghosted_ids;
+    container_type _ghosted_ids;
 
     /// Holds the local ids in the interior of a feature.
     /// This data structure is only maintained on the local processor
-    std::set<dof_id_type> _local_ids;
+    container_type _local_ids;
 
     /// Holds the ids surrounding the feature
-    std::set<dof_id_type> _halo_ids;
+    container_type _halo_ids;
 
     /// Holds halo ids that extend onto a non-topologically connected surface
-    std::set<dof_id_type> _disjoint_halo_ids;
+    container_type _disjoint_halo_ids;
 
     /// Holds the nodes that belong to the feature on a periodic boundary
-    std::set<dof_id_type> _periodic_nodes;
+    container_type _periodic_nodes;
 
     /// The Moose variable where this feature was found (often the "order parameter")
     std::size_t _var_index;
@@ -281,8 +317,8 @@ public:
      * standard containers directly. To enforce this, we are explicitly marking these methods
      * private. They can be triggered through an explicit call to "duplicate".
      */
-    FeatureData(const FeatureData & f) = default;
-    FeatureData & operator=(const FeatureData & f) = default;
+    FeatureData(const FeatureData & /* f */) = default;
+    FeatureData & operator=(const FeatureData & /* f */) = default;
     ///@}
   };
 
@@ -290,6 +326,12 @@ public:
   const std::vector<FeatureData> & getFeatures() const { return _feature_sets; }
 
 protected:
+  /**
+   * Returns a Boolean indicating whether the entity is on one of the desired boundaries.
+   */
+  template <typename T>
+  bool isBoundaryEntity(const T * entity) const;
+
   /**
    * This method is used to populate any of the data structures used for storing field data (nodal
    * or elemental). It is called at the end of finalize and can make use of any of the data
@@ -340,8 +382,8 @@ protected:
   /**
    * This method takes all of the partial features and expands the local, ghosted, and halo sets
    * around those regions to account for the diffuse interface. Rather than using any kind of
-   * recursion here, we simply expand the region by all "point" neighbors from the actual
-   * grain cells since all point neighbors will contain contributions to the region.
+   * recursion here, we simply expand the region by all "point" neighbors from the actual grain
+   * cells since all point neighbors will contain contributions to the region.
    */
   void expandPointHalos();
 
@@ -390,26 +432,32 @@ protected:
    *
    * _feature_sets layout:
    * The outer vector is sized to one when _single_map_mode == true, otherwise it is sized for the
-   * number of coupled variables. The inner list represents the flooded regions (local only
-   * after this call but fully populated after parallel communication and stitching).
+   * number of coupled variables. The inner list represents the flooded regions (local only after
+   * this call but fully populated after parallel communication and stitching).
    */
   void prepareDataForTransfer();
 
-  ///@{
   /**
-   * These routines packs/unpack the _feature_map data into a structure suitable for parallel
-   * communication operations. See the comments in these routines for the exact
-   * data structure layout.
+   * This routines packs the _partial_feature_sets data into a structure suitable for parallel
+   * communication operations.
    */
-  void serialize(std::string & serialized_buffer);
-  void deserialize(std::vector<std::string> & serialized_buffers);
-  ///@}
+  void serialize(std::string & serialized_buffer, unsigned int var_num = invalid_id);
+
+  /**
+   * This routine takes the vector of byte buffers (one for each processor), deserializes them
+   * into a series of FeatureSet objects, and appends them to the _feature_sets data structure.
+   *
+   * Note: It is assumed that local processor information may already be stored in the _feature_sets
+   * data structure so it is not cleared before insertion.
+   */
+  void deserialize(std::vector<std::string> & serialized_buffers,
+                   unsigned int var_num = invalid_id);
 
   /**
    * This routine is called on the master rank only and stitches together the partial
    * feature pieces seen on any processor.
    */
-  void mergeSets();
+  virtual void mergeSets();
 
   /**
    * Method for determining whether two features are mergeable. This routine exists because
@@ -479,10 +527,10 @@ protected:
    * It exits as soon as any intersection is detected.
    */
   template <class InputIterator>
-  static inline bool setsIntersect(InputIterator first1,
-                                   InputIterator last1,
-                                   InputIterator first2,
-                                   InputIterator last2)
+  static bool setsIntersect(InputIterator first1,
+                            InputIterator last1,
+                            InputIterator first2,
+                            InputIterator last2)
   {
     while (first1 != last1 && first2 != last2)
     {
@@ -500,8 +548,9 @@ protected:
   /*************************************************
    *************** Data Structures *****************
    ************************************************/
-
   /// The vector of coupled in variables
+  std::vector<MooseVariableFEBase *> _fe_vars;
+  /// The vector of coupled in variables cast to MooseVariable
   std::vector<MooseVariable *> _vars;
 
   /// The threshold above (or below) where an entity may begin a new region (feature)
@@ -584,15 +633,16 @@ protected:
   unsigned int _feature_count;
 
   /**
-   * The data structure used to hold partial and communicated feature data.
-   * The data structure mirrors that found in _feature_sets, but contains
-   * one additional vector indexed by processor id
+   * The data structure used to hold partial and communicated feature data, during the discovery and
+   * merging phases. The outer vector is indexed by map number (often variable number). The inner
+   * list is an unordered list of partially discovered features.
    */
   std::vector<std::list<FeatureData>> _partial_feature_sets;
 
   /**
-   * The data structure used to hold the globally unique features. The outer vector
-   * is indexed by variable number, the inner vector is indexed by feature number
+   * The data structure used to hold the globally unique features. The sorting of the vector is
+   * implementation defined and may not correspond to anything useful. The ID of each feature should
+   * be queried from the FeatureData objects.
    */
   std::vector<FeatureData> _feature_sets;
 
@@ -641,10 +691,60 @@ protected:
   std::vector<unsigned int> _empty_var_to_features;
 
   /// Determines if the flood counter is elements or not (nodes)
-  bool _is_elemental;
+  const bool _is_elemental;
+
+  /// Indicates that this object should only run on one or more boundaries
+  bool _is_boundary_restricted;
+
+  /// Boundary element range pointer (used when boundary restricting this object
+  ConstBndElemRange * _bnd_elem_range;
 
   /// Convenience variable for testing master rank
-  bool _is_master;
+  const bool _is_master;
+
+private:
+  template <class T>
+  static inline void sort(std::set<T> & /*container*/)
+  {
+    // Sets are already sorted, do nothing
+  }
+
+  template <class T>
+  static inline void sort(std::vector<T> & container)
+  {
+    std::sort(container.begin(), container.end());
+  }
+
+  template <class T>
+  static inline void reserve(std::set<T> & /*container*/, std::size_t /*size*/)
+  {
+    // Sets are trees, no reservations necessary
+  }
+
+  template <class T>
+  static inline void reserve(std::vector<T> & container, std::size_t size)
+  {
+    container.reserve(size);
+  }
+
+  /**
+   * This method consolidates all of the merged information from _partial_feature_sets into
+   * the _feature_sets vectors.
+   */
+  void consolidateMergedFeatures(std::vector<std::list<FeatureData>> * saved_data = nullptr);
+
+  /// Keeps track of whether we are distributing the merge work
+  const bool _distribute_merge_work;
+
+  /// Timers
+  const PerfID _execute_timer;
+  const PerfID _merge_timer;
+  const PerfID _finalize_timer;
+  const PerfID _comm_and_merge;
+  const PerfID _expand_halos;
+  const PerfID _update_field_info;
+  const PerfID _prepare_for_transfer;
+  const PerfID _consolidate_merged_features;
 };
 
 template <>

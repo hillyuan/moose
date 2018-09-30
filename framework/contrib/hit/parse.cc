@@ -6,6 +6,7 @@
 #include <set>
 #include <iterator>
 #include <memory>
+#include <regex>
 
 #include "parse.h"
 
@@ -17,7 +18,16 @@
 namespace hit
 {
 
-const std::string indentString = "  ";
+// returns the type of quoting used on string s (i.e. " or ') or an empty string otherwise.
+std::string
+quoteChar(const std::string & s)
+{
+  if (s[0] == '\'')
+    return "'";
+  else if (s[0] == '"')
+    return "\"";
+  return "";
+}
 
 // split breaks input into a vector treating whitespace as a delimiter.  Consecutive whitespace
 // characters are treated as a single delimiter.
@@ -50,8 +60,6 @@ trim(const std::string & str)
   return str.substr(first, (last - first + 1));
 }
 
-// toBool converts the given val to a boolean value which is stored in dst.  It returns true if
-// val was successfully converted to a boolean and returns false otherwise.
 bool
 toBool(const std::string & val, bool * dst)
 {
@@ -190,7 +198,7 @@ Node::boolVal()
 {
   valthrow();
 }
-int
+int64_t
 Node::intVal()
 {
   valthrow();
@@ -248,14 +256,14 @@ Node::children(NodeType t)
 }
 
 std::string
-Node::render(int indent)
+Node::render(int indent, const std::string & indent_text, int maxlen)
 {
   if (_type == NodeType::Root)
     indent = -1;
 
   std::string s;
   for (auto child : _children)
-    s += child->render(indent + 1) + "\n";
+    s += child->render(indent + 1, indent_text, maxlen) + "\n";
   return s;
 }
 
@@ -350,11 +358,11 @@ Comment::Comment(const std::string & text, bool is_inline)
 }
 
 std::string
-Comment::render(int indent)
+Comment::render(int indent, const std::string & indent_text, int /*maxlen*/)
 {
   if (_isinline)
     return " " + _text;
-  return "\n" + strRepeat(indentString, indent) + _text;
+  return "\n" + strRepeat(indent_text, indent) + _text;
 }
 
 Node *
@@ -372,22 +380,27 @@ Section::path()
 }
 
 std::string
-Section::render(int indent)
+Section::render(int indent, const std::string & indent_text, int maxlen)
 {
   std::string s;
-  if (path() != "")
-    s = "\n" + strRepeat(indentString, indent) + "[" + _path + "]";
+  if (path() != "" && tokens().size() > 4)
+    s = "\n" + strRepeat(indent_text, indent) + "[" + tokens()[1].val + "]";
+  else if (path() != "")
+    s = "\n" + strRepeat(indent_text, indent) + "[" + _path + "]";
 
   for (auto child : children())
     if (path() == "")
-      s += child->render(indent);
+      s += child->render(indent, indent_text, maxlen);
     else
-      s += child->render(indent + 1);
+      s += child->render(indent + 1, indent_text, maxlen);
 
-  if (path() != "")
-    s += "\n" + strRepeat(indentString, indent) + "[]";
+  if (path() != "" && tokens().size() > 4)
+    s += "\n" + strRepeat(indent_text, indent) + "[" + tokens()[4].val + "]";
+  else if (path() != "")
+    s += "\n" + strRepeat(indent_text, indent) + "[]";
 
-  if (indent == 0 && s[0] == '\n')
+  if (indent == 0 &&
+      ((root() == this && s[0] == '\n') || (parent() && parent()->children()[0] == this)))
     s = s.substr(1);
   return s;
 }
@@ -396,6 +409,9 @@ Node *
 Section::clone()
 {
   auto n = new Section(_path);
+  // Although we don't usually copy over tokens for cloned nodes, we make an exception here
+  // in order to "remember" whether or not the user used the legacy "../" section closing marker.
+  n->tokens() = tokens();
   for (auto child : children())
     n->addChild(child->clone());
   return n;
@@ -413,11 +429,62 @@ Field::path()
 }
 
 std::string
-Field::render(int indent)
+Field::render(int indent, const std::string & indent_text, int maxlen)
 {
-  std::string s = "\n" + strRepeat(indentString, indent) + _field + " = " + _val;
+  std::string s = "\n" + strRepeat(indent_text, indent) + _field + " = ";
+  size_t prefix_len = s.size() - 1;
+  auto quote = quoteChar(_val);
+  int max = maxlen - prefix_len - 1;
+
+  // special rendering logic for quoted strings that go over maxlen:
+  if (_kind == Kind::String && quote != "" && max > 0)
+  {
+    // strip outer quotes - will will add back our own for each line
+    std::string unquoted = _val.substr(1, _val.size() - 2);
+
+    // iterate over the string in chunks of size "max"
+    size_t pos = 0;
+    while (pos + max < unquoted.size())
+    {
+      // to avoid splitting words, walk backwards from the "max" sized chunk boundary to find a
+      // space character
+      size_t boundary = pos + max;
+      while (boundary > pos && !charIn(unquoted[boundary], " \t"))
+        boundary--;
+
+      // if we didn't find a space, just fall back to the original max sized chunk boundary and
+      // split the word anyway
+      if (boundary == pos)
+        boundary = pos + max;
+
+      // shift the boundary to after the space character (instead of before it) unless that would
+      // make the index beyond the string length.
+      boundary = std::min(boundary + 1, unquoted.size());
+
+      // add the leading indentation and newline - skip it for the first first chunk of a string
+      // because it should go on the same line as the "=",
+      if (pos > 0)
+        s += "\n" + strRepeat(" ", prefix_len);
+
+      // add the quoted chunk to our string text
+      s += quote + unquoted.substr(pos, boundary - pos) + quote;
+      pos = boundary;
+    }
+
+    // add any remaining partial chunk of the string value
+    if (pos < unquoted.size())
+    {
+      // again only add leading newline and indentation for greater chunks after the first.
+      if (pos > 0)
+        s += "\n" + strRepeat(" ", prefix_len);
+      s += quote + unquoted.substr(pos, std::string::npos) + quote;
+    }
+  }
+  else
+    s += _val;
+
   for (auto child : children())
-    s += child->render(indent + 1);
+    s += child->render(indent + 1, indent_text, maxlen);
   return s;
 }
 
@@ -454,7 +521,12 @@ Field::vecIntVal()
   {
     try
     {
-      vec.push_back(std::stoi(s));
+      size_t pos = 0;
+      auto converted_val = std::stoi(s, &pos);
+      if (pos != s.size())
+        throw std::invalid_argument("dummy");
+
+      vec.push_back(converted_val);
     }
     catch (...)
     {
@@ -473,7 +545,12 @@ Field::vecFloatVal()
   {
     try
     {
-      vec.push_back(std::stod(s));
+      size_t pos = 0;
+      auto converted_val = std::stod(s, &pos);
+      if (pos != s.size())
+        throw std::invalid_argument("dummy");
+
+      vec.push_back(converted_val);
     }
     catch (...)
     {
@@ -507,7 +584,7 @@ Field::boolVal()
   toBool(_val, &v);
   return v;
 }
-int
+int64_t
 Field::intVal()
 {
   if (_kind != Kind::Int)
@@ -515,7 +592,11 @@ Field::intVal()
                 "')");
   try
   {
-    return std::stoi(_val);
+    size_t pos = 0;
+    auto converted_val = std::stoll(_val, &pos);
+    if (pos != _val.size())
+      throw std::invalid_argument("dummy");
+    return converted_val;
   }
   catch (...)
   {
@@ -530,24 +611,24 @@ Field::floatVal()
                 "')");
   try
   {
-    return std::stod(_val);
+    size_t pos = 0;
+    auto converted_val = std::stod(_val, &pos);
+    if (pos != _val.size())
+      throw std::invalid_argument("dummy");
+    return converted_val;
   }
   catch (...)
   {
     throw Error("cannot convert '" + _val + "' to float");
   }
 }
+
 std::string
 Field::strVal()
 {
   std::string s = _val;
 
-  std::string quote = "";
-  if (_val[0] == '\'')
-    quote = "'";
-  else if (_val[0] == '"')
-    quote = "\"";
-
+  auto quote = quoteChar(_val);
   if (quote != "")
   {
     s = _val.substr(1, _val.size() - 2);
@@ -575,6 +656,7 @@ public:
 
   size_t start() { return _start; }
   size_t pos() { return _pos; }
+  std::vector<Token> & tokens() { return _tokens; }
 
   Token next()
   {
@@ -642,7 +724,7 @@ void parseEnterPath(Parser * p, Node * n);
 void parseExitPath(Parser * p, Node * n);
 
 void
-parseExitPath(Parser * p, Node *)
+parseExitPath(Parser * p, Node * n)
 {
   auto secOpenToks = p->scope()->tokens();
 
@@ -653,9 +735,14 @@ parseExitPath(Parser * p, Node *)
   auto path = p->require(TokType::Path, "malformed section close, expected PATH");
   p->require(TokType::RightBracket, "expected ']'");
 
+  auto s = n->children().back();
+  for (size_t i = p->start(); i < p->pos(); i++)
+    s->tokens().push_back(p->tokens()[i]);
+
   if (path.val != "../" && path.val != "")
     p->error(path, "invalid closing path");
   p->ignore();
+
   p->scopeclose();
 }
 
@@ -706,7 +793,7 @@ parseSectionBody(Parser * p, Node * n)
     else if (tok.type == TokType::EOF)
       return;
     else
-      p->error(tok, "unexpected token");
+      p->error(tok, "unexpected token " + tok.str());
   }
 }
 
@@ -727,7 +814,7 @@ parseField(Parser * p, Node * n)
     {
       if (charIn('e', s) || charIn('E', s) || charIn('.', s))
         kind = Field::Kind::Float;
-      else if ((double)std::stoi(s) != std::stod(s))
+      else if ((double)std::stoll(s) != std::stod(s))
         kind = Field::Kind::Float;
     }
     catch (...) // integer might be too big to fit in int - use float
@@ -744,7 +831,30 @@ parseField(Parser * p, Node * n)
     if (isbool)
       field = p->emit(new Field(fieldtok.val, Field::Kind::Bool, valtok.val));
     else
-      field = p->emit(new Field(fieldtok.val, Field::Kind::String, valtok.val));
+    {
+      std::string strval;
+      std::string quote = quoteChar(valtok.val);
+      while (true)
+      {
+        if (valtok.type == TokType::String)
+        {
+          auto s = valtok.val;
+          if (quote != "")
+            s = s.substr(1, s.size() - 2);
+          strval += s;
+        }
+
+        if (p->peek().type != TokType::BlankLine && p->peek().type != TokType::String)
+        {
+          if (valtok.type == TokType::BlankLine)
+            p->backup();
+          break;
+        }
+        valtok = p->next();
+      }
+      strval = quote + strval + quote;
+      field = p->emit(new Field(fieldtok.val, Field::Kind::String, strval));
+    }
   }
   else
     p->error(valtok, "malformed field value");
@@ -801,10 +911,10 @@ public:
     }
     else if (result->type() == NodeType::Field)
     {
-      // node exists - overwrite its value
+      // node exists - overwrite its value and kind
       auto dst = static_cast<Field *>(result);
       auto src = static_cast<Field *>(n);
-      dst->setVal(src->val());
+      dst->setVal(src->val(), src->kind());
     }
   }
 
@@ -887,6 +997,188 @@ explode(Node * n)
   for (auto child : n->children())
     explode(child);
   return n->root();
+}
+
+// When a node tree is walked with this, it removes/clears all tokens from all nodes in the tree.
+// This can be useful to clear tokens that might otherwise cause the tree to be rendered with
+// legacy "../" section closing paths or leading "./" in section headers.
+class TokenClearer : public hit::Walker
+{
+public:
+  void
+  walk(const std::string & /*fullpath*/, const std::string & /*nodepath*/, hit::Node * n) override
+  {
+    n->tokens().clear();
+  }
+};
+
+// matches returns true if s matches the given regex pattern.
+bool
+matches(const std::string & s, const std::string & regex, bool full = true)
+{
+  try
+  {
+    if (full)
+      return std::regex_match(s, std::regex(regex));
+    return std::regex_search(s, std::regex(regex));
+  }
+  catch (...)
+  {
+    return false;
+  }
+}
+
+Formatter::Formatter() : canonical_section_markers(true), line_length(100), indent_string("  ") {}
+
+void
+Formatter::walkPatternConfig(const std::string & prefix, Node * n)
+{
+  std::vector<std::string> order;
+  for (auto child : n->children())
+  {
+    order.push_back(child->path());
+    if (child->type() == NodeType::Section)
+    {
+      auto subpath = prefix + "/" + child->path();
+      if (prefix == "")
+        subpath = child->path();
+      walkPatternConfig(subpath, child);
+    }
+  }
+
+  addPattern(prefix, order);
+}
+
+Formatter::Formatter(const std::string & fname, const std::string & hit_config)
+  : canonical_section_markers(true), line_length(100), indent_string("  ")
+{
+  std::unique_ptr<hit::Node> root(hit::parse(fname, hit_config));
+  if (root->find("format/indent_string"))
+    indent_string = root->param<std::string>("format/indent_string");
+  if (root->find("format/line_length"))
+    line_length = root->param<int>("format/line_length");
+  if (root->find("format/canonical_section_markers"))
+    canonical_section_markers = root->param<bool>("format/canonical_section_markers");
+  if (root->find("format/sorting"))
+    walkPatternConfig("", root->find("format/sorting"));
+}
+
+std::string
+Formatter::format(const std::string & fname, const std::string & input)
+{
+  std::unique_ptr<hit::Node> root(hit::parse(fname, input));
+
+  TokenClearer tc;
+  if (canonical_section_markers)
+    root->walk(&tc, hit::NodeType::Section);
+
+  root->walk(this, hit::NodeType::All);
+  return root->render(0, indent_string, line_length);
+}
+
+void
+Formatter::addPattern(const std::string & section, const std::vector<std::string> & order)
+{
+  _patterns.push_back({section, order});
+}
+
+void
+Formatter::walk(const std::string & fullpath, const std::string & /*nodepath*/, Node * n)
+{
+  for (auto & pattern : _patterns)
+  {
+    if (!matches(fullpath, pattern.regex, true))
+      continue;
+
+    std::vector<std::string> frontorder;
+    std::vector<std::string> backorder;
+    bool onfront = true;
+    for (auto & field : pattern.order)
+    {
+      if (field == "**")
+      {
+        onfront = false;
+        continue;
+      }
+      else if (onfront)
+        frontorder.push_back(field);
+      else
+        backorder.push_back(field);
+    }
+
+    auto nodes = n->children();
+    std::vector<Node *> fronthalf;
+    std::vector<Node *> unused;
+    sortGroup(nodes, frontorder, fronthalf, unused);
+
+    std::vector<Node *> backhalf;
+    nodes = unused;
+    unused.clear();
+    sortGroup(nodes, backorder, backhalf, unused);
+
+    std::vector<Node *> children;
+    children.insert(children.end(), fronthalf.begin(), fronthalf.end());
+    children.insert(children.end(), unused.begin(), unused.end());
+    children.insert(children.end(), backhalf.rbegin(), backhalf.rend());
+
+    for (unsigned int i = 0; i < children.size(); i++)
+      children[i] = children[i]->clone();
+
+    for (auto child : n->children())
+      delete child;
+
+    for (auto child : children)
+      n->addChild(child);
+  }
+}
+
+void
+Formatter::sortGroup(const std::vector<Node *> & nodes,
+                     const std::vector<std::string> & order,
+                     std::vector<Node *> & sorted,
+                     std::vector<Node *> & unused)
+{
+  std::vector<bool> skips(nodes.size(), false);
+
+  for (auto next : order)
+  {
+    for (unsigned int i = 0; i < nodes.size(); i++)
+    {
+      if (skips[i])
+        continue;
+
+      auto comment = nodes[i];
+      Node * field = nullptr;
+      if (i + 1 < nodes.size())
+        field = nodes[i + 1];
+
+      if ((comment->type() == NodeType::Comment || comment->type() == NodeType::Blank) && field &&
+          (field->type() == NodeType::Field || field->type() == NodeType::Section))
+        i++;
+      else if (comment->type() == NodeType::Field || comment->type() == NodeType::Section)
+      {
+        field = comment;
+        comment = nullptr;
+      }
+      else
+        continue;
+
+      if (matches(next, field->path(), false))
+      {
+        if (comment != nullptr)
+        {
+          sorted.push_back(comment);
+          skips[i + 1] = true;
+        }
+        skips[i] = true;
+        sorted.push_back(field);
+      }
+    }
+  }
+
+  for (unsigned int i = 0; i < skips.size(); i++)
+    if (skips[i] == false)
+      unused.push_back(nodes[i]);
 }
 
 #define EOF TMPEOF

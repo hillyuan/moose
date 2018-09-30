@@ -1,11 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "AEFVSlopeLimitingOneD.h"
+
+registerMooseObject("RdgApp", AEFVSlopeLimitingOneD);
 
 template <>
 InputParameters
@@ -81,7 +85,10 @@ AEFVSlopeLimitingOneD::limitElementSlope() const
   std::vector<std::vector<Real>> sigma(nsten, std::vector<Real>(nvars, 0.));
 
   // get the cell-average variable in the central cell
-  ucell[0][0] = _u->getElementalValue(elem);
+  if (_is_implicit)
+    ucell[0][0] = _u->getElementalValue(elem);
+  else
+    ucell[0][0] = _u->getElementalValueOld(elem);
 
   // a flag to indicate the boundary side of the current cell
 
@@ -102,7 +109,10 @@ AEFVSlopeLimitingOneD::limitElementSlope() const
         xc[in] = neig->centroid()(0);
 
         // get the cell-average variable in this neighbor cell
-        ucell[in][0] = _u->getElementalValue(neig);
+        if (_is_implicit)
+          ucell[in][0] = _u->getElementalValue(neig);
+        else
+          ucell[in][0] = _u->getElementalValueOld(neig);
 
         // calculate the one-sided slopes of primitive variables
 

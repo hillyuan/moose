@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "EBSDReader.h"
 #include "EBSDMesh.h"
@@ -12,6 +14,8 @@
 #include "NonlinearSystem.h"
 
 #include <fstream>
+
+registerMooseObject("PhaseFieldApp", EBSDReader);
 
 template <>
 InputParameters
@@ -342,12 +346,10 @@ EBSDReader::buildNodeWeightMaps()
   libMesh::MeshBase & mesh = _mesh.getMesh();
 
   // Loop through each node in mesh and calculate eta values for each grain associated with the node
-  MeshBase::const_node_iterator ni = mesh.active_nodes_begin();
-  const MeshBase::const_node_iterator nend = mesh.active_nodes_end();
-  for (; ni != nend; ++ni)
+  for (const auto & node : as_range(mesh.active_nodes_begin(), mesh.active_nodes_end()))
   {
     // Get node_id
-    const dof_id_type node_id = (*ni)->id();
+    const dof_id_type node_id = node->id();
 
     // Initialize map entries for current node
     _node_to_grain_weight_map[node_id].assign(getGrainNum(), 0.0);

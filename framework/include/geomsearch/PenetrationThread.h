@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef PENETRATIONTHREAD_H
 #define PENETRATIONTHREAD_H
@@ -20,29 +15,31 @@
 #include "PenetrationLocator.h"
 
 // Forward declarations
-class MooseVariable;
+template <typename>
+class MooseVariableFE;
+typedef MooseVariableFE<Real> MooseVariable;
+typedef MooseVariableFE<VectorValue<Real>> VectorMooseVariable;
 
 class PenetrationThread
 {
 public:
-  PenetrationThread(SubProblem & subproblem,
-                    const MooseMesh & mesh,
-                    BoundaryID master_boundary,
-                    BoundaryID slave_boundary,
-                    std::map<dof_id_type, PenetrationInfo *> & penetration_info,
-                    bool check_whether_reasonable,
-                    bool update_location,
-                    Real tangential_tolerance,
-                    bool do_normal_smoothing,
-                    Real normal_smoothing_distance,
-                    PenetrationLocator::NORMAL_SMOOTHING_METHOD normal_smoothing_method,
-                    std::vector<std::vector<FEBase *>> & fes,
-                    FEType & fe_type,
-                    NearestNodeLocator & nearest_node,
-                    const std::map<dof_id_type, std::vector<dof_id_type>> & node_to_elem_map,
-                    std::vector<dof_id_type> & elem_list,
-                    std::vector<unsigned short int> & side_list,
-                    std::vector<boundary_id_type> & id_list);
+  PenetrationThread(
+      SubProblem & subproblem,
+      const MooseMesh & mesh,
+      BoundaryID master_boundary,
+      BoundaryID slave_boundary,
+      std::map<dof_id_type, PenetrationInfo *> & penetration_info,
+      bool check_whether_reasonable,
+      bool update_location,
+      Real tangential_tolerance,
+      bool do_normal_smoothing,
+      Real normal_smoothing_distance,
+      PenetrationLocator::NORMAL_SMOOTHING_METHOD normal_smoothing_method,
+      std::vector<std::vector<FEBase *>> & fes,
+      FEType & fe_type,
+      NearestNodeLocator & nearest_node,
+      const std::map<dof_id_type, std::vector<dof_id_type>> & node_to_elem_map,
+      const std::vector<std::tuple<dof_id_type, unsigned short int, boundary_id_type>> & bc_tuples);
 
   // Splitting Constructor
   PenetrationThread(PenetrationThread & x, Threads::split split);
@@ -50,6 +47,9 @@ public:
   void operator()(const NodeIdRange & range);
 
   void join(const PenetrationThread & other);
+
+  /// List of slave nodes for which penetration was not detected in the current patch and for which patch has to be updated.
+  std::vector<dof_id_type> _recheck_slave_nodes;
 
 protected:
   SubProblem & _subproblem;
@@ -79,11 +79,8 @@ protected:
 
   const std::map<dof_id_type, std::vector<dof_id_type>> & _node_to_elem_map;
 
-  std::vector<dof_id_type> & _elem_list;
-  std::vector<unsigned short int> & _side_list;
-  std::vector<boundary_id_type> & _id_list;
-
-  unsigned int _n_elems;
+  // Each boundary condition tuple has three entries, (0=elem-id, 1=side-id, 2=bc-id)
+  const std::vector<std::tuple<dof_id_type, unsigned short int, boundary_id_type>> & _bc_tuples;
 
   THREAD_ID _tid;
 

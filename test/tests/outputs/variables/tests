@@ -36,4 +36,17 @@
     input = show_hide.i
     exodiff = show_hide_out.e
   [../]
+
+  [./nemesis_hide]
+    type = 'Exodiff'
+    input = nemesis_hide.i
+    min_parallel = 2
+    max_parallel = 2
+    exodiff = 'nemesis_hide_out.e.2.0 nemesis_hide_out.e.2.1'
+    compiler = 'CLANG'
+    platform = 'DARWIN'
+    requirement = "The variables specified in an Output object's 'hide = ' list shall not appear in the output file."
+    design = 'Outputs/index.md'
+    issues = '#1895'
+  [../]
 []

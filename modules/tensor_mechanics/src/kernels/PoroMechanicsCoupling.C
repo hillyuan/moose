@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PoroMechanicsCoupling.h"
 
@@ -12,15 +14,16 @@
 #include "MooseMesh.h"
 #include "MooseVariable.h"
 
+registerMooseObject("TensorMechanicsApp", PoroMechanicsCoupling);
+
 template <>
 InputParameters
 validParams<PoroMechanicsCoupling>()
 {
   InputParameters params = validParams<Kernel>();
-  params.addClassDescription("Adds -BiotCoefficient*porepressure*grad_test[component]");
-  params.addRequiredCoupledVar(
-      "porepressure",
-      "Porepressure.  This kernel adds -BiotCoefficient*porepressure*grad_test[component]");
+  params.addClassDescription(
+      "Adds $-Bi \\cdot p_s \\cdot \\nabla \\Psi_c$, where the subscript $c$ is the component.");
+  params.addRequiredCoupledVar("porepressure", "Porepressure, $p_s$.");
   params.addRequiredParam<unsigned int>("component",
                                         "The gradient direction (0 for x, 1 for y and 2 for z)");
   return params;

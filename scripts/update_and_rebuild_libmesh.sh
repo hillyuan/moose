@@ -1,25 +1,58 @@
 #!/usr/bin/env bash
 
+DIAGNOSTIC_LOG="libmesh_diagnostic.log"
+
 # Set go_fast flag if "--fast" is found in command line args.
 for i in "$@"
 do
+  shift
   if [ "$i" == "--fast" ]; then
     go_fast=1;
-    break;
+  fi
+
+  if [[ "$i" == "-h" || "$i" == "--help" ]]; then
+    help=1;
+  fi
+
+  if [ "$i" == "--skip-submodule-update" ]; then
+    skip_sub_update=1;
+  else # Remove the skip submodule update argument before passing to libMesh configure
+    set -- "$@" "$i"
   fi
 done
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Display help
+if [[ -n "$help" ]]; then
+  cd $SCRIPT_DIR/..
+  echo "Usage: $0 [-h | --help | --fast | --skip-submodule-update | <libmesh options> ]"
+  echo
+  echo "-h | --help              Display this message and list of available libmesh options"
+  echo "--fast                   Run libmesh 'make && make install' only, do NOT run configure"
+  echo "--skip-submodule-update  Do not update the libMesh submodule, use the current version"
+  echo "*************************************************************************************"
+  echo ""
+
+  if [ -e "./libmesh/configure" ]; then
+    libmesh/configure -h
+  fi
+  exit 0
+fi
+
 # If --fast was used, it means we are going to skip configure, so
-# don't allow the user to pass any other flags to the script thinking
-# they are going to do something.
+# don't allow the user to pass any other flags (with the exception
+# of --skip-submodule-update) to the script thinking they are going
+# to do something.
 if [[ -n "$go_fast" && $# != 1 ]]; then
-  echo "Error: --fast cannot be used with other command line arguments to `basename "$0"`."
-  echo "Try again, removing either --fast or all of the other arguments!"
+  echo "Error: --fast can only be used by itself or with --skip-submodule-update."
+  echo "Try again, removing either --fast or all other conflicting arguments!"
   exit 1;
 fi
 
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# generate machine diagnostics and write it to the log
+$SCRIPT_DIR/diagnostics.sh > "$SCRIPT_DIR/$DIAGNOSTIC_LOG"
 
 if [[ -n "$LIBMESH_DIR" ]]; then
   echo "INFO: LIBMESH_DIR set - overriding default installed path"
@@ -49,9 +82,8 @@ cd $SCRIPT_DIR/..
 
 # Test for git repository when not using fast
 git_dir=`git rev-parse --show-cdup 2>/dev/null`
-if [[ -z "$go_fast" && $? == 0 && "x$git_dir" == "x" ]]; then
-  git submodule init libmesh
-  git submodule update libmesh
+if [[ -z "$go_fast" && -z "$skip_sub_update" && $? == 0 && "x$git_dir" == "x" ]]; then
+  git submodule update --init --recursive libmesh
   if [[ $? != 0 ]]; then
     echo "git submodule command failed, are your proxy settings correct?"
     # TODO: is this a git bug?
@@ -91,10 +123,10 @@ if [ -z "$go_fast" ]; then
                --enable-silent-rules \
                --enable-unique-id \
                --disable-warnings \
-               --enable-unique-ptr \
-               --enable-openmp \
+               --with-thread-model=openmp \
                --disable-maintainer-mode \
-               --enable-petsc-required \
+               --enable-petsc-hypre-required \
+               --enable-metaphysicl \
                $DISABLE_TIMESTAMPS $VTK_OPTIONS $* || exit 1
 else
   # The build directory must already exist: you can't do --fast for
@@ -114,14 +146,18 @@ fi
 LIBMESH_JOBS=${MOOSE_JOBS:-1}
 
 if [ -z "${MOOSE_MAKE}" ]; then
-  make -j ${JOBS:-$LIBMESH_JOBS} && \
-    make install
+  (make -j ${JOBS:-$LIBMESH_JOBS} && make install) || exit 1
 else
-  ${MOOSE_MAKE} && \
-    ${MOOSE_MAKE} install
+  (${MOOSE_MAKE} && ${MOOSE_MAKE} install) || exit 1
 fi
 
 # Local Variables:
 # sh-basic-offset: 2
 # sh-indentation: 2
 # End:
+
+# Include libMesh config.log in the diagnostics log
+if [ -f "$SCRIPT_DIR/../libmesh/build/config.log" ]; then
+  echo -e "\nLIBMESH CONFIGURE LOG" >> "$SCRIPT_DIR/$DIAGNOSTIC_LOG"
+  cat "$SCRIPT_DIR/../libmesh/build/config.log" >> "$SCRIPT_DIR/$DIAGNOSTIC_LOG"
+fi

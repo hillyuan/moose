@@ -1,19 +1,23 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "XFEMMaterialTensorMarkerUserObject.h"
 
 #include "libmesh/quadrature.h"
 
+registerMooseObject("XFEMApp", XFEMMaterialTensorMarkerUserObject);
+
 template <>
 InputParameters
 validParams<XFEMMaterialTensorMarkerUserObject>()
 {
-  InputParameters params = validParams<XFEMMarkerUserObject>();
+  InputParameters params = validParams<XFEMMaterialStateMarkerBase>();
   params += validParams<MaterialTensorCalculator>();
   params.addRequiredParam<std::string>("tensor", "The material tensor name.");
   params.addRequiredParam<Real>("threshold", "The threshold for crack growth.");
@@ -26,7 +30,7 @@ validParams<XFEMMaterialTensorMarkerUserObject>()
 
 XFEMMaterialTensorMarkerUserObject::XFEMMaterialTensorMarkerUserObject(
     const InputParameters & parameters)
-  : XFEMMarkerUserObject(parameters),
+  : XFEMMaterialStateMarkerBase(parameters),
     _material_tensor_calculator(parameters),
     _tensor(getMaterialProperty<SymmTensor>(getParam<std::string>("tensor"))),
     _threshold(getParam<Real>("threshold")),

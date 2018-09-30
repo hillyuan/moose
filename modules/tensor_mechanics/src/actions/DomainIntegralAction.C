@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "DomainIntegralAction.h"
@@ -14,6 +16,16 @@
 #include "MooseMesh.h"
 
 #include "libmesh/string_to_enum.h"
+
+registerMooseAction("TensorMechanicsApp", DomainIntegralAction, "add_user_object");
+
+registerMooseAction("TensorMechanicsApp", DomainIntegralAction, "add_aux_variable");
+
+registerMooseAction("TensorMechanicsApp", DomainIntegralAction, "add_aux_kernel");
+
+registerMooseAction("TensorMechanicsApp", DomainIntegralAction, "add_postprocessor");
+
+registerMooseAction("TensorMechanicsApp", DomainIntegralAction, "add_material");
 
 template <>
 InputParameters
@@ -54,7 +66,7 @@ validParams<DomainIntegralAction>()
   params.addParam<VariableName>("disp_x", "The x displacement");
   params.addParam<VariableName>("disp_y", "The y displacement");
   params.addParam<VariableName>("disp_z", "The z displacement");
-  params.addParam<VariableName>("temp", "", "The temperature");
+  params.addParam<VariableName>("temperature", "", "The temperature");
   MooseEnum position_type("Angle Distance", "Distance");
   params.addParam<MooseEnum>(
       "position_type",
@@ -74,8 +86,9 @@ validParams<DomainIntegralAction>()
   params.addParam<bool>("solid_mechanics",
                         false,
                         "Set to true if the solid_mechanics system is "
-                        "used. This option is only needed for "
-                        "interaction integrals.");
+                        "used.");
+  params.addRequiredParam<bool>(
+      "incremental", "Flag to indicate whether an incremental or total model is being used.");
   params.addParam<std::vector<MaterialPropertyName>>(
       "eigenstrain_names", "List of eigenstrains applied in the strain calculation");
   return params;
@@ -84,7 +97,7 @@ validParams<DomainIntegralAction>()
 DomainIntegralAction::DomainIntegralAction(const InputParameters & params)
   : Action(params),
     _boundary_names(getParam<std::vector<BoundaryName>>("boundary")),
-    _number_crack_front_points(0),
+    _closed_loop(getParam<bool>("closed_loop")),
     _use_crack_front_points_provider(false),
     _order(getParam<std::string>("order")),
     _family(getParam<std::string>("family")),
@@ -104,7 +117,8 @@ DomainIntegralAction::DomainIntegralAction(const InputParameters & params)
     _get_equivalent_k(getParam<bool>("equivalent_k")),
     _use_displaced_mesh(false),
     _output_q(getParam<bool>("output_q")),
-    _solid_mechanics(getParam<bool>("solid_mechanics"))
+    _solid_mechanics(getParam<bool>("solid_mechanics")),
+    _incremental(getParam<bool>("incremental"))
 {
   if (_q_function_type == GEOMETRY)
   {
@@ -135,9 +149,8 @@ DomainIntegralAction::DomainIntegralAction(const InputParameters & params)
     mooseError("DomainIntegral error: invalid q_function_type.");
 
   if (isParamValid("crack_front_points"))
-  {
     _crack_front_points = getParam<std::vector<Point>>("crack_front_points");
-  }
+
   if (isParamValid("crack_front_points_provider"))
   {
     if (!isParamValid("number_points_from_provider"))
@@ -146,7 +159,6 @@ DomainIntegralAction::DomainIntegralAction(const InputParameters & params)
                  "provided.");
     _use_crack_front_points_provider = true;
     _crack_front_points_provider = getParam<UserObjectName>("crack_front_points_provider");
-    _number_crack_front_points = getParam<unsigned int>("number_points_from_provider");
   }
   else if (isParamValid("number_points_from_provider"))
     mooseError("DomainIntegral error: number_points_from_provider is provided but "
@@ -230,8 +242,8 @@ DomainIntegralAction::DomainIntegralAction(const InputParameters & params)
     _integrals.insert(INTEGRAL(int(integral_moose_enums.get(i))));
   }
 
-  if (isParamValid("temp"))
-    _temp = getParam<VariableName>("temp");
+  if (isParamValid("temperature"))
+    _temp = getParam<VariableName>("temperature");
 
   if (_temp != "" && !isParamValid("eigenstrain_names") && !_solid_mechanics)
     mooseError(
@@ -280,7 +292,7 @@ DomainIntegralAction::act()
     const std::string uo_type_name("CrackFrontDefinition");
 
     InputParameters params = _factory.getValidParams(uo_type_name);
-    params.set<MultiMooseEnum>("execute_on") = "initial timestep_end";
+    params.set<ExecFlagEnum>("execute_on") = {EXEC_INITIAL, EXEC_TIMESTEP_END};
     params.set<MooseEnum>("crack_direction_method") = _direction_method_moose_enum;
     params.set<MooseEnum>("crack_end_direction_method") = _end_direction_method_moose_enum;
     if (_have_crack_direction_vector)
@@ -302,10 +314,10 @@ DomainIntegralAction::act()
     if (_crack_front_points.size() != 0)
       params.set<std::vector<Point>>("crack_front_points") = _crack_front_points;
     if (_use_crack_front_points_provider)
-    {
-      params.set<UserObjectName>("crack_front_points_provider") = _crack_front_points_provider;
-      params.set<unsigned int>("number_points_from_provider") = _number_crack_front_points;
-    }
+      params.applyParameters(parameters(),
+                             {"crack_front_points_provider, number_points_from_provider"});
+    if (_closed_loop)
+      params.set<bool>("closed_loop") = _closed_loop;
     params.set<bool>("use_displaced_mesh") = _use_displaced_mesh;
     if (_integrals.count(INTERACTION_INTEGRAL_T) != 0)
     {
@@ -378,7 +390,7 @@ DomainIntegralAction::act()
     }
 
     InputParameters params = _factory.getValidParams(ak_type_name);
-    params.set<MultiMooseEnum>("execute_on") = "initial timestep_end";
+    params.set<ExecFlagEnum>("execute_on") = {EXEC_INITIAL, EXEC_TIMESTEP_END};
     params.set<UserObjectName>("crack_front_definition") = uo_name;
     params.set<bool>("use_displaced_mesh") = _use_displaced_mesh;
 
@@ -430,7 +442,7 @@ DomainIntegralAction::act()
         pp_base_name = "J";
       const std::string pp_type_name("JIntegral");
       InputParameters params = _factory.getValidParams(pp_type_name);
-      params.set<MultiMooseEnum>("execute_on") = "timestep_end";
+      params.set<ExecFlagEnum>("execute_on") = EXEC_TIMESTEP_END;
       params.set<UserObjectName>("crack_front_definition") = uo_name;
       params.set<bool>("convert_J_to_K") = _convert_J_to_K;
       if (_convert_J_to_K)
@@ -488,7 +500,7 @@ DomainIntegralAction::act()
         pp_type_name = "InteractionIntegralSM";
 
       InputParameters params = _factory.getValidParams(pp_type_name);
-      params.set<MultiMooseEnum>("execute_on") = "timestep_end";
+      params.set<ExecFlagEnum>("execute_on") = EXEC_TIMESTEP_END;
       params.set<UserObjectName>("crack_front_definition") = uo_name;
       params.set<bool>("use_displaced_mesh") = _use_displaced_mesh;
       if (_has_symmetry_plane)
@@ -497,7 +509,7 @@ DomainIntegralAction::act()
       params.set<Real>("youngs_modulus") = _youngs_modulus;
       params.set<std::vector<VariableName>>("displacements") = _displacements;
       if (_temp != "")
-        params.set<std::vector<VariableName>>("temp") = {_temp};
+        params.set<std::vector<VariableName>>("temperature") = {_temp};
       if (_has_symmetry_plane)
         params.set<unsigned int>("symmetry_plane") = _symmetry_plane;
 
@@ -581,7 +593,7 @@ DomainIntegralAction::act()
       const std::string ov_base_name(_output_variables[i]);
       const std::string pp_type_name("CrackFrontData");
       InputParameters params = _factory.getValidParams(pp_type_name);
-      params.set<MultiMooseEnum>("execute_on") = "timestep_end";
+      params.set<ExecFlagEnum>("execute_on") = EXEC_TIMESTEP_END;
       params.set<UserObjectName>("crack_front_definition") = uo_name;
       if (_treat_as_2d)
       {
@@ -607,7 +619,7 @@ DomainIntegralAction::act()
       std::string pp_base_name("Keq");
       const std::string pp_type_name("MixedModeEquivalentK");
       InputParameters params = _factory.getValidParams(pp_type_name);
-      params.set<MultiMooseEnum>("execute_on") = "timestep_end";
+      params.set<ExecFlagEnum>("execute_on") = EXEC_TIMESTEP_END;
       params.set<Real>("poissons_ratio") = _poissons_ratio;
       for (unsigned int ring_index = 0; ring_index < _ring_vec.size(); ++ring_index)
       {
@@ -679,7 +691,7 @@ DomainIntegralAction::act()
         }
         const std::string vpp_type_name("CrackDataSampler");
         InputParameters params = _factory.getValidParams(vpp_type_name);
-        params.set<MultiMooseEnum>("execute_on") = "timestep_end";
+        params.set<ExecFlagEnum>("execute_on") = EXEC_TIMESTEP_END;
         params.set<UserObjectName>("crack_front_definition") = uo_name;
         params.set<MooseEnum>("sort_by") = "id";
         params.set<MooseEnum>("position_type") = _position_type;
@@ -703,7 +715,7 @@ DomainIntegralAction::act()
       {
         const std::string vpp_type_name("VectorOfPostprocessors");
         InputParameters params = _factory.getValidParams(vpp_type_name);
-        params.set<MultiMooseEnum>("execute_on") = "timestep_end";
+        params.set<ExecFlagEnum>("execute_on") = EXEC_TIMESTEP_END;
         std::ostringstream vpp_name_stream;
         vpp_name_stream << _output_variables[i] << "_crack";
         std::vector<PostprocessorName> postprocessor_names;
@@ -722,7 +734,7 @@ DomainIntegralAction::act()
       std::string pp_base_name("Keq");
       const std::string vpp_type_name("CrackDataSampler");
       InputParameters params = _factory.getValidParams(vpp_type_name);
-      params.set<MultiMooseEnum>("execute_on") = "timestep_end";
+      params.set<ExecFlagEnum>("execute_on") = EXEC_TIMESTEP_END;
       params.set<UserObjectName>("crack_front_definition") = uo_name;
       params.set<MooseEnum>("sort_by") = "id";
       params.set<MooseEnum>("position_type") = _position_type;
@@ -749,20 +761,47 @@ DomainIntegralAction::act()
     {
       std::string mater_name;
       const std::string mater_type_name("ThermalFractureIntegral");
-      if (isParamValid("blocks"))
-      {
-        _blocks = getParam<std::vector<SubdomainName>>("blocks");
-        mater_name = "ThermalFractureIntegral" + _blocks[0];
-      }
-      else
-        mater_name = "ThermalFractureIntegral";
+      mater_name = "ThermalFractureIntegral";
 
       InputParameters params = _factory.getValidParams(mater_type_name);
       params.set<std::vector<MaterialPropertyName>>("eigenstrain_names") =
           getParam<std::vector<MaterialPropertyName>>("eigenstrain_names");
       params.set<std::vector<VariableName>>("temperature") = {_temp};
-
+      params.set<std::vector<SubdomainName>>("block") = {_blocks};
       _problem->addMaterial(mater_type_name, mater_name, params);
+    }
+    MultiMooseEnum integral_moose_enums = getParam<MultiMooseEnum>("integrals");
+    bool have_j_integral = false;
+    for (auto ime : integral_moose_enums)
+    {
+      if (ime == "JIntegral")
+        have_j_integral = true;
+    }
+    if (have_j_integral && !_solid_mechanics)
+    {
+      std::string mater_name;
+      const std::string mater_type_name("StrainEnergyDensity");
+      mater_name = "StrainEnergyDensity";
+
+      InputParameters params = _factory.getValidParams(mater_type_name);
+      _incremental = getParam<bool>("incremental");
+      params.set<bool>("incremental") = _incremental;
+      params.set<std::vector<SubdomainName>>("block") = {_blocks};
+      _problem->addMaterial(mater_type_name, mater_name, params);
+
+      std::string mater_name2;
+      const std::string mater_type_name2("EshelbyTensor");
+      mater_name2 = "EshelbyTensor";
+
+      InputParameters params2 = _factory.getValidParams(mater_type_name2);
+      _displacements = getParam<std::vector<VariableName>>("displacements");
+      params2.set<std::vector<VariableName>>("displacements") = _displacements;
+      params2.set<std::vector<SubdomainName>>("block") = {_blocks};
+      if (_temp != "")
+      {
+        params2.set<std::vector<VariableName>>("temperature") = {_temp};
+      }
+      _problem->addMaterial(mater_type_name2, mater_name2, params2);
     }
   }
 }
@@ -796,7 +835,7 @@ DomainIntegralAction::calcNumCrackFrontPoints()
   else if (_crack_front_points.size() != 0)
     num_points = _crack_front_points.size();
   else if (_use_crack_front_points_provider)
-    num_points = _number_crack_front_points;
+    num_points = getParam<unsigned int>("number_points_from_provider");
   else
     mooseError("Must define either 'boundary' or 'crack_front_points'");
   return num_points;

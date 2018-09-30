@@ -1,22 +1,17 @@
 #pylint: disable=missing-docstring
-#################################################################
-#                   DO NOT MODIFY THIS HEADER                   #
-#  MOOSE - Multiphysics Object Oriented Simulation Environment  #
-#                                                               #
-#            (c) 2010 Battelle Energy Alliance, LLC             #
-#                      ALL RIGHTS RESERVED                      #
-#                                                               #
-#           Prepared by Battelle Energy Alliance, LLC           #
-#             Under Contract No. DE-AC07-05ID14517              #
-#              With the U. S. Department of Energy              #
-#                                                               #
-#              See COPYRIGHT for full restrictions              #
-#################################################################
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import mooseutils
+from chigger import utils
 from ChiggerResultBase import ChiggerResultBase
 from ChiggerSourceBase import ChiggerSourceBase
-from .. import utils
-
 
 class ChiggerResult(ChiggerResultBase):
     """
@@ -45,6 +40,8 @@ class ChiggerResult(ChiggerResultBase):
     def __init__(self, *sources, **kwargs):
         super(ChiggerResult, self).__init__(**kwargs)
         self._sources = sources
+        for src in self._sources:
+            src._parent = self #pylint: disable=protected-access
 
     def needsUpdate(self):
         """
@@ -94,6 +91,7 @@ class ChiggerResult(ChiggerResultBase):
             see ChiggerResultBase
         """
         super(ChiggerResult, self).update(**kwargs)
+
         for src in self._sources:
             if src.needsUpdate():
                 src.update()
@@ -120,20 +118,21 @@ class ChiggerResult(ChiggerResultBase):
             self.update()
         return utils.get_bounds(*self._sources)
 
-    def getRange(self):
+    def getRange(self, local=False):
         """
         Return the min/max range for the selected variables and blocks/boundary/nodeset.
 
         NOTE: For the range to be restricted by block/boundary/nodest the reader must have
               "squeeze=True", which can be much slower.
         """
-        rngs = [src.getRange() for src in self._sources]
+        rngs = [src.getRange(local=local) for src in self._sources]
         return utils.get_min_max(*rngs)
 
     def reset(self):
         """
         Remove actors from renderer.
         """
+
         super(ChiggerResult, self).reset()
         for src in self._sources:
             self._vtkrenderer.RemoveViewProp(src.getVTKActor())

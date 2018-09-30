@@ -1,11 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowSquarePulsePointSource.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowSquarePulsePointSource);
 
 template <>
 InputParameters
@@ -33,9 +37,10 @@ PorousFlowSquarePulsePointSource::PorousFlowSquarePulsePointSource(
     _start_time(getParam<Real>("start_time")),
     _end_time(getParam<Real>("end_time"))
 {
-  /// Sanity check to ensure that the end_time is greater than the start_time
+  // Sanity check to ensure that the end_time is greater than the start_time
   if (_end_time <= _start_time)
-    mooseError("Start time for PorousFlowSquarePulsePointSource is ",
+    mooseError(name(),
+               ": start time for PorousFlowSquarePulsePointSource is ",
                _start_time,
                " but it must be less than end time ",
                _end_time);
@@ -75,6 +80,6 @@ PorousFlowSquarePulsePointSource::computeQpResidual()
       factor = (_end_time - (_t - _dt)) / _dt;
   }
 
-  /// Negative sign to make a positive mass_flux in the input file a source
+  // Negative sign to make a positive mass_flux in the input file a source
   return -_test[_i][_qp] * factor * _mass_flux;
 }

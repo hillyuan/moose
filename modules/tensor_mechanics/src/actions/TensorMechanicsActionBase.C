@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "TensorMechanicsActionBase.h"
 #include "CommonTensorMechanicsAction.h"
 #include "ActionWarehouse.h"
@@ -74,14 +77,17 @@ validParams<TensorMechanicsActionBase>()
                                          "Scalar variable for the out-of-plane strain (in y "
                                          "direction for 1D Axisymmetric or in z direction for 2D "
                                          "Cartesian problems)");
+  MooseEnum outOfPlaneDirection("x y z", "z");
+  params.addParam<MooseEnum>(
+      "out_of_plane_direction", outOfPlaneDirection, "The direction of the out-of-plane strain.");
   params.addParam<FunctionName>("out_of_plane_pressure",
                                 "0",
                                 "Function used to prescribe pressure in the out-of-plane direction "
                                 "(y for 1D Axisymmetric or z for 2D Cartesian problems)");
   params.addParam<Real>("pressure_factor", 1.0, "Scale factor applied to prescribed pressure");
-  params.addParamNamesToGroup(
-      "planar_formulation scalar_out_of_plane_strain out_of_plane_pressure pressure_factor",
-      "Out-of-plane stress/strain");
+  params.addParamNamesToGroup("planar_formulation scalar_out_of_plane_strain out_of_plane_pressure "
+                              "pressure_factor out_of_plane_direction",
+                              "Out-of-plane stress/strain");
 
   // Output
   params.addParam<MultiMooseEnum>("generate_output",

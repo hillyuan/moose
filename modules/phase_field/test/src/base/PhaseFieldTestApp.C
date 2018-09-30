@@ -1,3 +1,11 @@
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 #include "PhaseFieldTestApp.h"
 #include "PhaseFieldApp.h"
 #include "Moose.h"
@@ -14,30 +22,27 @@ validParams<PhaseFieldTestApp>()
   return params;
 }
 
+registerKnownLabel("PhaseFieldTestApp");
+
 PhaseFieldTestApp::PhaseFieldTestApp(InputParameters parameters) : MooseApp(parameters)
 {
-  Moose::registerObjects(_factory);
-  PhaseFieldApp::registerObjects(_factory);
-
-  Moose::associateSyntax(_syntax, _action_factory);
-  PhaseFieldApp::associateSyntax(_syntax, _action_factory);
-
-  bool use_test_objs = getParam<bool>("allow_test_objects");
-  if (use_test_objs)
-  {
-    PhaseFieldTestApp::registerObjects(_factory);
-    PhaseFieldTestApp::associateSyntax(_syntax, _action_factory);
-  }
+  PhaseFieldTestApp::registerAll(
+      _factory, _action_factory, _syntax, getParam<bool>("allow_test_objects"));
 }
 
 PhaseFieldTestApp::~PhaseFieldTestApp() {}
 
-// External entry point for dynamic application loading
-extern "C" void
-PhaseFieldTestApp__registerApps()
+void
+PhaseFieldTestApp::registerAll(Factory & f, ActionFactory & af, Syntax & s, bool use_test_objs)
 {
-  PhaseFieldTestApp::registerApps();
+  PhaseFieldApp::registerAll(f, af, s);
+  if (use_test_objs)
+  {
+    Registry::registerObjectsTo(f, {"PhaseFieldTestApp"});
+    Registry::registerActionsTo(af, {"PhaseFieldTestApp"});
+  }
 }
+
 void
 PhaseFieldTestApp::registerApps()
 {
@@ -45,25 +50,30 @@ PhaseFieldTestApp::registerApps()
   registerApp(PhaseFieldTestApp);
 }
 
-// External entry point for dynamic object registration
-extern "C" void
-PhaseFieldTestApp__registerObjects(Factory & factory)
-{
-  PhaseFieldTestApp::registerObjects(factory);
-}
 void
 PhaseFieldTestApp::registerObjects(Factory & factory)
 {
-  registerKernel(GaussContForcing);
+  Registry::registerObjectsTo(factory, {"PhaseFieldTestApp"});
 }
 
-// External entry point for dynamic syntax association
-extern "C" void
-PhaseFieldTestApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
-{
-  PhaseFieldTestApp::associateSyntax(syntax, action_factory);
-}
 void
-PhaseFieldTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
+PhaseFieldTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & action_factory)
 {
+  Registry::registerActionsTo(action_factory, {"PhaseFieldTestApp"});
+}
+
+void
+PhaseFieldTestApp::registerExecFlags(Factory & /*factory*/)
+{
+}
+
+extern "C" void
+PhaseFieldTestApp__registerAll(Factory & f, ActionFactory & af, Syntax & s)
+{
+  PhaseFieldTestApp::registerAll(f, af, s);
+}
+extern "C" void
+PhaseFieldTestApp__registerApps()
+{
+  PhaseFieldTestApp::registerApps();
 }

@@ -3,8 +3,11 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <algorithm>
 #include <typeinfo>
+#include <cstdint>
+#include <iostream>
 
 #include "lex.h"
 
@@ -51,6 +54,12 @@
 /// See documentation comments for the Node class for details about lots of useful functionality.
 namespace hit
 {
+
+const std::string default_indent = "  ";
+
+// toBool converts the given val to a boolean value which is stored in dst.  It returns true if
+// val was successfully converted to a boolean and returns false otherwise.
+bool toBool(const std::string & val, bool * dst);
 
 /// NodeType represents every element type in a parsed hit tree.
 enum class NodeType
@@ -139,7 +148,7 @@ public:
   /// indicated in the function name. If the node holds a value of a different type or doesn't hold
   /// a value at all, an exception will be thrown.
   virtual bool boolVal();
-  virtual int intVal();
+  virtual int64_t intVal();
   virtual double floatVal();
   /// strVal is special in that it only throws an exception if the node doesn't hold a value at
   /// all.  All nodes with a value hold data that was originally represented as a string in the
@@ -166,8 +175,11 @@ public:
 
   /// render builds an hit syntax/text that is equivalent to the hit tree starting at this
   /// node (and downward) - i.e. parsing this function's returned string would yield a node tree
-  /// identical to this nodes tree downward.
-  virtual std::string render(int indent = 0);
+  /// identical to this nodes tree downward.  indent is the indent level using indent_text as the
+  /// indent string (repeated once for each level).  maxlen is the maximum line lengch before
+  /// breaking string values.
+  virtual std::string
+  render(int indent = 0, const std::string & indent_text = default_indent, int maxlen = 0);
 
   /// walk does a depth-first traversal of the hit tree starting at this node (it
   /// doesn't visit any nodes that require traversing this node's parent) calling the passed
@@ -228,6 +240,12 @@ inline bool
 Node::paramInner(Node * n)
 {
   return n->boolVal();
+}
+template <>
+inline int64_t
+Node::paramInner(Node * n)
+{
+  return n->intVal();
 }
 template <>
 inline int
@@ -306,7 +324,8 @@ public:
   static const bool Block = false;
   Comment(const std::string & text, bool is_inline);
 
-  virtual std::string render(int indent = 0) override;
+  virtual std::string
+  render(int indent = 0, const std::string & indent_text = default_indent, int maxlen = 0) override;
   virtual Node * clone() override;
 
 private:
@@ -319,7 +338,12 @@ class Blank : public Node
 {
 public:
   Blank() : Node(NodeType::Blank) {}
-  virtual std::string render(int /*indent = 0*/) override { return "\n"; }
+  virtual std::string render(int /*indent = 0*/,
+                             const std::string & /*indent_text = default_indent*/,
+                             int /*maxlen = 0*/) override
+  {
+    return "\n";
+  }
   virtual Node * clone() override { return new Blank(); };
 };
 
@@ -333,7 +357,8 @@ public:
   /// path returns the hit path located in the section's header i.e. the section's name.
   virtual std::string path() override;
 
-  virtual std::string render(int indent = 0) override;
+  virtual std::string
+  render(int indent = 0, const std::string & indent_text = default_indent, int maxlen = 0) override;
   virtual Node * clone() override;
 
 private:
@@ -347,12 +372,12 @@ class Field : public Node
 {
 public:
   // Kind represents all possible value types that can be stored in a field.
-  enum class Kind
+  enum class Kind : unsigned char
   {
     None,
+    Bool,
     Int,
     Float,
-    Bool,
     String,
   };
   Field(const std::string & field, Kind k, const std::string & val);
@@ -360,7 +385,8 @@ public:
   /// path returns the hit Field name (i.e. content before the "=")
   virtual std::string path() override;
 
-  virtual std::string render(int indent = 0) override;
+  virtual std::string
+  render(int indent = 0, const std::string & indent_text = default_indent, int maxlen = 0) override;
   virtual Node * clone() override;
 
   /// kind returns the semantic type of the value stored in this field (e.g. Int, Bool, Float,
@@ -380,7 +406,7 @@ public:
   virtual std::vector<int> vecIntVal() override;
   virtual std::vector<std::string> vecStrVal() override;
   virtual bool boolVal() override;
-  virtual int intVal() override;
+  virtual int64_t intVal() override;
   virtual double floatVal() override;
   virtual std::string strVal() override;
 
@@ -392,13 +418,13 @@ private:
 };
 
 /// parse is *the* function in the hit namespace.  It takes the given hit input text and
-/// parses and builds a hit tree returning the root node.  It throws an exceptions if input
+/// parses and builds a hit tree returning the root node.  It throws an exception if input
 /// contains any invalid hit syntax.  fname is label given as a convenience (and can be any
 /// string) used to prefix any error messages generated during the parsing process.  The caller
 /// accepts ownership of the returned root node and is responsible for destructing it.
 Node * parse(const std::string & fname, const std::string & input);
 
-/// parses the file checking for errors, but don't return any built node tree.
+/// parses the file checking for errors but does not return any node tree.
 inline void
 check(const std::string & fname, const std::string & input)
 {
@@ -414,11 +440,99 @@ check(const std::string & fname, const std::string & input)
 void merge(Node * from, Node * into);
 
 /// explode walks the tree converting/exploding any fields that have path separators into them into
-/// actually sections/subsections/etc. with the final path element as the field name.  For example,
+/// actuall sections/subsections/etc. with the final path element as the field name.  For example,
 /// "foo/bar=42" becomes nodes with the structure "[foo] bar=42 []".  If nodes for sections already
 /// exist in the tree, the fields will be moved into them rather than new sections created.  The
 /// returned node is the root of the exploded tree.
 Node * explode(Node * n);
+
+// Formatter is used to automatically format hit syntax/input to be uniform in a specified style.
+// After creating a formatter object and configuring it as desired by modifying/calling its members
+// you use the "format" function to format hit text as desired.
+class Formatter : public Walker
+{
+public:
+  /// Constructs a formatter that formats hit text in a canonical default style.
+  Formatter();
+
+  /// Constructs a formatter that formats hit text according to the configuration parameters
+  /// specified in hit_config - which is the text of a hit document of the following form:
+  ///
+  ///     [format]
+  ///       # these parameters set the correspondingly named Formatter member variables.  See them
+  ///       # for detailed descriptions of what they do.
+  ///       indent_string = "  "
+  ///       line_length = 100
+  ///       canonical_section_markers = true
+  ///
+  ///       # This section specifies parameter/section sorgin order as provided by the formatter's
+  ///       # addPattern member function. The content for this section mirrors the structure of
+  ///       # the hit file being formatted.  Each section name is a regex (limited to valid hit
+  ///       # identifier characters). The fields and subsections within each section specify an
+  ///       # order; any field values are ignored. See the docs for that function for more details.
+  ///       [sorting]
+  ///         [foo]        # section 'foo' goes first (before other sections)
+  ///           bar = bla  # field 'bar' (in the foo section) goes first
+  ///           ** = bla   # double glob is placeholder for unordered fields/sections
+  ///           baz = bla  # field 'baz' goes last
+  ///         []
+  ///         [.*]
+  ///           [.*]
+  ///             first = bla # fields named 'first' at double nested level go first
+  ///           []
+  ///         []
+  ///       []
+  ///     []
+  ///
+  /// All fields are optional and the sorting section is also optional.  If the sorting section
+  /// is present, you can have as many patterns as you like, but each pattern section must have
+  /// one set of "section" and "order" fields.
+  Formatter(const std::string & fname, const std::string & hit_config);
+
+  /// Formats the given input hit text (using fname to report better syntax errors) and returns
+  /// the text formatted as specified by the formatter's configuration.
+  std::string format(const std::string & fname, const std::string & input);
+  /// Add a sorting pattern to the formatter.  section is a regex that must match a section's
+  /// full path (as returned by a section node's fullpath function). order is a list of regexes
+  /// that partial match field names identifying the order of fields for sections that match the
+  /// section regex.  Fields that don't match any order regexes are remain unmoved/ignored. You can
+  /// include a "**" entry in the order vector to indicate a glob of unordered parameters.  This
+  /// allows a specifying an ordered set of parameters for the front of the section as well as an
+  /// ordered set of parameters at the back of the section with all parameters not matching any
+  /// order regex being placed in their original order in place of the "**".
+  void addPattern(const std::string & section, const std::vector<std::string> & order);
+
+  /// walk implements the hit::Walker interface and should generally not be called.
+  virtual void walk(const std::string & fullpath, const std::string & nodepath, Node * n);
+
+  /// Indicates whether or not to convert legacy leading "[./section_name]" in section headers and
+  /// closing "[../]" in section footers to the canonical "[section_name]" and "[]" respectively.
+  /// If true, the canonical (non-legacy) format is used.
+  bool canonical_section_markers;
+  /// The maximum length of a line before it will be automatically be broken and reflowed into
+  /// multiple lines.  Note that this only currently applies to string-literals (e.g. not comments,
+  /// integers, section headers, etc.)
+  int line_length;
+  /// The text used to represent a single level of nesting indentation.  It must be comprised of
+  /// only whitespace characters.
+  std::string indent_string;
+
+private:
+  struct Pattern
+  {
+    std::string regex;
+    std::vector<std::string> order;
+  };
+
+  void walkPatternConfig(const std::string & prefix, Node * n);
+
+  void sortGroup(const std::vector<Node *> & nodes,
+                 const std::vector<std::string> & order,
+                 std::vector<Node *> & sorted,
+                 std::vector<Node *> & unused);
+
+  std::vector<Pattern> _patterns;
+};
 
 } // namespace hit
 

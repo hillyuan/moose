@@ -1,3 +1,12 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from PyQt5 import QtWidgets
 from TabPlugin import TabPlugin
 from ViewerCornerWidget import ViewerCornerWidget
@@ -30,17 +39,9 @@ class ViewerBase(QtWidgets.QTabWidget, TabPlugin):
         self.setCornerWidget(ViewerCornerWidget())
         self.cornerWidget().close.connect(self.onClose)
         self.cornerWidget().clone.connect(self.onClone)
+        self.currentChanged.connect(self.onCurrentChanged)
         self.setup()
         self.addManager()
-
-    #def initialize(self, *args, **kwargs):
-    #    """
-    #    Initialize the widget by creating a tab and supplying data to the PluginManager initialize method.
-    #    """
-    #    super(ViewerBase, self).initialize(*args, **kwargs)
-    #    for i in range(self.count()):
-    #        self.widget(i).initialize(*args, **kwargs)
-    #    self._data = args
 
     def onClose(self):
         """
@@ -88,3 +89,6 @@ class ViewerBase(QtWidgets.QTabWidget, TabPlugin):
         since they should all be the same.
         """
         return self.currentWidget().preferencesWidget()
+
+    def onCurrentChanged(self, index):
+        pass

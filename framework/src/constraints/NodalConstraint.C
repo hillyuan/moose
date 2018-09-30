@@ -1,22 +1,17 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "NodalConstraint.h"
 
 // MOOSE includes
 #include "Assembly.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 #include "SystemBase.h"
 
 #include "libmesh/sparse_matrix.h"
@@ -36,9 +31,13 @@ validParams<NodalConstraint>()
 NodalConstraint::NodalConstraint(const InputParameters & parameters)
   : Constraint(parameters),
     NeighborCoupleableMooseVariableDependencyIntermediateInterface(this, true, true),
-    _u_slave(_var.nodalSlnNeighbor()),
-    _u_master(_var.nodalSln())
+    NeighborMooseVariableInterface<Real>(
+        this, true, Moose::VarKindType::VAR_NONLINEAR, Moose::VarFieldType::VAR_FIELD_STANDARD),
+    _u_slave(_var.dofValuesNeighbor()),
+    _u_master(_var.dofValues())
 {
+  addMooseVariableDependency(&_var);
+
   MooseEnum temp_formulation = getParam<MooseEnum>("formulation");
   if (temp_formulation == "penalty")
     _formulation = Moose::Penalty;

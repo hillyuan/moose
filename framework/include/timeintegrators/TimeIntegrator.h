@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef TIMEINTEGRATOR_H
 #define TIMEINTEGRATOR_H
@@ -29,7 +24,8 @@ namespace libMesh
 {
 template <typename T>
 class NumericVector;
-}
+class NonlinearImplicitSystem;
+} // namespace libMesh
 
 template <>
 InputParameters validParams<TimeIntegrator>();
@@ -49,21 +45,43 @@ class TimeIntegrator : public MooseObject, public Restartable
 {
 public:
   TimeIntegrator(const InputParameters & parameters);
-  virtual ~TimeIntegrator();
 
+  /**
+   * Called to setup datastructures.
+   *
+   * WILL be called during recover/restart
+   *
+   * Should NOT do any computation for initial values
+   * use init() for that
+   *
+   * Note: this doesn't inherit this from SetupInterface because
+   * I'm not sure that we need all the other setup functions for
+   * TimeIntegrator
+   */
+  virtual void initialSetup() {}
+
+  /**
+   * Called _only_ before the very first timestep (t_step = 0)
+   * Never called again (not even during recover/restart)
+   */
+  virtual void init() {}
   virtual void preSolve() {}
   virtual void preStep() {}
+
+  /**
+   * Solves the time step and sets the number of nonlinear and linear iterations.
+   */
   virtual void solve();
 
   /**
    * Callback to the TimeIntegrator called immediately after the
-   * residuals are computed in NonlinearSystem::computeResidual() (it
-   * is not really named well...).  The residual vector which is
-   * passed in to this function should be filled in by the user with
-   * the _Re_time and _Re_non_time vectors in a way that makes sense
-   * for the particular TimeIntegration method.
+   * residuals are computed in NonlinearSystem::computeResidual().
+   * The residual vector which is passed in to this function should
+   * be filled in by the user with the _Re_time and _Re_non_time
+   * vectors in a way that makes sense for the particular
+   * TimeIntegration method.
    */
-  virtual void postStep(NumericVector<Number> & /*residual*/) {}
+  virtual void postResidual(NumericVector<Number> & /*residual*/) {}
 
   /**
    * Callback to the TimeIntegrator called immediately after
@@ -74,13 +92,41 @@ public:
    */
   virtual void postSolve() {}
 
+  /**
+   * Callback to the TimeIntegrator called at the very end of time step.
+   */
+  virtual void postStep() {}
+
   virtual int order() = 0;
   virtual void computeTimeDerivatives() = 0;
 
+  /**
+   * Gets the total number of nonlinear iterations over all stages of the time step.
+   */
+  virtual unsigned int getNumNonlinearIterations() const { return _n_nonlinear_iterations; }
+
+  /**
+   * Gets the total number of linear iterations over all stages of the time step.
+   */
+  virtual unsigned int getNumLinearIterations() const { return _n_linear_iterations; }
+
 protected:
+  /**
+   * Gets the number of nonlinear iterations in the most recent solve.
+   */
+  unsigned int getNumNonlinearIterationsLastSolve() const;
+
+  /**
+   * Gets the number of linear iterations in the most recent solve.
+   */
+  unsigned int getNumLinearIterationsLastSolve() const;
+
   FEProblemBase & _fe_problem;
   SystemBase & _sys;
   NonlinearSystemBase & _nl;
+
+  /// Nonlinear implicit system, if applicable; otherwise, nullptr
+  const NonlinearImplicitSystem * _nonlinear_implicit_system;
 
   /// solution vector for u^dot
   NumericVector<Number> & _u_dot;
@@ -100,6 +146,11 @@ protected:
   NumericVector<Number> & _Re_time;
   /// residual vector for non-time contributions
   NumericVector<Number> & _Re_non_time;
+
+  /// Total number of nonlinear iterations over all stages of the time step
+  unsigned int _n_nonlinear_iterations;
+  /// Total number of linear iterations over all stages of the time step
+  unsigned int _n_linear_iterations;
 };
 
 #endif /* TIMEINTEGRATOR_H */

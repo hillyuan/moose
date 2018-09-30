@@ -1,21 +1,18 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "DynamicObjectRegistrationAction.h"
 #include "Factory.h"
 #include "FEProblem.h"
 #include "MooseApp.h"
+
+registerMooseAction("MooseApp", DynamicObjectRegistrationAction, "dynamic_object_registration");
 
 template <>
 InputParameters
@@ -33,6 +30,10 @@ validParams<DynamicObjectRegistrationAction>()
                                "Path to search for dynamic libraries (please "
                                "avoid committing absolute paths in addition to "
                                "MOOSE_LIBRARY_PATH)");
+  params.addParam<std::string>(
+      "library_name",
+      "",
+      "The file name of the library (*.la file) that will be dynamically loaded.");
   return params;
 }
 
@@ -54,9 +55,12 @@ DynamicObjectRegistrationAction::DynamicObjectRegistrationAction(InputParameters
         getParam<std::vector<std::string>>("register_objects_from");
     for (const auto & app_name : application_names)
     {
-      _app.dynamicObjectRegistration(app_name, &_factory, getParam<std::string>("library_path"));
-      _app.dynamicSyntaxAssociation(
-          app_name, &_awh.syntax(), &_action_factory, getParam<std::string>("library_path"));
+      _app.dynamicAllRegistration(app_name,
+                                  &_factory,
+                                  &_action_factory,
+                                  &_awh.syntax(),
+                                  getParam<std::string>("library_path"),
+                                  getParam<std::string>("library_name"));
     }
   }
 }

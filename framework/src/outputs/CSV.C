@@ -1,21 +1,18 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // Moose includes
 #include "CSV.h"
 #include "FEProblem.h"
 #include "MooseApp.h"
+
+registerMooseObject("MooseApp", CSV);
 
 template <>
 InputParameters
@@ -99,9 +96,6 @@ CSV::outputVectorPostprocessors()
 void
 CSV::output(const ExecFlagType & type)
 {
-  // Start the performance log
-  Moose::perf_log.push("CSV::output()", "Output");
-
   // Call the base class output (populates tables)
   TableOutput::output(type);
 
@@ -113,6 +107,8 @@ CSV::output(const ExecFlagType & type)
     _all_data_table.printCSV(filename(), 1, _align);
   }
 
+  const auto & vpp_data = _problem_ptr->getVectorPostprocessorData();
+
   // Output each VectorPostprocessor's data to a file
   if (_write_vector_table && processor_id() == 0)
   {
@@ -120,8 +116,11 @@ CSV::output(const ExecFlagType & type)
     {
       std::ostringstream output;
       output << _file_base << "_" << MooseUtils::shortName(it.first);
-      output << "_" << std::setw(_padding) << std::setprecision(0) << std::setfill('0')
-             << std::right << timeStep() << ".csv";
+
+      if (!vpp_data.containsCompleteHistory(it.first))
+        output << "_" << std::setw(_padding) << std::setprecision(0) << std::setfill('0')
+               << std::right << timeStep();
+      output << ".csv";
 
       it.second.setDelimiter(_delimiter);
       it.second.setPrecision(_precision);
@@ -141,6 +140,4 @@ CSV::output(const ExecFlagType & type)
   // Re-set write flags
   _write_all_table = false;
   _write_vector_table = false;
-
-  Moose::perf_log.pop("CSV::output()", "Output");
 }

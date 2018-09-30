@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "XFEMCrackGrowthIncrement2DCut.h"
 #include "XFEMFuncs.h"
@@ -63,10 +65,10 @@ XFEMCrackGrowthIncrement2DCut::cutElementByCrackGrowthIncrement(
       {
         cut_elem = true;
         CutEdgeForCrackGrowthIncr mycut;
-        mycut.id1 = node1->id();
-        mycut.id2 = node2->id();
-        mycut.distance = seg_int_frac;
-        mycut.host_side_id = i;
+        mycut._id1 = node1->id();
+        mycut._id2 = node2->id();
+        mycut._distance = seg_int_frac;
+        mycut._host_side_id = i;
         cut_edges.push_back(mycut);
       }
     }

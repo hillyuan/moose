@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #ifndef RADIALRETURNSTRESSUPDATE_H
 #define RADIALRETURNSTRESSUPDATE_H
 
@@ -18,11 +21,11 @@ InputParameters validParams<RadialReturnStressUpdate>();
 
 /**
  * RadialReturnStressUpdate computes the radial return stress increment for
- * an isotropic viscoplasticity plasticity model after interating on the difference
+ * an isotropic elastic-viscoplasticity model after interating on the difference
  * between new and old trial stress increments.  This radial return mapping class
  * acts as a base class for the radial return creep and plasticity classes / combinations.
  * The stress increment computed by RadialReturnStressUpdate is used by
- * ComputeRadialReturnMappingStress which computes the elastic stress for finite
+ * ComputeMultipleInelasticStress which computes the elastic stress for finite
  * strains.  This return mapping class is acceptable for finite strains but not
  * total strains.
  * This class is based on the Elasto-viscoplasticity algorithm in F. Dunne and N.
@@ -32,8 +35,7 @@ InputParameters validParams<RadialReturnStressUpdate>();
 class RadialReturnStressUpdate : public StressUpdateBase, public SingleVariableReturnMappingSolution
 {
 public:
-  RadialReturnStressUpdate(const InputParameters & parameters,
-                           const std::string inelastic_strain_name = "");
+  RadialReturnStressUpdate(const InputParameters & parameters);
 
   /**
    * A radial return (J2) mapping method is performed with return mapping
@@ -60,6 +62,11 @@ public:
 
   virtual Real computeReferenceResidual(const Real effective_trial_stress,
                                         const Real scalar_effective_inelastic_strain) override;
+
+  virtual Real minimumPermissibleValue(const Real /*effective_trial_stress*/) const override
+  {
+    return 0.0;
+  }
 
   virtual Real maximumPermissibleValue(const Real effective_trial_stress) const override;
 
@@ -98,10 +105,23 @@ protected:
   }
 
   /**
+   * Calculate the derivative of the strain increment with respect to the updated stress.
+   * @param effective_trial_stress Effective trial stress
+   * @param scalar                 Inelastic strain increment magnitude being solved for
+   */
+  virtual Real computeStressDerivative(const Real /*effective_trial_stress*/, const Real /*scalar*/)
+  {
+    return 0.0;
+  }
+
+  /**
    * Perform any necessary steps to finalize state after return mapping iterations
    * @param inelasticStrainIncrement Inelastic strain increment
    */
   virtual void computeStressFinalize(const RankTwoTensor & /*inelasticStrainIncrement*/) {}
+
+  void outputIterationSummary(std::stringstream * iter_output,
+                              const unsigned int total_it) override;
 
   /// 3 * shear modulus
   Real _three_shear_modulus;
@@ -109,6 +129,21 @@ protected:
   MaterialProperty<Real> & _effective_inelastic_strain;
   const MaterialProperty<Real> & _effective_inelastic_strain_old;
   Real _max_inelastic_increment;
+
+  /**
+   * Rank two identity tensor
+   */
+  const RankTwoTensor _identity_two;
+
+  /**
+   * Rank four symmetric identity tensor
+   */
+  const RankFourTensor _identity_symmetric_four;
+
+  /**
+   * Rank four deviatoric projection tensor
+   */
+  const RankFourTensor _deviatoric_projection_four;
 };
 
 #endif // RADIALRETURNSTRESSUPDATE_H

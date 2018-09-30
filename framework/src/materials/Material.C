@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "Material.h"
@@ -56,6 +51,8 @@ validParams<Material>()
       "quadrature point, and then copy that value to the other qps. Evaluations on element qps "
       "will be skipped");
 
+  params.addPrivateParam<bool>("_neighbor", false);
+
   // Outputs
   params += validParams<OutputInterface>();
   params.set<std::vector<OutputName>>("outputs") = {"none"};
@@ -87,19 +84,18 @@ Material::Material(const InputParameters & parameters)
     PostprocessorInterface(this),
     VectorPostprocessorInterface(this),
     DependencyResolverInterface(),
-    Restartable(parameters, "Materials"),
-    ZeroInterface(parameters),
+    Restartable(this, "Materials"),
     MeshChangedInterface(parameters),
 
     // The false flag disables the automatic call buildOutputVariableHideList;
     // for Material objects the hide lists are handled by MaterialOutputAction
     OutputInterface(parameters, false),
     RandomInterface(parameters,
-                    *parameters.get<FEProblemBase *>("_fe_problem_base"),
+                    *parameters.getCheckedPointerParam<FEProblemBase *>("_fe_problem_base"),
                     parameters.get<THREAD_ID>("_tid"),
                     false),
-    _subproblem(*parameters.get<SubProblem *>("_subproblem")),
-    _fe_problem(*parameters.get<FEProblemBase *>("_fe_problem_base")),
+    _subproblem(*getCheckedPointerParam<SubProblem *>("_subproblem")),
+    _fe_problem(*getCheckedPointerParam<FEProblemBase *>("_fe_problem_base")),
     _tid(parameters.get<THREAD_ID>("_tid")),
     _assembly(_subproblem.assembly(_tid)),
     _bnd(_material_data_type != Moose::BLOCK_MATERIAL_DATA),
@@ -121,7 +117,7 @@ Material::Material(const InputParameters & parameters)
     _has_stateful_property(false)
 {
   // Fill in the MooseVariable dependencies
-  const std::vector<MooseVariable *> & coupled_vars = getCoupledMooseVars();
+  const std::vector<MooseVariableFEBase *> & coupled_vars = getCoupledMooseVars();
   for (const auto & var : coupled_vars)
     addMooseVariableDependency(var);
 }
@@ -139,9 +135,10 @@ Material::initStatefulProperties(unsigned int n_points)
   for (auto & prop : _supplied_props)
     if (_material_data->getMaterialPropertyStorage().isStatefulProp(prop) &&
         !_overrides_init_stateful_props)
-      mooseError(std::string("Material \"") + name() + "\" provides one or more stateful "
-                                                       "properties but initQpStatefulProperties() "
-                                                       "was not overridden in the derived class.");
+      mooseError(std::string("Material \"") + name() +
+                 "\" provides one or more stateful "
+                 "properties but initQpStatefulProperties() "
+                 "was not overridden in the derived class.");
 }
 
 void
@@ -173,11 +170,11 @@ Material::registerPropName(std::string prop_name, bool is_get, Material::Prop_St
 
   // Store material properties for block ids
   for (const auto & block_id : blockIDs())
-    _fe_problem.storeMatPropName(block_id, prop_name);
+    _fe_problem.storeSubdomainMatPropName(block_id, prop_name);
 
   // Store material properties for the boundary ids
   for (const auto & boundary_id : boundaryIDs())
-    _fe_problem.storeMatPropName(boundary_id, prop_name);
+    _fe_problem.storeBoundaryMatPropName(boundary_id, prop_name);
 }
 
 std::set<OutputName>

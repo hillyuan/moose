@@ -1,21 +1,18 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "VTKOutput.h"
 
 #include "libmesh/vtk_io.h"
 #include "libmesh/equation_systems.h"
+
+registerMooseObjectAliased("MooseApp", VTKOutput, "VTK");
 
 template <>
 InputParameters
@@ -36,13 +33,16 @@ validParams<VTKOutput>()
 VTKOutput::VTKOutput(const InputParameters & parameters)
   : OversampleOutput(parameters), _binary(getParam<bool>("binary"))
 {
+#ifndef LIBMESH_HAVE_VTK
+  mooseError("VTK output was requested, but libMesh was not configured with VTK. To fix this, you "
+             "must reconfigure libMesh to use VTK.");
+#endif
 }
 
 void
 VTKOutput::output(const ExecFlagType & /*type*/)
 {
 #ifdef LIBMESH_HAVE_VTK
-
   /// Create VTKIO object
   VTKIO vtk(_es_ptr->get_mesh());
 
@@ -52,9 +52,6 @@ VTKOutput::output(const ExecFlagType & /*type*/)
   // Write the data
   vtk.write_equation_systems(filename(), *_es_ptr);
   _file_num++;
-
-#else
-  mooseError("libMesh not configured with VTK");
 #endif
 }
 

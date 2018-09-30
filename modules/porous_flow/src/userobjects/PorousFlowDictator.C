@@ -1,14 +1,18 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 //  Holds maps between PorousFlow variables (porepressure, saturations) and the variable number used
 //  by MOOSE.
 #include "PorousFlowDictator.h"
 #include "NonlinearSystem.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowDictator);
 
 template <>
 InputParameters
@@ -26,16 +30,32 @@ validParams<PorousFlowDictator>()
                                         "The number of fluid phases in the simulation");
   params.addRequiredParam<unsigned int>("number_fluid_components",
                                         "The number of fluid components in the simulation");
+  params.addParam<unsigned int>("number_aqueous_equilibrium",
+                                0,
+                                "The number of secondary species in the aqueous-equilibrium "
+                                "reaction system.  (Leave as zero if the simulation does not "
+                                "involve chemistry)");
+  params.addParam<unsigned int>("number_aqueous_kinetic",
+                                0,
+                                "The number of secondary species in the aqueous-kinetic reaction "
+                                "system involved in precipitation and dissolution.  (Leave as zero "
+                                "if the simulation does not involve chemistry)");
+  params.addParam<unsigned int>("aqueous_phase_number",
+                                0,
+                                "The fluid phase number of the aqueous phase in which the "
+                                "equilibrium and kinetic chemical reactions occur");
   return params;
 }
 
 PorousFlowDictator::PorousFlowDictator(const InputParameters & parameters)
   : GeneralUserObject(parameters),
     Coupleable(this, false),
-    ZeroInterface(parameters),
     _num_variables(coupledComponents("porous_flow_vars")),
     _num_phases(getParam<unsigned int>("number_fluid_phases")),
-    _num_components(getParam<unsigned int>("number_fluid_components"))
+    _num_components(getParam<unsigned int>("number_fluid_components")),
+    _num_aqueous_equilibrium(getParam<unsigned int>("number_aqueous_equilibrium")),
+    _num_aqueous_kinetic(getParam<unsigned int>("number_aqueous_kinetic")),
+    _aqueous_phase_number(getParam<unsigned int>("aqueous_phase_number"))
 {
   _moose_var_num.resize(_num_variables);
   for (unsigned int i = 0; i < _num_variables; ++i)
@@ -54,6 +74,10 @@ PorousFlowDictator::PorousFlowDictator(const InputParameters & parameters)
                  "for this is against specification #1984.  Variable number ",
                  i,
                  " is an AuxVariable.");
+
+  if ((_num_phases > 0) && (_aqueous_phase_number >= _num_phases))
+    mooseError("PorousflowDictator: The aqueous phase number must be less than the number of fluid "
+               "phases.  The Dictator does not appreciate jokes.");
 }
 
 unsigned int
@@ -72,6 +96,24 @@ unsigned int
 PorousFlowDictator::numComponents() const
 {
   return _num_components;
+}
+
+unsigned int
+PorousFlowDictator::numAqueousEquilibrium() const
+{
+  return _num_aqueous_equilibrium;
+}
+
+unsigned int
+PorousFlowDictator::numAqueousKinetic() const
+{
+  return _num_aqueous_kinetic;
+}
+
+unsigned int
+PorousFlowDictator::aqueousPhaseNumber() const
+{
+  return _aqueous_phase_number;
 }
 
 unsigned int
@@ -94,28 +136,4 @@ bool
 PorousFlowDictator::notPorousFlowVariable(unsigned int moose_var_num) const
 {
   return moose_var_num >= _pf_var_num.size() || _pf_var_num[moose_var_num] == _num_variables;
-}
-
-const VariableName
-PorousFlowDictator::pressureVariableNameDummy() const
-{
-  return "pressure_variable_dummy";
-}
-
-const VariableName
-PorousFlowDictator::saturationVariableNameDummy() const
-{
-  return "saturation_variable_dummy";
-}
-
-const VariableName
-PorousFlowDictator::temperatureVariableNameDummy() const
-{
-  return "temperature_variable_dummy";
-}
-
-const VariableName
-PorousFlowDictator::massFractionVariableNameDummy() const
-{
-  return "mass_fraction_variable_dummy";
 }

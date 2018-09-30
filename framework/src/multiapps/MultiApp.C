@@ -1,22 +1,18 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "MultiApp.h"
 
 #include "AppFactory.h"
 #include "AuxiliarySystem.h"
+#include "DisplacedProblem.h"
 #include "Console.h"
 #include "Executioner.h"
 #include "FEProblem.h"
@@ -73,6 +69,10 @@ validParams<MultiApp>()
                                "Path to search for dynamic libraries (please "
                                "avoid committing absolute paths in addition to "
                                "MOOSE_LIBRARY_PATH)");
+  params.addParam<std::string>(
+      "library_name",
+      "",
+      "The file name of the library (*.la file) that will be dynamically loaded.");
   params.addParam<std::vector<Point>>(
       "positions",
       "The positions of the App locations.  Each set of 3 values will represent a "
@@ -91,11 +91,15 @@ validParams<MultiApp>()
   params.addParam<Real>("bounding_box_inflation",
                         0.01,
                         "Relative amount to 'inflate' the bounding box of this MultiApp.");
+  params.addParam<Point>("bounding_box_padding",
+                         RealVectorValue(),
+                         "Additional padding added to the dimensions of the bounding box. The "
+                         "values are added to the x, y and z dimension respectively.");
 
   params.addPrivateParam<MPI_Comm>("_mpi_comm");
 
   // Set the default execution time
-  params.set<MultiMooseEnum>("execute_on") = "timestep_begin";
+  params.set<ExecFlagEnum>("execute_on", true) = EXEC_TIMESTEP_BEGIN;
 
   params.addParam<unsigned int>("max_procs_per_app",
                                 std::numeric_limits<unsigned int>::max(),
@@ -134,6 +138,7 @@ validParams<MultiApp>()
   params.addParam<std::vector<Point>>("move_positions",
                                       "The positions corresponding to each move_app.");
 
+  params.addPrivateParam<std::shared_ptr<CommandLine>>("_command_line");
   params.addPrivateParam<bool>("use_positions", true);
   params.declareControllable("enable");
   params.registerBase("MultiApp");
@@ -144,8 +149,8 @@ validParams<MultiApp>()
 MultiApp::MultiApp(const InputParameters & parameters)
   : MooseObject(parameters),
     SetupInterface(this),
-    Restartable(parameters, "MultiApps"),
-    _fe_problem(*parameters.getCheckedPointerParam<FEProblemBase *>("_fe_problem_base")),
+    Restartable(this, "MultiApps"),
+    _fe_problem(*getCheckedPointerParam<FEProblemBase *>("_fe_problem_base")),
     _app_type(isParamValid("app_type") ? std::string(getParam<MooseEnum>("app_type"))
                                        : _fe_problem.getMooseApp().type()),
     _use_positions(getParam<bool>("use_positions")),
@@ -153,10 +158,12 @@ MultiApp::MultiApp(const InputParameters & parameters)
     _total_num_apps(0),
     _my_num_apps(0),
     _first_local_app(0),
-    _orig_comm(getParam<MPI_Comm>("_mpi_comm")),
-    _my_comm(MPI_COMM_SELF),
+    _orig_comm(_communicator.get()),
+    _my_communicator(),
+    _my_comm(_my_communicator.get()),
     _my_rank(0),
     _inflation(getParam<Real>("bounding_box_inflation")),
+    _bounding_box_padding(getParam<Point>("bounding_box_padding")),
     _max_procs_per_app(getParam<unsigned int>("max_procs_per_app")),
     _output_in_position(getParam<bool>("output_in_position")),
     _reset_time(getParam<Real>("reset_time")),
@@ -169,12 +176,6 @@ MultiApp::MultiApp(const InputParameters & parameters)
     _has_an_app(true),
     _backups(declareRestartableDataWithContext<SubAppBackups>("backups", this))
 {
-  if (_use_positions)
-  {
-    // Fill in the _positions vector and initialize
-    fillPositions();
-    init(_positions.size());
-  }
 }
 
 void
@@ -185,6 +186,19 @@ MultiApp::init(unsigned int num)
   _backups.reserve(_my_num_apps);
   for (unsigned int i = 0; i < _my_num_apps; i++)
     _backups.emplace_back(std::make_shared<Backup>());
+
+  _has_bounding_box.resize(_my_num_apps, false);
+  _bounding_box.resize(_my_num_apps);
+}
+
+void
+MultiApp::setupPositions()
+{
+  if (_use_positions)
+  {
+    fillPositions();
+    init(_positions.size());
+  }
 }
 
 void
@@ -199,7 +213,8 @@ MultiApp::initialSetup()
 
   // If the user provided an unregistered app type, see if we can load it dynamically
   if (!AppFactory::instance().isRegistered(_app_type))
-    _app.dynamicAppRegistration(_app_type, getParam<std::string>("library_path"));
+    _app.dynamicAppRegistration(
+        _app_type, getParam<std::string>("library_path"), getParam<std::string>("library_name"));
 
   for (unsigned int i = 0; i < _my_num_apps; i++)
     createApp(i, _app.getGlobalTimeOffset());
@@ -356,21 +371,36 @@ MultiApp::restore()
 }
 
 BoundingBox
-MultiApp::getBoundingBox(unsigned int app)
+MultiApp::getBoundingBox(unsigned int app, bool displaced_mesh)
 {
   if (!_has_an_app)
     mooseError("No app for ", name(), " on processor ", _orig_rank);
 
-  FEProblemBase & problem = appProblemBase(app);
+  unsigned int local_app = globalAppToLocal(app);
+  FEProblemBase & fe_problem_base = _apps[local_app]->getExecutioner()->feProblem();
+  MooseMesh & mesh = (displaced_mesh && fe_problem_base.getDisplacedProblem().get() != NULL)
+                         ? fe_problem_base.getDisplacedProblem()->mesh()
+                         : fe_problem_base.mesh();
 
-  BoundingBox bbox = {};
   {
     Moose::ScopedCommSwapper swapper(_my_comm);
-    bbox = MeshTools::create_bounding_box(problem.mesh());
+    if (displaced_mesh)
+      _bounding_box[local_app] = MeshTools::create_bounding_box(mesh);
+    else
+    {
+      if (!_has_bounding_box[local_app])
+      {
+        _bounding_box[local_app] = MeshTools::create_bounding_box(mesh);
+        _has_bounding_box[local_app] = true;
+      }
+    }
   }
+  BoundingBox bbox = _bounding_box[local_app];
 
   Point min = bbox.min();
+  min -= _bounding_box_padding;
   Point max = bbox.max();
+  max += _bounding_box_padding;
 
   Point inflation_amount = (max - min) * _inflation;
 
@@ -385,7 +415,7 @@ MultiApp::getBoundingBox(unsigned int app)
 
   // If the problem is RZ then we're going to invent a box that would cover the whole "3D" app
   // FIXME: Assuming all subdomains are the same coordinate system type!
-  if (problem.getCoordSystem(*(problem.mesh().meshSubdomains().begin())) == Moose::COORD_RZ)
+  if (fe_problem_base.getCoordSystem(*(mesh.meshSubdomains().begin())) == Moose::COORD_RZ)
   {
     shifted_min(0) = -inflated_max(0);
     shifted_min(1) = inflated_min(1);
@@ -533,7 +563,7 @@ MultiApp::createApp(unsigned int i, Real start_time)
   app_params.set<std::shared_ptr<CommandLine>>("_command_line") = _app.commandLine();
   app_params.set<unsigned int>("_multiapp_level") = _app.multiAppLevel() + 1;
   app_params.set<unsigned int>("_multiapp_number") = _first_local_app + i;
-  _apps[i].reset(AppFactory::instance().create(_app_type, full_name, app_params, _my_comm));
+  _apps[i] = AppFactory::instance().createShared(_app_type, full_name, app_params, _my_comm);
   auto & app = _apps[i];
 
   std::string input_file = "";
@@ -585,9 +615,9 @@ MultiApp::buildComm()
 {
   int ierr;
 
-  ierr = MPI_Comm_size(_orig_comm, &_orig_num_procs);
+  ierr = MPI_Comm_size(_communicator.get(), &_orig_num_procs);
   mooseCheckMPIErr(ierr);
-  ierr = MPI_Comm_rank(_orig_comm, &_orig_rank);
+  ierr = MPI_Comm_rank(_communicator.get(), &_orig_rank);
   mooseCheckMPIErr(ierr);
 
   struct utsname sysInfo;
@@ -629,7 +659,7 @@ MultiApp::buildComm()
 
   // In this case we need to divide up the processors that are going to work on each app
   int rank;
-  ierr = MPI_Comm_rank(_orig_comm, &rank);
+  ierr = MPI_Comm_rank(_communicator.get(), &rank);
   mooseCheckMPIErr(ierr);
 
   unsigned int procs_per_app = _orig_num_procs / _total_num_apps;
@@ -663,15 +693,15 @@ MultiApp::buildComm()
 
   if (_has_an_app)
   {
-    ierr = MPI_Comm_split(_orig_comm, _first_local_app, rank, &_my_comm);
-    mooseCheckMPIErr(ierr);
+    _communicator.split(_first_local_app, rank, _my_communicator);
+
     ierr = MPI_Comm_rank(_my_comm, &_my_rank);
     mooseCheckMPIErr(ierr);
   }
   else
   {
-    ierr = MPI_Comm_split(_orig_comm, MPI_UNDEFINED, rank, &_my_comm);
-    mooseCheckMPIErr(ierr);
+    _communicator.split(MPI_UNDEFINED, rank, _my_communicator);
+
     _my_rank = 0;
   }
 }

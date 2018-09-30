@@ -1,13 +1,18 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "MaterialVectorAuxKernelAction.h"
 #include "Factory.h"
 #include "Conversion.h"
 #include "FEProblem.h"
+
+registerMooseAction("PhaseFieldApp", MaterialVectorAuxKernelAction, "add_aux_kernel");
 
 template <>
 InputParameters
@@ -39,7 +44,7 @@ void
 MaterialVectorAuxKernelAction::act()
 {
   if (_num_prop != _num_var)
-    mooseError("variable_base and property must be vectors of the same size");
+    paramError("property", "variable_base and property must be vectors of the same size");
 
   for (unsigned int gr = 0; gr < _grain_num; ++gr)
     for (unsigned int val = 0; val < _num_var; ++val)

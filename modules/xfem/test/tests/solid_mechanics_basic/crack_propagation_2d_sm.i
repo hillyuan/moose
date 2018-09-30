@@ -4,7 +4,6 @@
 []
 
 [XFEM]
-  geometric_cut_userobjects = 'line_seg_cut_uo'
   qrule = volfrac
   output_cut_plane = true
   use_crack_growth_increment = true
@@ -140,7 +139,6 @@
   execute_on = timestep_end
   [./console]
     type = Console
-    perf_log = true
     output_linear = true
   [../]
 []

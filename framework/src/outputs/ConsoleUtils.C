@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "ConsoleUtils.h"
@@ -37,7 +32,7 @@ indent(unsigned int spaces)
 }
 
 std::string
-outputFrameworkInformation(MooseApp & app)
+outputFrameworkInformation(const MooseApp & app)
 {
   std::stringstream oss;
   oss << std::left;
@@ -66,13 +61,23 @@ outputMeshInformation(FEProblemBase & problem, bool verbose)
 
   if (verbose)
   {
+    bool forced = moose_mesh.isParallelTypeForced();
+    bool pre_split = problem.getMooseApp().isUseSplit();
+
+    // clang-format off
     oss << "Mesh: " << '\n'
         << std::setw(console_field_width)
         << "  Parallel Type: " << (moose_mesh.isDistributedMesh() ? "distributed" : "replicated")
-        << (moose_mesh.isParallelTypeForced() ? " (forced) " : "") << '\n'
+        << (forced || pre_split ? " (" : "")
+        << (forced ? "forced" : "")
+        << (forced && pre_split ? ", " : "")
+        << (pre_split ? "pre-split" : "")
+        << (forced || pre_split ? ")" : "")
+        << '\n'
         << std::setw(console_field_width) << "  Mesh Dimension: " << mesh.mesh_dimension() << '\n'
         << std::setw(console_field_width) << "  Spatial Dimension: " << mesh.spatial_dimension()
         << '\n';
+    // clang-format on
   }
 
   oss << std::setw(console_field_width) << "  Nodes:" << '\n'
@@ -112,7 +117,7 @@ outputNonlinearSystemInformation(FEProblemBase & problem)
 }
 
 std::string
-outputSystemInformationHelper(const System & system)
+outputSystemInformationHelper(System & system)
 {
   std::stringstream oss;
   oss << std::left;
@@ -149,8 +154,9 @@ outputSystemInformationHelper(const System & system)
 #ifndef LIBMESH_ENABLE_INFINITE_ELEMENTS
     for (unsigned int vg = 0; vg < system.n_variable_groups(); vg++)
     {
-      oss << "\"" << libMesh::Utility::enum_to_string<FEFamily>(
-                         system.get_dof_map().variable_group(vg).type().family)
+      oss << "\""
+          << libMesh::Utility::enum_to_string<FEFamily>(
+                 system.get_dof_map().variable_group(vg).type().family)
           << "\" ";
       curr_string_pos = oss.tellp();
       insertNewline(oss, begin_string_pos, curr_string_pos);
@@ -159,10 +165,12 @@ outputSystemInformationHelper(const System & system)
 #else
     for (unsigned int vg = 0; vg < system.n_variable_groups(); vg++)
     {
-      oss << "\"" << libMesh::Utility::enum_to_string<FEFamily>(
-                         system.get_dof_map().variable_group(vg).type().family)
-          << "\", \"" << libMesh::Utility::enum_to_string<FEFamily>(
-                             system.get_dof_map().variable_group(vg).type().radial_family)
+      oss << "\""
+          << libMesh::Utility::enum_to_string<FEFamily>(
+                 system.get_dof_map().variable_group(vg).type().family)
+          << "\", \""
+          << libMesh::Utility::enum_to_string<FEFamily>(
+                 system.get_dof_map().variable_group(vg).type().radial_family)
           << "\" ";
       curr_string_pos = oss.tellp();
       insertNewline(oss, begin_string_pos, curr_string_pos);
@@ -174,8 +182,9 @@ outputSystemInformationHelper(const System & system)
     oss << std::setw(console_field_width) << "  Infinite Element Mapping: ";
     for (unsigned int vg = 0; vg < system.n_variable_groups(); vg++)
     {
-      oss << "\"" << libMesh::Utility::enum_to_string<InfMapType>(
-                         system.get_dof_map().variable_group(vg).type().inf_map)
+      oss << "\""
+          << libMesh::Utility::enum_to_string<InfMapType>(
+                 system.get_dof_map().variable_group(vg).type().inf_map)
           << "\" ";
       curr_string_pos = oss.tellp();
       insertNewline(oss, begin_string_pos, curr_string_pos);
@@ -195,8 +204,9 @@ outputSystemInformationHelper(const System & system)
 #else
       oss << "\""
           << Utility::enum_to_string<Order>(system.get_dof_map().variable_group(vg).type().order)
-          << "\", \"" << Utility::enum_to_string<Order>(
-                             system.get_dof_map().variable_group(vg).type().radial_order)
+          << "\", \""
+          << Utility::enum_to_string<Order>(
+                 system.get_dof_map().variable_group(vg).type().radial_order)
           << "\" ";
 #endif
       curr_string_pos = oss.tellp();
@@ -209,7 +219,25 @@ outputSystemInformationHelper(const System & system)
 }
 
 std::string
-outputExecutionInformation(MooseApp & app, FEProblemBase & problem)
+outputRelationshipManagerInformation(const MooseApp & app)
+{
+  std::stringstream oss;
+  oss << std::left;
+
+  auto info_strings = app.getRelationshipManagerInfo();
+  if (info_strings.size())
+  {
+    for (const auto & info_pair : info_strings)
+      oss << std::setw(console_field_width) << std::string("  ") + info_pair.first << ": "
+          << info_pair.second << '\n';
+    oss << '\n';
+  }
+
+  return oss.str();
+}
+
+std::string
+outputExecutionInformation(const MooseApp & app, FEProblemBase & problem)
 {
 
   std::stringstream oss;

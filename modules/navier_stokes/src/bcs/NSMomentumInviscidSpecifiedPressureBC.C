@@ -1,10 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "NSMomentumInviscidSpecifiedPressureBC.h"
+
+registerMooseObject("NavierStokesApp", NSMomentumInviscidSpecifiedPressureBC);
 
 template <>
 InputParameters
@@ -14,7 +19,6 @@ validParams<NSMomentumInviscidSpecifiedPressureBC>()
   params.addClassDescription("Momentum equation boundary condition in which pressure is specified "
                              "(given) and the value of the convective part is allowed to vary (is "
                              "computed implicitly).");
-  params.addRequiredParam<Real>("specified_pressure", "The specified pressure for this boundary");
   return params;
 }
 

@@ -1,21 +1,19 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "MooseUtils.h"
 #include "MooseError.h"
 #include "MaterialProperty.h"
+#include "MultiMooseEnum.h"
+#include "InputParameters.h"
+#include "ExecFlagEnum.h"
 
 #include "libmesh/elem.h"
 
@@ -28,10 +26,12 @@
 #include <fstream>
 #include <istream>
 #include <iterator>
+#include <ctime>
 
 // System includes
 #include <sys/stat.h>
 #include <numeric>
+#include <unistd.h>
 
 std::string getLatestCheckpointFileHelper(const std::list<std::string> & checkpoint_files,
                                           const std::vector<std::string> extensions,
@@ -118,6 +118,13 @@ pathContains(const std::string & expression,
 }
 
 bool
+pathExists(const std::string & path)
+{
+  struct stat buffer;
+  return (stat(path.c_str(), &buffer) == 0);
+}
+
+bool
 checkFileReadable(const std::string & filename, bool check_line_endings, bool throw_on_unreadable)
 {
   std::ifstream in(filename.c_str(), std::ifstream::in);
@@ -168,20 +175,22 @@ checkFileWriteable(const std::string & filename, bool throw_on_unwritable)
 }
 
 void
-parallelBarrierNotify(const Parallel::Communicator & comm)
+parallelBarrierNotify(const Parallel::Communicator & comm, bool messaging)
 {
   processor_id_type slave_processor_id;
 
   if (comm.rank() == 0)
   {
     // The master process is already through, so report it
-    Moose::out << "Jobs complete: 1/" << comm.size() << (1 == comm.size() ? "\n" : "\r")
-               << std::flush;
+    if (messaging)
+      Moose::out << "Jobs complete: 1/" << comm.size() << (1 == comm.size() ? "\n" : "\r")
+                 << std::flush;
     for (unsigned int i = 2; i <= comm.size(); ++i)
     {
       comm.receive(MPI_ANY_SOURCE, slave_processor_id);
-      Moose::out << "Jobs complete: " << i << "/" << comm.size() << (i == comm.size() ? "\n" : "\r")
-                 << std::flush;
+      if (messaging)
+        Moose::out << "Jobs complete: " << i << "/" << comm.size()
+                   << (i == comm.size() ? "\n" : "\r") << std::flush;
     }
   }
   else
@@ -194,7 +203,7 @@ parallelBarrierNotify(const Parallel::Communicator & comm)
 }
 
 void
-serialBegin(const libMesh::Parallel::Communicator & comm)
+serialBegin(const libMesh::Parallel::Communicator & comm, bool warn)
 {
   // unless we are the first processor...
   if (comm.rank() > 0)
@@ -203,12 +212,12 @@ serialBegin(const libMesh::Parallel::Communicator & comm)
     int dummy = 0;
     comm.receive(comm.rank() - 1, dummy);
   }
-  else
+  else if (warn)
     mooseWarning("Entering serial execution block (use only for debugging)");
 }
 
 void
-serialEnd(const libMesh::Parallel::Communicator & comm)
+serialEnd(const libMesh::Parallel::Communicator & comm, bool warn)
 {
   // unless we are the last processor...
   if (comm.rank() + 1 < comm.size())
@@ -219,7 +228,7 @@ serialEnd(const libMesh::Parallel::Communicator & comm)
   }
 
   comm.barrier();
-  if (comm.rank() == 0)
+  if (comm.rank() == 0 && warn)
     mooseWarning("Leaving serial execution block (use only for debugging)");
 }
 
@@ -245,6 +254,15 @@ hasExtension(const std::string & filename, std::string ext, bool strip_exodus_ex
     return true;
   else
     return false;
+}
+
+std::string
+stripExtension(const std::string & s)
+{
+  auto pos = s.rfind(".");
+  if (pos != std::string::npos)
+    return s.substr(0, pos);
+  return s;
 }
 
 std::pair<std::string, std::string>
@@ -331,6 +349,21 @@ std::string
 baseName(const std::string & name)
 {
   return name.substr(0, name.find_last_of('/') != std::string::npos ? name.find_last_of('/') : 0);
+}
+
+std::string
+hostname()
+{
+  // This is from: https://stackoverflow.com/a/505546
+  char hostname[1024];
+  hostname[1023] = '\0';
+
+  auto failure = gethostname(hostname, 1023);
+
+  if (failure)
+    mooseError("Failed to retrieve hostname!");
+
+  return hostname;
 }
 
 bool
@@ -463,30 +496,38 @@ indentMessage(const std::string & prefix,
 }
 
 std::list<std::string>
+listDir(const std::string path, bool files_only)
+{
+  std::list<std::string> files;
+
+  tinydir_dir dir;
+  dir.has_next = 0; // Avoid a garbage value in has_next (clang StaticAnalysis)
+  tinydir_open(&dir, path.c_str());
+
+  while (dir.has_next)
+  {
+    tinydir_file file;
+    file.is_dir = 0; // Avoid a garbage value in is_dir (clang StaticAnalysis)
+    tinydir_readfile(&dir, &file);
+
+    if (!files_only || !file.is_dir)
+      files.push_back(path + "/" + file.name);
+
+    tinydir_next(&dir);
+  }
+
+  tinydir_close(&dir);
+
+  return files;
+}
+
+std::list<std::string>
 getFilesInDirs(const std::list<std::string> & directory_list)
 {
   std::list<std::string> files;
 
   for (const auto & dir_name : directory_list)
-  {
-    tinydir_dir dir;
-    dir.has_next = 0; // Avoid a garbage value in has_next (clang StaticAnalysis)
-    tinydir_open(&dir, dir_name.c_str());
-
-    while (dir.has_next)
-    {
-      tinydir_file file;
-      file.is_dir = 0; // Avoid a garbage value in is_dir (clang StaticAnalysis)
-      tinydir_readfile(&dir, &file);
-
-      if (!file.is_dir)
-        files.push_back(dir_name + "/" + file.name);
-
-      tinydir_next(&dir);
-    }
-
-    tinydir_close(&dir);
-  }
+    files.splice(files.end(), listDir(dir_name, true));
 
   return files;
 }
@@ -551,12 +592,128 @@ wildCardMatch(std::string name, std::string search_string)
     return false;
 }
 
+template <typename T>
+T
+convertStringToInt(const std::string & str, bool throw_on_failure)
+{
+  T val;
+
+  // Let's try to read a double and see if we can cast it to an int
+  // This would be the case for scientific notation
+  long double double_val;
+  std::stringstream double_ss(str);
+
+  if ((double_ss >> double_val).fail() || !double_ss.eof())
+  {
+    std::string msg =
+        std::string("Unable to convert '") + str + "' to type " + demangle(typeid(T).name());
+
+    if (throw_on_failure)
+      throw std::invalid_argument(msg);
+    else
+      mooseError(msg);
+  }
+
+  // Check to see if it's an integer (and within range of an integer
+  if (double_val == static_cast<T>(double_val))
+    val = double_val;
+  else // Still failure
+  {
+    std::string msg =
+        std::string("Unable to convert '") + str + "' to type " + demangle(typeid(T).name());
+
+    if (throw_on_failure)
+      throw std::invalid_argument(msg);
+    else
+      mooseError(msg);
+  }
+
+  return val;
+}
+
+template <>
+short int
+convert<short int>(const std::string & str, bool throw_on_failure)
+{
+  return convertStringToInt<short int>(str, throw_on_failure);
+}
+
+template <>
+unsigned short int
+convert<unsigned short int>(const std::string & str, bool throw_on_failure)
+{
+  return convertStringToInt<unsigned short int>(str, throw_on_failure);
+}
+
+template <>
+int
+convert<int>(const std::string & str, bool throw_on_failure)
+{
+  return convertStringToInt<int>(str, throw_on_failure);
+}
+
+template <>
+unsigned int
+convert<unsigned int>(const std::string & str, bool throw_on_failure)
+{
+  return convertStringToInt<unsigned int>(str, throw_on_failure);
+}
+
+template <>
+long int
+convert<long int>(const std::string & str, bool throw_on_failure)
+{
+  return convertStringToInt<long int>(str, throw_on_failure);
+}
+
+template <>
+unsigned long int
+convert<unsigned long int>(const std::string & str, bool throw_on_failure)
+{
+  return convertStringToInt<unsigned long int>(str, throw_on_failure);
+}
+
+template <>
+long long int
+convert<long long int>(const std::string & str, bool throw_on_failure)
+{
+  return convertStringToInt<long long int>(str, throw_on_failure);
+}
+
+template <>
+unsigned long long int
+convert<unsigned long long int>(const std::string & str, bool throw_on_failure)
+{
+  return convertStringToInt<unsigned long long int>(str, throw_on_failure);
+}
+
 std::string
 toUpper(const std::string & name)
 {
   std::string upper(name);
   std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
   return upper;
+}
+
+ExecFlagEnum
+getDefaultExecFlagEnum()
+{
+  ExecFlagEnum exec_enum = ExecFlagEnum();
+  exec_enum.addAvailableFlags(EXEC_NONE,
+                              EXEC_INITIAL,
+                              EXEC_LINEAR,
+                              EXEC_NONLINEAR,
+                              EXEC_TIMESTEP_END,
+                              EXEC_TIMESTEP_BEGIN,
+                              EXEC_FINAL,
+                              EXEC_CUSTOM);
+  return exec_enum;
+}
+
+int
+stringToInteger(const std::string & input, bool throw_on_failure)
+{
+  return convert<int>(input, throw_on_failure);
 }
 
 } // MooseUtils namespace
@@ -569,7 +726,7 @@ getLatestCheckpointFileHelper(const std::list<std::string> & checkpoint_files,
   // Create storage for newest restart files
   // Note that these might have the same modification time if the simulation was fast.
   // In that case we're going to save all of the "newest" files and sort it out momentarily
-  time_t newest_time = 0;
+  std::time_t newest_time = 0;
   std::list<std::string> newest_restart_files;
 
   // Loop through all possible files and store the newest
@@ -582,7 +739,7 @@ getLatestCheckpointFileHelper(const std::list<std::string> & checkpoint_files,
       struct stat stats;
       stat(cp_file.c_str(), &stats);
 
-      time_t mod_time = stats.st_mtime;
+      std::time_t mod_time = stats.st_mtime;
       if (mod_time > newest_time)
       {
         newest_restart_files.clear(); // If the modification time is greater, clear the list

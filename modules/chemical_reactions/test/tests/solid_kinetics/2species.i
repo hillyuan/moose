@@ -40,7 +40,6 @@
 []
 
 [ReactionNetwork]
-  primary_species = 'a b'
   [./SolidKineticReactions]
     primary_species = 'a b'
     secondary_species = mineral
@@ -126,6 +125,6 @@
 [Outputs]
   file_base = 2species_out
   exodus = true
-  print_perf_log = true
+  perf_graph = true
   print_linear_residuals = true
 []

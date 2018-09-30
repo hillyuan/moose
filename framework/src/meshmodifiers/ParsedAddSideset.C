@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "ParsedAddSideset.h"
@@ -18,6 +13,8 @@
 #include "MooseMesh.h"
 
 #include "libmesh/fparser_ad.hh"
+
+registerMooseObject("MooseApp", ParsedAddSideset);
 
 template <>
 InputParameters
@@ -120,7 +117,7 @@ ParsedAddSideset::modify()
         continue;
 
       // check expression
-      std::unique_ptr<Elem> curr_side = elem->side(side);
+      std::unique_ptr<Elem> curr_side = elem->side_ptr(side);
       _func_params[0] = curr_side->centroid()(0);
       _func_params[1] = curr_side->centroid()(1);
       _func_params[2] = curr_side->centroid()(2);

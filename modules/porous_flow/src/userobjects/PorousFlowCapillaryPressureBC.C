@@ -1,12 +1,16 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowCapillaryPressureBC.h"
 #include "PorousFlowBrooksCorey.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowCapillaryPressureBC);
 
 template <>
 InputParameters
@@ -28,21 +32,21 @@ PorousFlowCapillaryPressureBC::PorousFlowCapillaryPressureBC(const InputParamete
 }
 
 Real
-PorousFlowCapillaryPressureBC::capillaryPressureCurve(Real saturation) const
+PorousFlowCapillaryPressureBC::capillaryPressureCurve(Real saturation, unsigned /*qp*/) const
 {
   Real seff = effectiveSaturationFromSaturation(saturation);
   return PorousFlowBrooksCorey::capillaryPressure(seff, _pe, _lambda, _pc_max);
 }
 
 Real
-PorousFlowCapillaryPressureBC::dCapillaryPressureCurve(Real saturation) const
+PorousFlowCapillaryPressureBC::dCapillaryPressureCurve(Real saturation, unsigned /*qp*/) const
 {
   Real seff = effectiveSaturationFromSaturation(saturation);
   return PorousFlowBrooksCorey::dCapillaryPressure(seff, _pe, _lambda, _pc_max) * _dseff_ds;
 }
 
 Real
-PorousFlowCapillaryPressureBC::d2CapillaryPressureCurve(Real saturation) const
+PorousFlowCapillaryPressureBC::d2CapillaryPressureCurve(Real saturation, unsigned /*qp*/) const
 {
   Real seff = effectiveSaturationFromSaturation(saturation);
   return PorousFlowBrooksCorey::d2CapillaryPressure(seff, _pe, _lambda, _pc_max) * _dseff_ds *
@@ -50,19 +54,19 @@ PorousFlowCapillaryPressureBC::d2CapillaryPressureCurve(Real saturation) const
 }
 
 Real
-PorousFlowCapillaryPressureBC::effectiveSaturation(Real pc) const
+PorousFlowCapillaryPressureBC::effectiveSaturation(Real pc, unsigned /*qp*/) const
 {
   return PorousFlowBrooksCorey::effectiveSaturation(pc, _pe, _lambda);
 }
 
 Real
-PorousFlowCapillaryPressureBC::dEffectiveSaturation(Real pc) const
+PorousFlowCapillaryPressureBC::dEffectiveSaturation(Real pc, unsigned /*qp*/) const
 {
   return PorousFlowBrooksCorey::dEffectiveSaturation(pc, _pe, _lambda);
 }
 
 Real
-PorousFlowCapillaryPressureBC::d2EffectiveSaturation(Real pc) const
+PorousFlowCapillaryPressureBC::d2EffectiveSaturation(Real pc, unsigned /*qp*/) const
 {
   return PorousFlowBrooksCorey::d2EffectiveSaturation(pc, _pe, _lambda);
 }

@@ -1,3 +1,12 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from FileTester import FileTester
 import os
 import sys
@@ -30,7 +39,7 @@ class ImageDiff(FileTester):
 
         # Call base class processResults
         FileTester.processResults(self, moose_dir, options, output)
-        if self.getStatus() == self.bucket_fail:
+        if self.isFail():
             return output
 
         # Loop through files
@@ -40,7 +49,7 @@ class ImageDiff(FileTester):
             # Error if gold file does not exist
             if not os.path.exists(os.path.join(specs['test_dir'], specs['gold_dir'], filename)):
                 output += "File Not Found: " + os.path.join(specs['test_dir'], specs['gold_dir'], filename)
-                self.setStatus('MISSING GOLD FILE', self.bucket_fail)
+                self.setStatus(self.fail, 'MISSING GOLD FILE')
                 break
 
             # Perform diff
@@ -61,11 +70,7 @@ class ImageDiff(FileTester):
 
                 output += differ.message()
                 if differ.fail():
-                    self.setStatus('IMAGEDIFF', self.bucket_diff)
+                    self.setStatus(self.diff, 'IMAGEDIFF')
                     break
-
-        # If status is still pending, then it is a passing test
-        if self.getStatus() == self.bucket_pending:
-            self.setStatus(self.success_message, self.bucket_success)
 
         return output

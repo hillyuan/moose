@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "MultiAppNearestNodeTransfer.h"
 
@@ -19,12 +14,14 @@
 #include "FEProblem.h"
 #include "MooseMesh.h"
 #include "MooseTypes.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 
 #include "libmesh/system.h"
 #include "libmesh/mesh_tools.h"
 #include "libmesh/id_types.h"
 #include "libmesh/parallel_algebra.h"
+
+registerMooseObject("MooseApp", MultiAppNearestNodeTransfer);
 
 template <>
 InputParameters
@@ -41,12 +38,6 @@ validParams<MultiAppNearestNodeTransfer>()
   params.addParam<BoundaryName>(
       "target_boundary",
       "The boundary we are transferring to (if not specified, whole domain is used).");
-  params.addParam<bool>("displaced_source_mesh",
-                        false,
-                        "Whether or not to use the displaced mesh for the source mesh.");
-  params.addParam<bool>("displaced_target_mesh",
-                        false,
-                        "Whether or not to use the displaced mesh for the target mesh.");
   params.addParam<bool>("fixed_meshes",
                         false,
                         "Set to true when the meshes are not changing (ie, "
@@ -72,9 +63,6 @@ MultiAppNearestNodeTransfer::MultiAppNearestNodeTransfer(const InputParameters &
         declareRestartableData<std::map<dof_id_type, unsigned int>>("cached_from_ids")),
     _cached_qp_inds(declareRestartableData<std::map<dof_id_type, unsigned int>>("cached_qp_inds"))
 {
-  // This transfer does not work with DistributedMesh
-  _displaced_source_mesh = getParam<bool>("displaced_source_mesh");
-  _displaced_target_mesh = getParam<bool>("displaced_target_mesh");
 }
 
 void
@@ -146,13 +134,9 @@ MultiAppNearestNodeTransfer::execute()
         else
         {
           target_local_nodes.resize(to_mesh->n_local_nodes());
-          MeshBase::const_node_iterator nodes_begin = to_mesh->local_nodes_begin();
-          MeshBase::const_node_iterator nodes_end = to_mesh->local_nodes_end();
-
           unsigned int i = 0;
-          for (MeshBase::const_node_iterator nodes_it = nodes_begin; nodes_it != nodes_end;
-               ++nodes_it, ++i)
-            target_local_nodes[i] = *nodes_it;
+          for (auto & node : to_mesh->local_node_ptr_range())
+            target_local_nodes[i++] = node;
         }
 
         for (const auto & node : target_local_nodes)
@@ -192,13 +176,8 @@ MultiAppNearestNodeTransfer::execute()
       }
       else // Elemental
       {
-        MeshBase::const_element_iterator elem_it = to_mesh->local_elements_begin();
-        MeshBase::const_element_iterator elem_end = to_mesh->local_elements_end();
-
-        for (; elem_it != elem_end; ++elem_it)
+        for (auto & elem : as_range(to_mesh->local_elements_begin(), to_mesh->local_elements_end()))
         {
-          Elem * elem = *elem_it;
-
           Point centroid = elem->centroid();
 
           // Skip this element if the variable has no dofs at it.
@@ -303,7 +282,11 @@ MultiAppNearestNodeTransfer::execute()
         for (unsigned int i_local_from = 0; i_local_from < froms_per_proc[processor_id()];
              i_local_from++)
         {
-          MooseVariable & from_var = _from_problems[i_local_from]->getVariable(0, _from_var_name);
+          MooseVariableFEBase & from_var =
+              _from_problems[i_local_from]->getVariable(0,
+                                                        _from_var_name,
+                                                        Moose::VarKindType::VAR_ANY,
+                                                        Moose::VarFieldType::VAR_FIELD_STANDARD);
           System & from_sys = from_var.sys().system();
           unsigned int from_sys_num = from_sys.number();
           unsigned int from_var_num = from_sys.variable_number(from_var.name());
@@ -351,8 +334,11 @@ MultiAppNearestNodeTransfer::execute()
 
       for (unsigned int qp = 0; qp < outgoing_evals.size(); qp++)
       {
-        MooseVariable & from_var =
-            _from_problems[_cached_froms[i_proc][qp]]->getVariable(0, _from_var_name);
+        MooseVariableFEBase & from_var = _from_problems[_cached_froms[i_proc][qp]]->getVariable(
+            0,
+            _from_var_name,
+            Moose::VarKindType::VAR_ANY,
+            Moose::VarFieldType::VAR_FIELD_STANDARD);
         System & from_sys = from_var.sys().system();
         dof_id_type from_dof = _cached_dof_ids[i_proc][qp];
         // outgoing_evals[qp] = (*from_sys.solution)(_cached_dof_ids[i_proc][qp]);
@@ -421,13 +407,9 @@ MultiAppNearestNodeTransfer::execute()
       else
       {
         target_local_nodes.resize(to_mesh->n_local_nodes());
-        MeshBase::const_node_iterator nodes_begin = to_mesh->local_nodes_begin();
-        MeshBase::const_node_iterator nodes_end = to_mesh->local_nodes_end();
-
         unsigned int i = 0;
-        for (MeshBase::const_node_iterator nodes_it = nodes_begin; nodes_it != nodes_end;
-             ++nodes_it, ++i)
-          target_local_nodes[i] = *nodes_it;
+        for (auto & node : to_mesh->local_node_ptr_range())
+          target_local_nodes[i++] = node;
       }
 
       for (const auto & node : target_local_nodes)
@@ -471,13 +453,8 @@ MultiAppNearestNodeTransfer::execute()
     }
     else // Elemental
     {
-      MeshBase::const_element_iterator elem_it = to_mesh->local_elements_begin();
-      MeshBase::const_element_iterator elem_end = to_mesh->local_elements_end();
-
-      for (; elem_it != elem_end; ++elem_it)
+      for (auto & elem : as_range(to_mesh->local_elements_begin(), to_mesh->local_elements_end()))
       {
-        Elem * elem = *elem_it;
-
         // Skip this element if the variable has no dofs at it.
         if (elem->n_dofs(sys_num, var_num) < 1)
           continue;
@@ -565,11 +542,8 @@ MultiAppNearestNodeTransfer::getNearestNode(const Point & p,
   }
   else
   {
-    SimpleRange<MeshBase::const_node_iterator> range(
-        local ? mesh->localNodesBegin() : mesh->getMesh().nodes_begin(),
-        local ? mesh->localNodesEnd() : mesh->getMesh().nodes_end());
-
-    for (auto & node : range)
+    for (auto & node : as_range(local ? mesh->localNodesBegin() : mesh->getMesh().nodes_begin(),
+                                local ? mesh->localNodesEnd() : mesh->getMesh().nodes_end()))
     {
       Real current_distance = (p - *node).norm();
 
@@ -645,12 +619,8 @@ MultiAppNearestNodeTransfer::getLocalNodes(MooseMesh * mesh, std::vector<Node *>
   else
   {
     local_nodes.resize(mesh->getMesh().n_local_nodes());
-
-    MeshBase::const_node_iterator nodes_begin = mesh->localNodesBegin();
-    MeshBase::const_node_iterator nodes_end = mesh->localNodesEnd();
-
     unsigned int i = 0;
-    for (MeshBase::const_node_iterator node_it = nodes_begin; node_it != nodes_end; ++node_it, ++i)
-      local_nodes[i] = *node_it;
+    for (auto & node : as_range(mesh->localNodesBegin(), mesh->localNodesEnd()))
+      local_nodes[i++] = node;
   }
 }

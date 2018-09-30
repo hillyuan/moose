@@ -1,13 +1,18 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "KKSPhaseChemicalPotential.h"
 #include "MathUtils.h"
 
 using namespace MathUtils;
+
+registerMooseObject("PhaseFieldApp", KKSPhaseChemicalPotential);
 
 template <>
 InputParameters
@@ -47,7 +52,7 @@ KKSPhaseChemicalPotential::KKSPhaseChemicalPotential(const InputParameters & par
     _d2fadca2(getMaterialPropertyDerivative<Real>("fa_name", _var.name(), _var.name())),
     _d2fbdcbca(getMaterialPropertyDerivative<Real>("fb_name", _cb_name, _var.name()))
 {
-  MooseVariable * arg;
+  MooseVariableFEBase * arg;
   unsigned int i;
 
 #ifdef DEBUG

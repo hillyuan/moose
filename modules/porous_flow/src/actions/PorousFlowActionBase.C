@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "PorousFlowActionBase.h"
 
 #include "FEProblem.h"
@@ -39,6 +42,16 @@ validParams<PorousFlowActionBase>()
                        "N=num_components and P=num_phases, and it is assumed that "
                        "f_ph^cN=1-sum(f_ph^c,{c,0,N-1}) so that f_ph^cN need not be given.  If no "
                        "variables are provided then num_phases=1=num_components.");
+  params.addParam<unsigned int>("number_aqueous_equilibrium",
+                                0,
+                                "The number of secondary species in the aqueous-equilibrium "
+                                "reaction system.  (Leave as zero if the simulation does not "
+                                "involve chemistry)");
+  params.addParam<unsigned int>("number_aqueous_kinetic",
+                                0,
+                                "The number of secondary species in the aqueous-kinetic reaction "
+                                "system involved in precipitation and dissolution.  (Leave as zero "
+                                "if the simulation does not involve chemistry)");
   params.addParam<std::vector<NonlinearVariableName>>(
       "displacements",
       "The name of the displacement variables (relevant only for "
@@ -58,6 +71,8 @@ PorousFlowActionBase::PorousFlowActionBase(const InputParameters & params)
     PorousFlowDependencies(),
     _objects_to_add(),
     _dictator_name(getParam<std::string>("dictator_name")),
+    _num_aqueous_equilibrium(getParam<unsigned int>("number_aqueous_equilibrium")),
+    _num_aqueous_kinetic(getParam<unsigned int>("number_aqueous_kinetic")),
     _gravity(getParam<RealVectorValue>("gravity")),
     _mass_fraction_vars(getParam<std::vector<VariableName>>("mass_fraction_vars")),
     _num_mass_fraction_vars(_mass_fraction_vars.size()),
@@ -106,7 +121,7 @@ PorousFlowActionBase::addSaturationAux(unsigned phase)
     params.set<MaterialPropertyName>("property") = "PorousFlow_saturation_qp";
     params.set<unsigned>("index") = phase;
     params.set<AuxVariableName>("variable") = "saturation" + phase_str;
-    params.set<MultiMooseEnum>("execute_on") = "timestep_end";
+    params.set<ExecFlagEnum>("execute_on") = EXEC_TIMESTEP_END;
     _problem->addAuxKernel(aux_kernel_type, aux_kernel_name, params);
   }
 }
@@ -134,7 +149,7 @@ PorousFlowActionBase::addDarcyAux(const RealVectorValue & gravity)
 
     params.set<RealVectorValue>("gravity") = gravity;
     params.set<UserObjectName>("PorousFlowDictator") = _dictator_name;
-    params.set<MultiMooseEnum>("execute_on") = "timestep_end";
+    params.set<ExecFlagEnum>("execute_on") = EXEC_TIMESTEP_END;
 
     std::string aux_kernel_name = "PorousFlowActionBase_Darcy_x_Aux";
     params.set<MooseEnum>("component") = "x";
@@ -193,7 +208,7 @@ PorousFlowActionBase::addStressAux()
     InputParameters params = _factory.getValidParams(aux_kernel_type);
 
     params.set<MaterialPropertyName>("rank_two_tensor") = "stress";
-    params.set<MultiMooseEnum>("execute_on") = "timestep_end";
+    params.set<ExecFlagEnum>("execute_on") = EXEC_TIMESTEP_END;
 
     std::string aux_kernel_name = "PorousFlowAction_stress_xx";
     params.set<AuxVariableName>("variable") = "stress_xx";
@@ -454,81 +469,4 @@ PorousFlowActionBase::addCapillaryPressureVG(Real m, Real alpha, std::string use
     params.set<Real>("alpha") = alpha;
     _problem->addUserObject(userobject_type, userobject_name, params);
   }
-}
-
-void
-PorousFlowActionBase::addJoiner(bool at_nodes,
-                                const std::string & material_property,
-                                const std::string & output_name)
-{
-  if (_current_task == "add_material")
-  {
-    std::string material_type = "PorousFlowJoiner";
-    InputParameters params = _factory.getValidParams(material_type);
-    params.set<UserObjectName>("PorousFlowDictator") = _dictator_name;
-    params.set<bool>("at_nodes") = at_nodes;
-    params.set<std::string>("material_property") = material_property;
-    _problem->addMaterial(material_type, output_name, params);
-  }
-}
-
-void
-PorousFlowActionBase::joinDensity(bool at_nodes)
-{
-  if (at_nodes)
-    addJoiner(at_nodes,
-              "PorousFlow_fluid_phase_density_nodal",
-              "PorousFlowActionBase_fluid_phase_density_all");
-  else
-    addJoiner(at_nodes,
-              "PorousFlow_fluid_phase_density_qp",
-              "PorousFlowActionBase_fluid_phase_density_qp_all");
-}
-
-void
-PorousFlowActionBase::joinViscosity(bool at_nodes)
-{
-  if (at_nodes)
-    addJoiner(at_nodes, "PorousFlow_viscosity_nodal", "PorousFlowActionBase_viscosity_all");
-  else
-    addJoiner(at_nodes, "PorousFlow_viscosity_qp", "PorousFlowActionBase_viscosity_qp_all");
-}
-
-void
-PorousFlowActionBase::joinRelativePermeability(bool at_nodes)
-{
-  if (at_nodes)
-    addJoiner(at_nodes,
-              "PorousFlow_relative_permeability_nodal",
-              "PorousFlowActionBase_relative_permeability_all");
-  else
-    addJoiner(at_nodes,
-              "PorousFlow_relative_permeability_qp",
-              "PorousFlowActionBase_relative_permeability_qp_all");
-}
-
-void
-PorousFlowActionBase::joinInternalEnergy(bool at_nodes)
-{
-  if (at_nodes)
-    addJoiner(at_nodes,
-              "PorousFlow_fluid_phase_internal_energy_nodal",
-              "PorousFlowActionBase_fluid_phase_internal_energy_all");
-  else
-    addJoiner(at_nodes,
-              "PorousFlow_fluid_phase_internal_energy_qp",
-              "PorousFlowActionBase_fluid_phase_internal_energy_qp_all");
-}
-
-void
-PorousFlowActionBase::joinEnthalpy(bool at_nodes)
-{
-  if (at_nodes)
-    addJoiner(at_nodes,
-              "PorousFlow_fluid_phase_enthalpy_nodal",
-              "PorousFlowActionBase_fluid_phase_enthalpy_all");
-  else
-    addJoiner(at_nodes,
-              "PorousFlow_fluid_phase_enthalpy_qp",
-              "PorousFlowActionBase_fluid_phase_enthalpy_qp_all");
 }

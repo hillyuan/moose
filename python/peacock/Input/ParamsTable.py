@@ -1,3 +1,12 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from PyQt5 import QtWidgets
 from PyQt5.QtGui import QColor, QBrush
 from PyQt5.QtCore import pyqtSignal, Qt
@@ -480,6 +489,9 @@ class ParamsTable(QtWidgets.QTableWidget, MooseWidget):
             list of paths that will be used as options, or None
         """
         for key, value in self.type_to_block_map.iteritems():
-            if key in cpp_type:
+            # The key (ie something like VectorPostprocessorName) can
+            # also be inside a vector
+            vector_key = "vector<%s>" % key
+            if key == cpp_type or vector_key in cpp_type:
                 return value
         return None

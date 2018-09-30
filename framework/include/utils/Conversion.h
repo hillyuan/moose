@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef CONVERSION_H
 #define CONVERSION_H
@@ -31,9 +26,6 @@ namespace Moose
 // Scalar conversions
 template <typename T>
 T stringToEnum(const std::string & s);
-
-template <>
-ExecFlagType stringToEnum<ExecFlagType>(const std::string & s);
 
 template <>
 QuadratureType stringToEnum<QuadratureType>(const std::string & s);
@@ -57,9 +49,6 @@ TimeIntegratorType stringToEnum<TimeIntegratorType>(const std::string & s);
 template <typename T>
 std::vector<T> vectorStringsToEnum(const MultiMooseEnum & v);
 
-template <>
-std::vector<ExecFlagType> vectorStringsToEnum<ExecFlagType>(const MultiMooseEnum & v);
-
 /// conversion to string
 template <typename T>
 std::string
@@ -73,9 +62,6 @@ stringify(const T & t)
 /// Convert solve type into human readable string
 std::string stringify(const SolveType & t);
 
-/// Convert execute flags type into human readable string
-std::string stringify(const ExecFlagType & t);
-
 /// Add no-op stringify if the argument already is a string (must use overloading)
 std::string stringify(const std::string & s);
 
@@ -87,15 +73,35 @@ stringify(const std::pair<T, U> & p)
   return stringify(p.first) + ':' + stringify(p.second);
 }
 
-/// Convert a container to a flat comma (or otherwise) separated string
+/**
+ * Convert a container to a string with elements separated by delimiter of user's choice
+ *
+ * Optionally, the container elements can be enclosed by curly braces and can
+ * enclose elements in quotations (or other characters) to make the separation
+ * of elements more clear.
+ *
+ * @param[in] c           Container to stringify
+ * @param[in] delim       String to print between elements
+ * @param[in] elem_encl   String to use at the beginning and end of each element,
+ *                        typically quotation marks
+ * @param[in] enclose_list_in_curly_braces   Enclose the list string in curly braces?
+ */
 template <template <typename...> class T, typename... U>
 std::string
-stringify(const T<U...> & c, const std::string & delim = ",")
+stringify(const T<U...> & c,
+          const std::string & delim = ",",
+          const std::string & elem_encl = "",
+          bool enclose_list_in_curly_braces = false)
 {
   std::string str;
-  const auto begin = c.begin(), end = c.end();
+  if (enclose_list_in_curly_braces)
+    str += "{";
+  const auto begin = c.begin();
+  const auto end = c.end();
   for (auto i = begin; i != end; ++i)
-    str += (i != begin ? delim : "") + stringify(*i);
+    str += (i != begin ? delim : "") + elem_encl + stringify(*i) + elem_encl;
+  if (enclose_list_in_curly_braces)
+    str += "}";
   return str;
 }
 

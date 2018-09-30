@@ -1,19 +1,16 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "BoundingBoxIC.h"
 #include "libmesh/point.h"
+
+registerMooseObject("MooseApp", BoundingBoxIC);
 
 template <>
 InputParameters
@@ -30,6 +27,11 @@ validParams<BoundingBoxIC>()
 
   params.addParam<Real>("inside", 0.0, "The value of the variable inside the box");
   params.addParam<Real>("outside", 0.0, "The value of the variable outside the box");
+
+  params.addClassDescription("BoundingBoxIC allows setting the initial condition of a value inside "
+                             "and outside of a specified box. The box is aligned with the x, y, z "
+                             "axes");
+
   return params;
 }
 

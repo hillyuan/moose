@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "SamplerBase.h"
 
@@ -29,6 +24,10 @@ validParams<SamplerBase>()
 
   MooseEnum sort_options("x y z id");
   params.addRequiredParam<MooseEnum>("sort_by", sort_options, "What to sort the samples by");
+
+  // The value from this VPP is naturally already on every processor
+  // TODO: Make this not the case!  See #11415
+  params.set<bool>("_is_broadcast") = true;
 
   return params;
 }
@@ -74,6 +73,10 @@ SamplerBase::addSample(const Point & p, const Real & id, const std::vector<Real>
 void
 SamplerBase::initialize()
 {
+  // Don't reset the vectors if we want to retain history
+  if (_vpp->containsCompleteHistory() && _comm.rank() == 0)
+    return;
+
   _x.clear();
   _y.clear();
   _z.clear();

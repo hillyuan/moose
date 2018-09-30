@@ -138,4 +138,5 @@
 [Outputs]
   exodus = true
   execute_on = timestep_end
+  hide = 'dummy eta'
 []

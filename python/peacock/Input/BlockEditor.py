@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from PyQt5.QtWidgets import QWidget, QSplitter, QMessageBox
 from PyQt5.QtCore import Qt, pyqtSignal
 from peacock.utils import WidgetUtils
@@ -22,7 +31,8 @@ class BlockEditor(QWidget, MooseWidget):
         blockChanged(object): Apply has been clicked for this block.
         cloneBlock(object): The user wants to clone the block we are currently editing.
         removeBlock(object): The user wants to remove the block we are currently editing.
-        editingFinished(object): The user is done editing this block. Typically done by closing the window.
+        editingFinished(): The user is done editing this block. Typically done by closing the window.
+        appliedAndClosed(object): Emit the block when the user hits the "Apply & Close" button
     """
     needBlockList = pyqtSignal(list) # list of paths that we need children for
     blockRenamed = pyqtSignal(object, str) # block with changes, old path
@@ -31,6 +41,7 @@ class BlockEditor(QWidget, MooseWidget):
     cloneBlock = pyqtSignal(object) # block to clone
     removeBlock = pyqtSignal(object) # block to remove
     editingFinished = pyqtSignal()
+    appliedAndClosed = pyqtSignal(object)
 
     def __init__(self, block, type_to_block_map, **kwds):
         """
@@ -41,6 +52,7 @@ class BlockEditor(QWidget, MooseWidget):
         super(BlockEditor, self).__init__(**kwds)
         self.block = block
         self.comment_edit = CommentEditor()
+        self.comment_edit.setComments(self.block.comments)
         self.comment_edit.textChanged.connect(self._blockChanged)
         self.splitter = None
         self.clone_button = None
@@ -178,6 +190,7 @@ class BlockEditor(QWidget, MooseWidget):
         """
         if self.apply_button.isEnabled():
             self.applyChanges()
+            self.appliedAndClosed.emit(self.block)
         self.close()
 
     def resetChanges(self):

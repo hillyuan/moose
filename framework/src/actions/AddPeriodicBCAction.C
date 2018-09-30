@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "AddPeriodicBCAction.h"
 
@@ -21,10 +16,12 @@
 #include "GeneratedMesh.h"
 #include "InputParameters.h"
 #include "MooseMesh.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 #include "NonlinearSystem.h"
 
 #include "libmesh/periodic_boundary.h" // translation PBCs provided by libmesh
+
+registerMooseAction("MooseApp", AddPeriodicBCAction, "add_periodic_bc");
 
 template <>
 InputParameters
@@ -68,10 +65,12 @@ AddPeriodicBCAction::setPeriodicVars(PeriodicBoundaryBase & p,
 
   for (const auto & var_name : *var_names_ptr)
   {
-    unsigned int var_num = nl.getVariable(0, var_name).number();
-
-    p.set_variable(var_num);
-    _mesh->addPeriodicVariable(var_num, p.myboundary, p.pairedboundary);
+    if (!nl.hasScalarVariable(var_name))
+    {
+      unsigned int var_num = nl.getVariable(0, var_name).number();
+      p.set_variable(var_num);
+      _mesh->addPeriodicVariable(var_num, p.myboundary, p.pairedboundary);
+    }
   }
 }
 

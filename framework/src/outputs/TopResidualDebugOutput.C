@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // MOOSE includes
 #include "TopResidualDebugOutput.h"
@@ -25,6 +20,8 @@
 #include "libmesh/transient_system.h"
 #include "libmesh/fe_type.h"
 
+registerMooseObject("MooseApp", TopResidualDebugOutput);
+
 template <>
 InputParameters
 validParams<TopResidualDebugOutput>()
@@ -36,7 +33,7 @@ validParams<TopResidualDebugOutput>()
       "num_residuals", 0, "The number of top residuals to print out (0 = no output)");
 
   // By default operate on both nonlinear and linear residuals
-  params.set<MultiMooseEnum>("execute_on") = "linear nonlinear timestep_end";
+  params.set<ExecFlagEnum>("execute_on", true) = {EXEC_LINEAR, EXEC_NONLINEAR, EXEC_TIMESTEP_END};
   return params;
 }
 
@@ -58,26 +55,43 @@ TopResidualDebugOutput::output(const ExecFlagType & /*type*/)
 void
 TopResidualDebugOutput::printTopResiduals(const NumericVector<Number> & residual, unsigned int n)
 {
-  // Need a reference to the libMesh mesh object
-  MeshBase & mesh = _problem_ptr->mesh().getMesh();
+  MooseMesh & mesh = _problem_ptr->mesh();
 
   std::vector<TopResidualDebugOutputTopResidualData> vec;
   vec.resize(residual.local_size());
 
   unsigned int j = 0;
-  MeshBase::node_iterator it = mesh.local_nodes_begin();
-  const MeshBase::node_iterator end = mesh.local_nodes_end();
-  for (; it != end; ++it)
-  {
-    Node & node = *(*it);
-    dof_id_type nd = node.id();
 
-    for (unsigned int var = 0; var < node.n_vars(_sys.number()); ++var)
-      if (node.n_dofs(_sys.number(), var) >
-          0) // this check filters scalar variables (which are clearly not a dof on every node)
+  // Loop over all nodal variables
+  for (const auto & node : as_range(mesh.localNodesBegin(), mesh.localNodesEnd()))
+  {
+    dof_id_type nd = node->id();
+
+    for (unsigned int var = 0; var < node->n_vars(_sys.number()); ++var)
+      // check that variable exists on node
+      if (node->n_dofs(_sys.number(), var) > 0)
       {
-        dof_id_type dof_idx = node.dof_number(_sys.number(), var, 0);
-        vec[j] = TopResidualDebugOutputTopResidualData(var, nd, residual(dof_idx));
+        const auto & subdomain_ids = mesh.getNodeBlockIds(*node);
+        dof_id_type dof_idx = node->dof_number(_sys.number(), var, 0);
+        vec[j] = TopResidualDebugOutputTopResidualData(
+            var, subdomain_ids, nd, *node, residual(dof_idx), false, true);
+        j++;
+      }
+  }
+
+  // Loop over all elemental variables
+  for (const auto & elem : as_range(mesh.activeLocalElementsBegin(), mesh.activeLocalElementsEnd()))
+  {
+    dof_id_type elem_id = elem->id();
+    const SubdomainID subdomain_id = elem->subdomain_id();
+
+    for (unsigned int var = 0; var < elem->n_vars(_sys.number()); ++var)
+      // check that variable exists on element
+      if (elem->n_dofs(_sys.number(), var) > 0)
+      {
+        dof_id_type dof_idx = elem->dof_number(_sys.number(), var, 0);
+        vec[j] = TopResidualDebugOutputTopResidualData(
+            var, {subdomain_id}, elem_id, elem->centroid(), residual(dof_idx), false, false);
         j++;
       }
   }
@@ -95,7 +109,8 @@ TopResidualDebugOutput::printTopResiduals(const NumericVector<Number> & residual
       for (const auto & dof : dof_indices)
         if (dof >= dof_map.first_dof() && dof < dof_map.end_dof())
         {
-          vec[j] = TopResidualDebugOutputTopResidualData(var_num, 0, residual(dof), true);
+          vec[j] =
+              TopResidualDebugOutputTopResidualData(var_num, {}, 0, Point(), residual(dof), true);
           j++;
         }
     }
@@ -119,6 +134,22 @@ TopResidualDebugOutput::printTopResiduals(const NumericVector<Number> & residual
     if (vec[i]._is_scalar)
       Moose::err << "(SCALAR)\n";
     else
-      Moose::err << "at node " << vec[i]._nd << '\n';
+    {
+      // Create subdomain list string for node
+      const unsigned int n_subdomains = vec[i]._subdomain_ids.size();
+      std::vector<SubdomainName> subdomain_names(n_subdomains);
+      unsigned int i_block = 0;
+      for (const auto & subdomain_id : vec[i]._subdomain_ids)
+      {
+        subdomain_names[i_block] = mesh.getSubdomainName(subdomain_id);
+        i_block++;
+      }
+      const std::string subdomains_string = Moose::stringify(subdomain_names, ", ", "'", true);
+
+      const std::string elem_or_node_string = vec[i]._is_nodal ? "node" : "element";
+
+      Moose::err << "in subdomain(s) " << subdomains_string << " at " << elem_or_node_string << " "
+                 << vec[i]._id << ": " << vec[i]._point << '\n';
+    }
   }
 }

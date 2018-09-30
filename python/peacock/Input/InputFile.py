@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import os
 from FactorySystem.Parser import DupWalker
 import mooseutils
@@ -45,17 +54,14 @@ class InputFile(object):
         # parser doesn't do any checks.
         if not os.path.exists(filename):
             msg = "Input file %s does not exist" % filename
-            mooseutils.mooseError(msg)
             raise PeacockException(msg)
 
         if not os.path.isfile(filename):
             msg = "Input file %s is not a file" % filename
-            mooseutils.mooseError(msg)
             raise PeacockException(msg)
 
         if not filename.endswith(".i"):
             msg = "Input file %s does not have the proper extension" % filename
-            mooseutils.mooseError(msg)
             raise PeacockException(msg)
 
         with open(filename, 'r') as f:
@@ -68,7 +74,7 @@ class InputFile(object):
             root = hit.parse(os.path.abspath(filename), data)
             hit.explode(root)
             w = DupWalker(os.path.abspath(filename))
-            root.walk(w, hit.NodeType.All)
+            root.walk(w, hit.NodeType.Field)
             if w.errors:
                 for err in w.errors:
                     mooseutils.mooseWarning(err)

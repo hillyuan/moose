@@ -1,18 +1,24 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "PorousFlowPorosityHMBiotModulus.h"
 #include "libmesh/utility.h"
+
+registerMooseObject("PorousFlowApp", PorousFlowPorosityHMBiotModulus);
 
 template <>
 InputParameters
 validParams<PorousFlowPorosityHMBiotModulus>()
 {
-  InputParameters params = validParams<PorousFlowPorosityHM>();
+  InputParameters params = validParams<PorousFlowPorosity>();
+  params.set<bool>("mechanical") = true;
+  params.set<bool>("fluid") = true;
   params.addRequiredRangeCheckedParam<Real>("constant_biot_modulus",
                                             "constant_biot_modulus>0",
                                             "Biot modulus, which is constant for this Material");
@@ -23,12 +29,12 @@ validParams<PorousFlowPorosityHMBiotModulus>()
   params.addClassDescription(
       "This Material calculates the porosity for hydro-mechanical simulations, assuming that the "
       "Biot modulus and the fluid bulk modulus are both constant.  This is useful for comparing "
-      "with solutions from poroelasticity theory, but is less accurate than PorousFlowPorosityHM");
+      "with solutions from poroelasticity theory, but is less accurate than PorousFlowPorosity");
   return params;
 }
 
 PorousFlowPorosityHMBiotModulus::PorousFlowPorosityHMBiotModulus(const InputParameters & parameters)
-  : PorousFlowPorosityHM(parameters),
+  : PorousFlowPorosity(parameters),
     _porosity_old(_nodal_material ? getMaterialPropertyOld<Real>("PorousFlow_porosity_nodal")
                                   : getMaterialPropertyOld<Real>("PorousFlow_porosity_qp")),
     _biot_modulus(getParam<Real>("constant_biot_modulus")),
@@ -56,16 +62,16 @@ PorousFlowPorosityHMBiotModulus::computeQpProperties()
 
   const Real denom = 1.0 + _vol_strain_rate_qp[qp_to_use] * _dt;
   _porosity[_qp] =
-      (_porosity_old[_qp] * std::exp(-(_pf[_qp] - _pf_old[_qp]) / _fluid_bulk_modulus) +
-       (_pf[_qp] - _pf_old[_qp]) / _biot_modulus +
-       _biot * (_vol_strain_qp[qp_to_use] - _vol_strain_qp_old[qp_to_use])) /
+      (_porosity_old[_qp] * std::exp(-((*_pf)[_qp] - _pf_old[_qp]) / _fluid_bulk_modulus) +
+       ((*_pf)[_qp] - _pf_old[_qp]) / _biot_modulus +
+       _biot * ((*_vol_strain_qp)[qp_to_use] - _vol_strain_qp_old[qp_to_use])) /
       denom;
 
   _dporosity_dvar[_qp].resize(_num_var);
   for (unsigned int v = 0; v < _num_var; ++v)
     _dporosity_dvar[_qp][v] =
-        _dpf_dvar[_qp][v] *
-        (-_porosity_old[_qp] * std::exp(-(_pf[_qp] - _pf_old[_qp]) / _fluid_bulk_modulus) /
+        (*_dpf_dvar)[_qp][v] *
+        (-_porosity_old[_qp] * std::exp(-((*_pf)[_qp] - _pf_old[_qp]) / _fluid_bulk_modulus) /
              _fluid_bulk_modulus +
          1.0 / _biot_modulus) /
         denom;
@@ -73,6 +79,6 @@ PorousFlowPorosityHMBiotModulus::computeQpProperties()
   _dporosity_dgradvar[_qp].resize(_num_var);
   for (unsigned int v = 0; v < _num_var; ++v)
     _dporosity_dgradvar[_qp][v] =
-        _biot * _dvol_strain_qp_dvar[qp_to_use][v] / denom -
+        _biot * (*_dvol_strain_qp_dvar)[qp_to_use][v] / denom -
         _porosity[_qp] / denom * _dvol_strain_rate_qp_dvar[qp_to_use][v] * _dt;
 }

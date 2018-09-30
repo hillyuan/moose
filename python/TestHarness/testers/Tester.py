@@ -1,5 +1,15 @@
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 import platform, re, os
 from TestHarness import util
+from TestHarness.StatusSystem import TestStatus
 from FactorySystem.MooseObject import MooseObject
 from tempfile import TemporaryFile
 import subprocess
@@ -16,7 +26,6 @@ class Tester(MooseObject):
         # Common Options
         params.addRequiredParam('type', "The type of test of Tester to create for this test.")
         params.addParam('max_time',   300, "The maximum in seconds that the test will be allowed to run.")
-        params.addParam('min_reported_time', 10, "The minimum time elapsed before a test is reported as taking to long to run.")
         params.addParam('skip',     "Provide a reason this test will be skipped.")
         params.addParam('deleted',         "Tests that only show up when using the '-e' option (Permanently skipped or not implemented).")
 
@@ -32,6 +41,8 @@ class Tester(MooseObject):
 
         params.addParam('valgrind', 'NONE', "Set to (NONE, NORMAL, HEAVY) to determine which configurations where valgrind will run.")
         params.addParam('tags',      [], "A list of strings")
+        params.addParam('max_buffer_size', None, "Bytes allowed in stdout/stderr before it is subjected to being trimmed. Set to -1 to ignore output size restrictions. "
+                                                 "If 'max_buffer_size' is not set, the default value of 'None' triggers a reasonable value (e.g. 100 kB)")
 
         # Test Filters
         params.addParam('platform',      ['ALL'], "A list of platforms for which this test will run on. ('ALL', 'DARWIN', 'LINUX', 'SL', 'LION', 'ML')")
@@ -50,26 +61,34 @@ class Tester(MooseObject):
         params.addParam('dof_id_bytes',  ['ALL'], "A test that runs only if libmesh is configured --with-dof-id-bytes = a specific number, e.g. '4', '8'")
         params.addParam('petsc_debug',   ['ALL'], "{False,True} -> test only runs when PETSc is configured with --with-debugging={0,1}, otherwise test always runs.")
         params.addParam('curl',          ['ALL'], "A test that runs only if CURL is detected ('ALL', 'TRUE', 'FALSE')")
-        params.addParam('tbb',           ['ALL'], "A test that runs only if TBB is available ('ALL', 'TRUE', 'FALSE')")
+        params.addParam('threading',     ['ALL'], "A list of threading models ths tests runs with ('ALL', 'TBB', 'OPENMP', 'PTHREADS', 'NONE')")
         params.addParam('superlu',       ['ALL'], "A test that runs only if SuperLU is available via PETSc ('ALL', 'TRUE', 'FALSE')")
+        params.addParam('chaco',         ['ALL'], "A test that runs only if Chaco (partitioner) is available via PETSc ('ALL', 'TRUE', 'FALSE')")
+        params.addParam('parmetis',      ['ALL'], "A test that runs only if Parmetis (partitioner) is available via PETSc ('ALL', 'TRUE', 'FALSE')")
+        params.addParam('party',         ['ALL'], "A test that runs only if Party (partitioner) is available via PETSc ('ALL', 'TRUE', 'FALSE')")
+        params.addParam('ptscotch',      ['ALL'], "A test that runs only if PTScotch (partitioner) is available via PETSc ('ALL', 'TRUE', 'FALSE')")
         params.addParam('slepc',         ['ALL'], "A test that runs only if SLEPc is available ('ALL', 'TRUE', 'FALSE')")
         params.addParam('unique_id',     ['ALL'], "A test that runs only if libmesh is configured with --enable-unique-id ('ALL', 'TRUE', 'FALSE')")
         params.addParam('cxx11',         ['ALL'], "A test that runs only if CXX11 is available ('ALL', 'TRUE', 'FALSE')")
         params.addParam('asio',          ['ALL'], "A test that runs only if ASIO is available ('ALL', 'TRUE', 'FALSE')")
+        params.addParam("fparser_jit",   ['ALL'], "A test that runs only if FParser JIT is available ('ALL', 'TRUE', 'FALSE')")
         params.addParam('depend_files',  [], "A test that only runs if all depend files exist (files listed are expected to be relative to the base directory, not the test directory")
         params.addParam('env_vars',      [], "A test that only runs if all the environment variables listed exist")
         params.addParam('should_execute', True, 'Whether or not the executable needs to be run.  Use this to chain together multiple tests based off of one executeable invocation')
         params.addParam('required_submodule', [], "A list of initialized submodules for which this test requires.")
         params.addParam('required_objects', [], "A list of required objects that are in the executable.")
+        params.addParam('required_applications', [], "A list of required registered applications that are in the executable.")
         params.addParam('check_input',    False, "Check for correct input file syntax")
         params.addParam('display_required', False, "The test requires and active display for rendering (i.e., ImageDiff tests).")
-        params.addParam('boost',         ['ALL'], "A test that runs only if BOOT is detected ('ALL', 'TRUE', 'FALSE')")
+        params.addParam('timing',         True, "If True, the test will be allowed to run with the timing flag (i.e. Manually turning on performance logging).")
+        params.addParam('boost',         ['ALL'], "A test that runs only if BOOST is detected ('ALL', 'TRUE', 'FALSE')")
 
-        # Queueing specific
-        params.addParam('copy_files',         [], "Additional list of files/directories to copy when performing queueing operations")
-        params.addParam('link_files',         [], "Additional list of files/directories to symlink when performing queueing operations")
-        params.addParam('queue_scheduler',  True, "A test that runs only if using queue options")
-
+        # SQA
+        params.addParam("requirement", None, "The SQA requirement that this test satisfies (e.g., 'The Marker system shall provide means to mark elements for refinement within a box region.')")
+        params.addParam("design", [], "The list of markdown files that contain the design(s) associated with this test (e.g., '/Markers/index.md /BoxMarker.md').")
+        params.addParam("issues", [], "The list of github issues associated with this test (e.g., '#1234 #4321')")
+        params.addParam("validation", False, "Set to True to mark test as a validation problem.")
+        params.addParam("verification", False, "Set to True to mark test as a verification problem.")
         return params
 
     # This is what will be checked for when we look for valid testers
@@ -79,35 +98,15 @@ class Tester(MooseObject):
         MooseObject.__init__(self, name, params)
         self.specs = params
         self.outfile = None
-        self.std_out = ''
+        self.errfile = None
+        self.joined_out = ''
         self.exit_code = 0
         self.process = None
         self.tags = params['tags']
+        self.__caveats = set([])
 
         # Bool if test can run
         self._runnable = None
-
-        # Initialize the status bucket class
-        self.status = util.TestStatus()
-
-        # Enumerate the buckets here so ther are easier to work with in the tester class
-        self.bucket_initialized  = self.status.bucket_initialized
-        self.bucket_success      = self.status.bucket_success
-        self.bucket_fail         = self.status.bucket_fail
-        self.bucket_diff         = self.status.bucket_diff
-        self.bucket_pending      = self.status.bucket_pending
-        self.bucket_finished     = self.status.bucket_finished
-        self.bucket_deleted      = self.status.bucket_deleted
-        self.bucket_skip         = self.status.bucket_skip
-        self.bucket_silent       = self.status.bucket_silent
-        self.bucket_queued       = self.status.bucket_queued
-        self.bucket_waiting_processing = self.status.bucket_waiting_processing
-
-        # Set the status message
-        if self.specs['check_input']:
-            self.success_message = 'SYNTAX PASS'
-        else:
-            self.success_message = self.specs['success_message']
 
         # Set up common paramaters
         self.should_execute = self.specs['should_execute']
@@ -115,6 +114,73 @@ class Tester(MooseObject):
 
         if self.specs["allow_test_objects"]:
             self.specs["cli_args"].append("--allow-test-objects")
+
+    def initStatusSystem(self, options):
+        """ Initialize the tester status system """
+        self.status = TestStatus(options)
+
+        ### Enumerate the statuses
+        self.no_status = self.status.no_status
+        self.skip = self.status.skip
+        self.silent = self.status.silent
+        self.success = self.status.success
+        self.fail = self.status.fail
+        self.diff = self.status.diff
+        self.deleted = self.status.deleted
+        self.finished = self.status.finished
+
+        ### Deprecated statuses to be removed upon application fixes
+        self.bucket_initialized        = self.no_status
+        self.bucket_success            = self.success
+        self.bucket_fail               = self.fail
+        self.bucket_diff               = self.diff
+        self.bucket_finished           = self.finished
+        self.bucket_deleted            = self.deleted
+        self.bucket_skip               = self.skip
+        self.bucket_silent             = self.silent
+        self.bucket_pending            = None
+        self.bucket_queued             = None
+        self.bucket_waiting_processing = None
+        ### END Deprecated statuses
+
+    def getStatus(self):
+        return self.status.getStatus()
+
+    def setStatus(self, status, message=''):
+        # Support deprecated statuses, alert the user.
+        if type(status) == type(''):
+            self.addCaveats('deprecated status bucket')
+            test_status = self.createStatus()
+            result_status = message.status
+            result_color = message.color
+            new_status = test_status(status=result_status, color=result_color)
+            return self.status.setStatus(new_status)
+
+        return self.status.setStatus(status, message)
+
+    def getStatusMessage(self):
+        return self.status.getStatusMessage()
+    def createStatus(self):
+        return self.status.createStatus()
+    def getColor(self):
+        return self.status.getColor()
+    def isNoStatus(self):
+        return self.status.isNoStatus()
+    def isSkip(self):
+        return self.status.isSkip()
+    def isSilent(self):
+        return self.status.isSilent()
+    def isPass(self):
+        return self.status.isPass()
+    def isFail(self):
+        return self.status.isFail()
+    def isDiff(self):
+        return self.status.isDiff()
+    def isDeleted(self):
+        return self.status.isDeleted()
+    def isFinished(self):
+        return self.status.isFinished()
+    ### Status System wrapper methods ###
 
     def getTestName(self):
         """ return test name """
@@ -138,17 +204,13 @@ class Tester(MooseObject):
 
     def getMaxTime(self):
         """ return maximum time elapse before reporting a 'timeout' status """
-        return self.specs['max_time']
+        return float(self.specs['max_time'])
 
     def getRunnable(self, options):
         """ return bool and cache results, if this test can run """
         if self._runnable is None:
             self._runnable = self.checkRunnableBase(options)
         return self._runnable
-
-    def getColor(self):
-        """ return print color assigned to this tester """
-        return self.status.getColor()
 
     def getInputFile(self):
         """ return the input file if applicable to this Tester """
@@ -158,117 +220,9 @@ class Tester(MooseObject):
         """ return the output files if applicable to this Tester """
         return []
 
-    def getSuccessMessage(self):
-        """ return the success message assigned to this tester """
-        return self.success_message
-
-    def getStatusMessage(self):
-        """ return the status message assigned to this tester """
-        return self.status.getStatusMessage()
-
-    def getStatus(self):
-        """ return current enumerated tester status bucket """
-        return self.status.getStatus()
-
-    def setStatus(self, reason, bucket):
-        """
-        Method to set a testers status.
-
-        Syntax:
-          .setStatus('str message', <enumerated tester status bucket>)
-        """
-        self.status.setStatus(reason, bucket)
-        return self.getStatus()
-
-    # Method to check if a test has failed. This method will return true if a
-    # tester has failed at any point during the processing of the test.
-    # Note: It's possible for a tester to report false for both didFail and
-    #       didPass. This will happen if the tester is in-progress for instance.
-    # See didPass()
-    def didFail(self):
-        """
-        return bool for tester failure
-        see util.TestStatus for more information
-        """
-        return self.status.didFail()
-
-    # Method to check for successfull test
-    # Note: This method can return False until the tester has completely finished.
-    #       For this reason it should be used only after the tester has completed.
-    #       Instead you may want to use the didFail method which returns false
-    #       only if the tester has failed at any point during the processing
-    #       of that tester (e.g. after the main command has been run but before
-    #       output has been tested).
-    # See didFail()
-    def didPass(self):
-        """
-        return boolean for tester successfulness
-        see util.TestStatus for more information
-        """
-        return self.status.didPass()
-
-    def didDiff(self):
-        """
-        return boolean for a differential tester failure
-        see util.TestStatus for more information
-        """
-        return self.status.didDiff()
-
-    def isInitialized(self):
-        """
-        return boolean for tester in an initialization status
-        see util.TestStatus for more information
-        """
-        return self.status.isInitialized()
-
-    def isPending(self):
-        """
-        return boolean for tester in a pending status
-        see util.TestStatus for more information
-        """
-        return self.status.isPending()
-
-    def isFinished(self):
-        """
-        return boolean for tester no longer pending
-        see util.TestStatus for more information
-        """
-        return self.status.isFinished()
-
-    def isSkipped(self):
-        """
-        return boolean for tester being reported as skipped
-        see util.TestStatus for more information
-        """
-        return self.status.isSkipped()
-
-    def isSilent(self):
-        """
-        return boolean for tester being skipped and not reported
-        see util.TestStatus for more information
-        """
-        return self.status.isSilent()
-
-    def isDeleted(self):
-        """
-        return boolean for tester being skipped and not reported due to
-        internal deletion status
-        see util.TestStatus for more information
-        """
-        return self.status.isDeleted()
-
-    def isQueued(self):
-        """
-        return boolean for tester in a queued status
-        see util.TestStatus for more information
-        """
-        return self.status.isQueued()
-
-    def isWaiting(self):
-        """
-        return boolean for tester awaiting process results
-        """
-        return self.status.isWaiting()
+    def getOutput(self):
+        """ Return the contents of stdout and stderr """
+        return self.joined_out
 
     def getCheckInput(self):
         return self.check_input
@@ -276,9 +230,9 @@ class Tester(MooseObject):
     def setValgrindMode(self, mode):
         """ Increase the alloted time for tests when running with the valgrind option """
         if mode == 'NORMAL':
-            self.specs['max_time'] = self.specs['max_time'] * 2
+            self.specs['max_time'] = float(self.specs['max_time']) * 2
         elif mode == 'HEAVY':
-            self.specs['max_time'] = self.specs['max_time'] * 6
+            self.specs['max_time'] = float(self.specs['max_time']) * 6
 
     def checkRunnable(self, options):
         """
@@ -312,6 +266,10 @@ class Tester(MooseObject):
         """ return number of processors to use for this tester """
         return 1
 
+    def getSlots(self, options):
+        """ return number of slots to use for this tester """
+        return self.getThreads(options) * self.getProcs(options)
+
     def getCommand(self, options):
         """ return the executable command that will be executed by the tester """
         return ''
@@ -330,28 +288,36 @@ class Tester(MooseObject):
         self.process = None
         try:
             f = TemporaryFile()
+            e = TemporaryFile()
+
             # On Windows, there is an issue with path translation when the command is passed in
             # as a list.
             if platform.system() == "Windows":
-                process = subprocess.Popen(cmd,stdout=f,stderr=f,close_fds=False, shell=True, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, cwd=cwd)
+                process = subprocess.Popen(cmd, stdout=f, stderr=e, close_fds=False,
+                                           shell=True, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP, cwd=cwd)
             else:
-                process = subprocess.Popen(cmd,stdout=f,stderr=f,close_fds=False, shell=True, preexec_fn=os.setsid, cwd=cwd)
+                process = subprocess.Popen(cmd, stdout=f, stderr=e, close_fds=False,
+                                           shell=True, preexec_fn=os.setsid, cwd=cwd)
         except:
             print("Error in launching a new task", cmd)
             raise
 
         self.process = process
         self.outfile = f
+        self.errfile = e
 
         timer.start()
         process.wait()
         timer.stop()
 
         self.exit_code = process.poll()
+        self.outfile.flush()
+        self.errfile.flush()
 
         # store the contents of output, and close the file
-        self.std_out = util.readOutput(self.outfile, options)
+        self.joined_out = util.readOutput(self.outfile, self.errfile, options, max_size=self.specs['max_buffer_size'])
         self.outfile.close()
+        self.errfile.close()
 
     def killCommand(self):
         """
@@ -360,7 +326,11 @@ class Tester(MooseObject):
         if self.process is not None:
             try:
                 if platform.system() == "Windows":
-                    self.process.terminate()
+                    from distutils import spawn
+                    if spawn.find_executable("taskkill"):
+                        subprocess.call(['taskkill', '/F', '/T', '/PID', str(self.process.pid)])
+                    else:
+                        self.process.terminate()
                 else:
                     pgid = os.getpgid(self.process.pid)
                     os.killpg(pgid, SIGTERM)
@@ -397,6 +367,24 @@ class Tester(MooseObject):
         """ return a list of redirected output """
         return [os.path.join(self.getTestDir(), self.name() + '.processor.{}'.format(p)) for p in xrange(self.getProcs(options))]
 
+    def addCaveats(self, *kwargs):
+        """ Add caveat(s) which will be displayed with the final test status """
+        for i in [x for x in kwargs if x]:
+            if type(i) == type([]):
+                self.__caveats.update(i)
+            else:
+                self.__caveats.add(i)
+        return self.getCaveats()
+
+    def getCaveats(self):
+        """ Return caveats accumalted by this tester """
+        return self.__caveats
+
+    def clearCaveats(self):
+        """ Clear any caveats stored in tester """
+        self.__caveats = set([])
+        return self.getCaveats()
+
     def checkRunnableBase(self, options):
         """
         Method to check for caveats that would prevent this tester from
@@ -413,42 +401,37 @@ class Tester(MooseObject):
                 tag_match = True
                 break
         if len(options.runtags) > 0 and not tag_match:
-            self.setStatus('no tag', self.bucket_silent)
+            self.setStatus(self.silent)
             return False
 
-        # If the something has already deemed this test a failure, return now
-        if self.didFail():
+        # If something has already deemed this test a failure or is silent, return now
+        if self.isFail() or self.isSilent():
             return False
-
-        # If --dry-run set the test status to pass and DO NOT return.
-        # This will allow additional checks to perform and report tests
-        # that would normally be skipped (and return as False).
-        if options.dry_run:
-            self.success_message = 'DRY RUN'
-            self.setStatus(self.success_message, self.bucket_success)
 
         # Check if we only want to run failed tests
-        if options.failed_tests:
-            if self.specs['test_name'] not in options._test_list:
-                self.setStatus('not failed', self.bucket_silent)
+        if options.failed_tests and options.results_storage is not None:
+            result_key = options.results_storage.get(self.getTestDir(), {})
+            status = result_key.get(self.getTestName(), {}).get('FAIL', '')
+            if not status:
+                self.setStatus(self.silent)
                 return False
 
         # Check if we only want to run syntax tests
         if options.check_input and not self.specs['check_input']:
-            self.setStatus('not check_input', self.bucket_silent)
+            self.setStatus(self.silent)
             return False
 
         # Check if we want to exclude syntax tests
         if options.no_check_input and self.specs['check_input']:
-            self.setStatus('is check_input', self.bucket_silent)
+            self.setStatus(self.silent)
             return False
 
         # Are we running only tests in a specific group?
         if options.group <> 'ALL' and options.group not in self.specs['group']:
-            self.setStatus('unmatched group', self.bucket_silent)
+            self.setStatus(self.silent)
             return False
         if options.not_group <> '' and options.not_group in self.specs['group']:
-            self.setStatus('unmatched group', self.bucket_silent)
+            self.setStatus(self.silent)
             return False
 
         # Store regexp for matching tests if --re is used
@@ -459,7 +442,7 @@ class Tester(MooseObject):
         # This also needs to be in its own bucket group. We normally print skipped messages.
         # But we do not want to print tests that didn't match regex.
         if options.reg_exp and not match_regexp.search(self.specs['test_name']):
-            self.setStatus('silent', self.bucket_silent)
+            self.setStatus(self.silent)
             return False
 
         # Short circuit method and run this test if we are ignoring all caveats
@@ -469,17 +452,20 @@ class Tester(MooseObject):
 
         # Check for deleted tests
         if self.specs.isValid('deleted'):
-            reasons['deleted'] = 'deleted ({})'.format(self.specs['deleted'])
+            reasons['deleted'] = str(self.specs['deleted'])
 
-        # Check for skipped tests
-        if self.specs.type('skip') is bool and self.specs['skip']:
+        # Skipped by external means (example: TestHarness part2 with --check-input)
+        if self.isSkip() and self.getStatusMessage():
+            reasons['skip'] = self.getStatusMessage()
+        # Test is skipped
+        elif self.specs.type('skip') is bool and self.specs['skip']:
             # Backwards compatible (no reason)
             reasons['skip'] = 'no reason'
         elif self.specs.type('skip') is not bool and self.specs.isValid('skip'):
             reasons['skip'] = self.specs['skip']
         # If were testing for SCALE_REFINE, then only run tests with a SCALE_REFINE set
-        elif (options.store_time or options.scaling) and self.specs['scale_refine'] == 0:
-            self.setStatus('silent', self.bucket_silent)
+        elif (options.scaling) and self.specs['scale_refine'] == 0:
+            self.setStatus(self.silent)
             return False
         # If we're testing with valgrind, then skip tests that require parallel or threads or don't meet the valgrind setting
         elif options.valgrind_mode != '':
@@ -488,8 +474,10 @@ class Tester(MooseObject):
                 tmp_reason = 'Valgrind==NONE'
             elif self.specs['valgrind'].upper() == 'HEAVY' and options.valgrind_mode.upper() == 'NORMAL':
                 tmp_reason = 'Valgrind==HEAVY'
-            elif self.specs['min_parallel'] > 1 or self.specs['min_threads'] > 1:
-                tmp_reason = 'Valgrind requires serial'
+            elif int(self.specs['min_threads']) > 1:
+                tmp_reason = 'Valgrind requires non-threaded'
+            elif self.specs["check_input"]:
+                tmp_reason = 'check_input==True'
             if tmp_reason != '':
                 reasons['valgrind'] = tmp_reason
         # If we're running in recover mode skip tests that have recover = false
@@ -511,7 +499,8 @@ class Tester(MooseObject):
 
         # PETSc and SLEPc is being explicitly checked above
         local_checks = ['platform', 'compiler', 'mesh_mode', 'method', 'library_mode', 'dtk', 'unique_ids', 'vtk', 'tecplot', \
-                        'petsc_debug', 'curl', 'tbb', 'superlu', 'cxx11', 'asio', 'unique_id', 'slepc', 'petsc_version_release', 'boost']
+                        'petsc_debug', 'curl', 'superlu', 'cxx11', 'asio', 'unique_id', 'slepc', 'petsc_version_release', 'boost', 'fparser_jit',
+                        'parmetis', 'chaco', 'party', 'ptscotch', 'threading']
         for check in local_checks:
             test_platforms = set()
             operator_display = '!='
@@ -541,10 +530,6 @@ class Tester(MooseObject):
         elif self.specs['heavy']:
             reasons['heavy'] = 'HEAVY'
 
-        # Check for positive scale refine values when using store timing options
-        if self.specs['scale_refine'] == 0 and options.store_time:
-            reasons['scale_refine'] = 'scale_refine==0 store_time=True'
-
         # There should only be one entry in self.specs['dof_id_bytes']
         for x in self.specs['dof_id_bytes']:
             if x != 'ALL' and not x in checks['dof_id_bytes']:
@@ -565,6 +550,16 @@ class Tester(MooseObject):
                 reasons['required_objects'] = '%s not found in executable' % var
                 break
 
+        # We extract the registered apps only if we need them
+        if self.specs["required_applications"] and checks["registered_apps"] is None:
+            checks["registered_apps"] = util.getExeRegisteredApps(self.specs["executable"])
+
+        # Check to see if we have the required application names
+        for var in self.specs['required_applications']:
+            if var not in checks["registered_apps"]:
+                reasons['required_applications'] = 'App %s not registered in executable' % var
+                break
+
         # Check to make sure required submodules are initialized
         for var in self.specs['required_submodule']:
             if var not in checks["submodules"]:
@@ -579,11 +574,6 @@ class Tester(MooseObject):
         if self.specs['display_required'] and not os.getenv('DISPLAY', False):
             reasons['display_required'] = 'NO DISPLAY'
 
-        # Check for queueing
-        if (not self.specs['queue_scheduler'] or not self.shouldExecute()) \
-           and options.queueing:
-            reasons['queue_scheduler'] = 'queue not supported'
-
         # Remove any matching user supplied caveats from accumulated checkRunnable caveats that
         # would normally produce a skipped test.
         caveat_list = set()
@@ -596,17 +586,14 @@ class Tester(MooseObject):
                 if key.lower() not in caveat_list:
                     tmp_reason.append(value)
 
-            # Format joined reason to better fit on the screen
-            if len(', '.join(tmp_reason)) >= util.TERM_COLS - (len(self.specs['test_name'])+21):
-                flat_reason = (', '.join(tmp_reason))[:(util.TERM_COLS - (len(self.specs['test_name'])+24))] + '...'
-            else:
-                flat_reason = ', '.join(tmp_reason)
+            flat_reason = ', '.join(tmp_reason)
 
             # If the test is deleted we still need to treat this differently
+            self.addCaveats(flat_reason)
             if 'deleted' in reasons.keys():
-                self.setStatus(flat_reason, self.bucket_deleted)
+                self.setStatus(self.deleted)
             else:
-                self.setStatus(flat_reason, self.bucket_skip)
+                self.setStatus(self.skip)
             return False
 
         # Check the return values of the derived classes

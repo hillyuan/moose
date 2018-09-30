@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "MultiAppMeshFunctionTransfer.h"
 
@@ -19,13 +14,15 @@
 #include "FEProblem.h"
 #include "MooseMesh.h"
 #include "MooseTypes.h"
-#include "MooseVariable.h"
+#include "MooseVariableFE.h"
 
 #include "libmesh/meshfree_interpolation.h"
 #include "libmesh/system.h"
 #include "libmesh/mesh_function.h"
 #include "libmesh/mesh_tools.h"
 #include "libmesh/parallel_algebra.h" // for communicator send and receive stuff
+
+registerMooseObject("MooseApp", MultiAppMeshFunctionTransfer);
 
 template <>
 InputParameters
@@ -36,12 +33,6 @@ validParams<MultiAppMeshFunctionTransfer>()
       "variable", "The auxiliary variable to store the transferred values in.");
   params.addRequiredParam<std::vector<VariableName>>("source_variable",
                                                      "The variable to transfer from.");
-  params.addParam<bool>("displaced_source_mesh",
-                        false,
-                        "Whether or not to use the displaced mesh for the source mesh.");
-  params.addParam<bool>("displaced_target_mesh",
-                        false,
-                        "Whether or not to use the displaced mesh for the target mesh.");
   params.addParam<bool>(
       "error_on_miss",
       false,
@@ -55,9 +46,6 @@ MultiAppMeshFunctionTransfer::MultiAppMeshFunctionTransfer(const InputParameters
     _from_var_name(getParam<std::vector<VariableName>>("source_variable")),
     _error_on_miss(getParam<bool>("error_on_miss"))
 {
-  _displaced_source_mesh = getParam<bool>("displaced_source_mesh");
-  _displaced_target_mesh = getParam<bool>("displaced_target_mesh");
-
   if (_to_var_name.size() == _from_var_name.size())
     _var_size = _to_var_name.size();
   else
@@ -138,13 +126,8 @@ MultiAppMeshFunctionTransfer::transferVariable(unsigned int i)
 
     if (is_nodal)
     {
-      MeshBase::const_node_iterator node_it = to_mesh->local_nodes_begin();
-      MeshBase::const_node_iterator node_end = to_mesh->local_nodes_end();
-
-      for (; node_it != node_end; ++node_it)
+      for (const auto & node : to_mesh->local_node_ptr_range())
       {
-        Node * node = *node_it;
-
         // Skip this node if the variable has no dofs at it.
         if (node->n_dofs(sys_num, var_num) < 1)
           continue;
@@ -173,13 +156,8 @@ MultiAppMeshFunctionTransfer::transferVariable(unsigned int i)
     }
     else // Elemental
     {
-      MeshBase::const_element_iterator elem_it = to_mesh->local_elements_begin();
-      MeshBase::const_element_iterator elem_end = to_mesh->local_elements_end();
-
-      for (; elem_it != elem_end; ++elem_it)
+      for (auto & elem : as_range(to_mesh->local_elements_begin(), to_mesh->local_elements_end()))
       {
-        Elem * elem = *elem_it;
-
         Point centroid = elem->centroid();
 
         // Skip this element if the variable has no dofs at it.
@@ -238,7 +216,8 @@ MultiAppMeshFunctionTransfer::transferVariable(unsigned int i)
   for (unsigned int i_from = 0; i_from < _from_problems.size(); ++i_from)
   {
     FEProblemBase & from_problem = *_from_problems[i_from];
-    MooseVariable & from_var = from_problem.getVariable(0, _from_var_name[i]);
+    MooseVariableFEBase & from_var = from_problem.getVariable(
+        0, _from_var_name[i], Moose::VarKindType::VAR_ANY, Moose::VarFieldType::VAR_FIELD_STANDARD);
     System & from_sys = from_var.sys().system();
     unsigned int from_var_num = from_sys.variable_number(from_var.name());
 
@@ -367,13 +346,8 @@ MultiAppMeshFunctionTransfer::transferVariable(unsigned int i)
 
     if (is_nodal)
     {
-      MeshBase::const_node_iterator node_it = to_mesh->local_nodes_begin();
-      MeshBase::const_node_iterator node_end = to_mesh->local_nodes_end();
-
-      for (; node_it != node_end; ++node_it)
+      for (const auto & node : to_mesh->local_node_ptr_range())
       {
-        Node * node = *node_it;
-
         // Skip this node if the variable has no dofs at it.
         if (node->n_dofs(sys_num, var_num) < 1)
           continue;
@@ -414,13 +388,8 @@ MultiAppMeshFunctionTransfer::transferVariable(unsigned int i)
     }
     else // Elemental
     {
-      MeshBase::const_element_iterator elem_it = to_mesh->local_elements_begin();
-      MeshBase::const_element_iterator elem_end = to_mesh->local_elements_end();
-
-      for (; elem_it != elem_end; ++elem_it)
+      for (auto & elem : as_range(to_mesh->local_elements_begin(), to_mesh->local_elements_end()))
       {
-        Elem * elem = *elem_it;
-
         // Skip this element if the variable has no dofs at it.
         if (elem->n_dofs(sys_num, var_num) < 1)
           continue;

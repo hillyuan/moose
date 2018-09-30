@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ComputeStrainBase.h"
 #include "MooseMesh.h"
@@ -25,6 +27,9 @@ validParams<ComputeStrainBase>()
       "volumetric_locking_correction", false, "Flag to correct volumetric locking");
   params.addParam<std::vector<MaterialPropertyName>>(
       "eigenstrain_names", "List of eigenstrains to be applied in this strain calculation");
+  params.addParam<MaterialPropertyName>("global_strain",
+                                        "Optional material property holding a global strain "
+                                        "tensor applied to the mesh as a whole");
   params.suppressParameter<bool>("use_displaced_mesh");
   return params;
 }
@@ -39,6 +44,9 @@ ComputeStrainBase::ComputeStrainBase(const InputParameters & parameters)
     _total_strain(declareProperty<RankTwoTensor>(_base_name + "total_strain")),
     _eigenstrain_names(getParam<std::vector<MaterialPropertyName>>("eigenstrain_names")),
     _eigenstrains(_eigenstrain_names.size()),
+    _global_strain(isParamValid("global_strain")
+                       ? &getMaterialProperty<RankTwoTensor>(_base_name + "global_strain")
+                       : NULL),
     _volumetric_locking_correction(getParam<bool>("volumetric_locking_correction")),
     _current_elem_volume(_assembly.elemVolume())
 {
@@ -48,11 +56,17 @@ ComputeStrainBase::ComputeStrainBase(const InputParameters & parameters)
     _eigenstrains[i] = &getMaterialProperty<RankTwoTensor>(_eigenstrain_names[i]);
   }
 
-  // Checking for consistency between mesh size and length of the provided displacements vector
-  if (_ndisp != _mesh.dimension())
-    mooseError(
-        "The number of variables supplied in 'displacements' must match the mesh dimension.");
+  if (_ndisp == 1 && _volumetric_locking_correction)
+    paramError("volumetric_locking_correction", "has to be set to false for 1-D problems.");
 
+  if (getParam<bool>("use_displaced_mesh"))
+    paramError("use_displaced_mesh", "The strain calculator needs to run on the undisplaced mesh.");
+}
+
+void
+ComputeStrainBase::initialSetup()
+{
+  displacementIntegrityCheck();
   // fetch coupled variables and gradients (as stateful properties if necessary)
   for (unsigned int i = 0; i < _ndisp; ++i)
   {
@@ -66,12 +80,16 @@ ComputeStrainBase::ComputeStrainBase(const InputParameters & parameters)
     _disp[i] = &_zero;
     _grad_disp[i] = &_grad_zero;
   }
+}
 
-  if (_ndisp == 1 && _volumetric_locking_correction)
-    mooseError("Volumetric locking correction have to be set to false for 1-D problems.");
-
-  if (getParam<bool>("use_displaced_mesh"))
-    mooseError("The strain calculator needs to run on the undisplaced mesh.");
+void
+ComputeStrainBase::displacementIntegrityCheck()
+{
+  // Checking for consistency between mesh size and length of the provided displacements vector
+  if (_ndisp != _mesh.dimension())
+    paramError(
+        "displacements",
+        "The number of variables supplied in 'displacements' must match the mesh dimension.");
 }
 
 void

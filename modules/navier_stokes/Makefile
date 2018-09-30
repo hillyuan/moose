@@ -11,14 +11,12 @@
 MODULE_DIR         ?= $(shell dirname `pwd`)
 MOOSE_DIR          ?= $(shell dirname $(MODULE_DIR))
 FRAMEWORK_DIR      ?= $(MOOSE_DIR)/framework
+ADDITIONAL_CPPFLAGS += -Wall -Wextra
 ###############################################################################
 
 # framework
 include $(FRAMEWORK_DIR)/build.mk
 include $(FRAMEWORK_DIR)/moose.mk
-
-# dependency on rDG module
-RDG              := yes
 
 # dependency on fluid_properties module
 FLUID_PROPERTIES := yes
@@ -29,7 +27,7 @@ include $(MODULE_DIR)/modules.mk
 APPLICATION_DIR    := $(MODULE_DIR)/navier_stokes
 APPLICATION_NAME   := navier_stokes
 BUILD_EXEC         := yes
-DEP_APPS           := $(shell $(FRAMEWORK_DIR)/scripts/find_dep_apps.py $(APPLICATION_NAME))
+GEN_REVISION       := no
 include            $(FRAMEWORK_DIR)/app.mk
 
 ###############################################################################

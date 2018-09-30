@@ -1,11 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ComputeAxisymmetric1DSmallStrain.h"
+
+registerMooseObject("TensorMechanicsApp", ComputeAxisymmetric1DSmallStrain);
 
 template <>
 InputParameters
@@ -30,19 +34,13 @@ ComputeAxisymmetric1DSmallStrain::ComputeAxisymmetric1DSmallStrain(
     _has_out_of_plane_strain(isParamValid("out_of_plane_strain")),
     _out_of_plane_strain(_has_out_of_plane_strain ? coupledValue("out_of_plane_strain") : _zero),
     _has_scalar_out_of_plane_strain(isParamValid("scalar_out_of_plane_strain")),
-    _nscalar_strains(
-        _has_scalar_out_of_plane_strain ? coupledScalarComponents("scalar_out_of_plane_strain") : 0)
+    _nscalar_strains(coupledScalarComponents("scalar_out_of_plane_strain"))
 {
   if (_has_out_of_plane_strain && _has_scalar_out_of_plane_strain)
     mooseError("Must define only one of out_of_plane_strain or scalar_out_of_plane_strain");
 
   if (!_has_out_of_plane_strain && !_has_scalar_out_of_plane_strain)
     mooseError("Must define either out_of_plane_strain or scalar_out_of_plane_strain");
-
-  // in case when the provided scalar_out_of_plane_strain is not a coupled
-  // scalar variable, still set _nscalar_strains = 1 but return its default value 0
-  if (coupledScalarComponents("scalar_out_of_plane_strain") == 0)
-    _nscalar_strains = 1;
 
   if (_has_scalar_out_of_plane_strain)
   {
@@ -55,6 +53,8 @@ ComputeAxisymmetric1DSmallStrain::ComputeAxisymmetric1DSmallStrain(
 void
 ComputeAxisymmetric1DSmallStrain::initialSetup()
 {
+  ComputeStrainBase::initialSetup();
+
   if (getBlockCoordSystem() != Moose::COORD_RZ)
     mooseError("The coordinate system must be set to RZ for Axisymmetric geometries.");
 }

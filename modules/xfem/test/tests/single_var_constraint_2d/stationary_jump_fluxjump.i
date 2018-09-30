@@ -16,7 +16,6 @@
 []
 
 [XFEM]
-  geometric_cut_userobjects = 'line_seg_cut_uo'
   qrule = volfrac
   output_cut_plane = true
 []
@@ -46,6 +45,7 @@
     variable = u
     jump = 0.5
     jump_flux = 1
+    geometric_cut_userobject = 'line_seg_cut_uo'
   [../]
 []
 
@@ -89,7 +89,6 @@
   exodus = true
   [./console]
     type = Console
-    perf_log = true
     output_linear = true
   [../]
 []

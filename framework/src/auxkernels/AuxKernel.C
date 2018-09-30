@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "AuxKernel.h"
 
@@ -36,8 +31,9 @@ validParams<AuxKernel>()
   params += validParams<MeshChangedInterface>();
   params += validParams<MaterialPropertyInterface>();
 
-  // Add the SetupInterface parameter, 'execute_on', the default is 'linear'
+  // Add the SetupInterface parameter 'execute_on' with 'linear' and 'timestep_end'
   params += validParams<SetupInterface>();
+  params.set<ExecFlagEnum>("execute_on", true) = {EXEC_LINEAR, EXEC_TIMESTEP_END};
 
   params.addRequiredParam<AuxVariableName>("variable",
                                            "The name of the variable that this object applies to");
@@ -62,19 +58,18 @@ validParams<AuxKernel>()
 
 AuxKernel::AuxKernel(const InputParameters & parameters)
   : MooseObject(parameters),
+    MooseVariableInterface<Real>(this,
+                                 parameters.getCheckedPointerParam<AuxiliarySystem *>("_aux_sys")
+                                     ->getVariable(parameters.get<THREAD_ID>("_tid"),
+                                                   parameters.get<AuxVariableName>("variable"))
+                                     .isNodal(),
+                                 "variable",
+                                 Moose::VarKindType::VAR_AUXILIARY,
+                                 Moose::VarFieldType::VAR_FIELD_STANDARD),
     BlockRestrictable(this),
-    BoundaryRestrictable(this,
-                         parameters.get<AuxiliarySystem *>("_aux_sys")
-                             ->getVariable(parameters.get<THREAD_ID>("_tid"),
-                                           parameters.get<AuxVariableName>("variable"))
-                             .isNodal()),
+    BoundaryRestrictable(this, mooseVariable()->isNodal()),
     SetupInterface(this),
-    CoupleableMooseVariableDependencyIntermediateInterface(
-        this,
-        parameters.get<AuxiliarySystem *>("_aux_sys")
-            ->getVariable(parameters.get<THREAD_ID>("_tid"),
-                          parameters.get<AuxVariableName>("variable"))
-            .isNodal()),
+    CoupleableMooseVariableDependencyIntermediateInterface(this, mooseVariable()->isNodal()),
     FunctionInterface(this),
     UserObjectInterface(this),
     TransientInterface(this),
@@ -82,25 +77,21 @@ AuxKernel::AuxKernel(const InputParameters & parameters)
     PostprocessorInterface(this),
     DependencyResolverInterface(),
     RandomInterface(parameters,
-                    *parameters.get<FEProblemBase *>("_fe_problem_base"),
+                    *parameters.getCheckedPointerParam<FEProblemBase *>("_fe_problem_base"),
                     parameters.get<THREAD_ID>("_tid"),
-                    parameters.get<AuxiliarySystem *>("_aux_sys")
-                        ->getVariable(parameters.get<THREAD_ID>("_tid"),
-                                      parameters.get<AuxVariableName>("variable"))
-                        .isNodal()),
+                    mooseVariable()->isNodal()),
     GeometricSearchInterface(this),
-    Restartable(parameters, "AuxKernels"),
-    ZeroInterface(parameters),
+    Restartable(this, "AuxKernels"),
     MeshChangedInterface(parameters),
     VectorPostprocessorInterface(this),
-    _subproblem(*parameters.get<SubProblem *>("_subproblem")),
-    _sys(*parameters.get<SystemBase *>("_sys")),
-    _nl_sys(*parameters.get<SystemBase *>("_nl_sys")),
-    _aux_sys(*parameters.get<AuxiliarySystem *>("_aux_sys")),
+    _subproblem(*getCheckedPointerParam<SubProblem *>("_subproblem")),
+    _sys(*getCheckedPointerParam<SystemBase *>("_sys")),
+    _nl_sys(*getCheckedPointerParam<SystemBase *>("_nl_sys")),
+    _aux_sys(*getCheckedPointerParam<AuxiliarySystem *>("_aux_sys")),
     _tid(parameters.get<THREAD_ID>("_tid")),
     _assembly(_subproblem.assembly(_tid)),
 
-    _var(_aux_sys.getVariable(_tid, parameters.get<AuxVariableName>("variable"))),
+    _var(_aux_sys.getFieldVariable<Real>(_tid, parameters.get<AuxVariableName>("variable"))),
     _nodal(_var.isNodal()),
     _bnd(boundaryRestricted()),
 
@@ -111,13 +102,13 @@ AuxKernel::AuxKernel(const InputParameters & parameters)
     _JxW(_bnd ? _assembly.JxWFace() : _assembly.JxW()),
     _coord(_assembly.coordTransformation()),
 
-    _u(_nodal ? _var.nodalSln() : _var.sln()),
-    _u_old(_nodal ? _var.nodalSlnOld() : _var.slnOld()),
-    _u_older(_nodal ? _var.nodalSlnOlder() : _var.slnOlder()),
+    _u(_nodal ? _var.dofValues() : _var.sln()),
+    _u_old(_nodal ? _var.dofValuesOld() : _var.slnOld()),
+    _u_older(_nodal ? _var.dofValuesOlder() : _var.slnOlder()),
     _test(_var.phi()),
 
-    _current_elem(_var.currentElem()),
-    _current_side(_var.currentSide()),
+    _current_elem(_assembly.elem()),
+    _current_side(_assembly.side()),
     _current_elem_volume(_assembly.elemVolume()),
     _current_side_volume(_assembly.sideElemVolume()),
 
@@ -125,9 +116,10 @@ AuxKernel::AuxKernel(const InputParameters & parameters)
 
     _solution(_aux_sys.solution())
 {
+  addMooseVariableDependency(mooseVariable());
   _supplied_vars.insert(parameters.get<AuxVariableName>("variable"));
 
-  std::map<std::string, std::vector<MooseVariable *>> coupled_vars = getCoupledVars();
+  std::map<std::string, std::vector<MooseVariableFEBase *>> coupled_vars = getCoupledVars();
   for (const auto & it : coupled_vars)
     for (const auto & var : it.second)
       _depend_vars.insert(var->name());
@@ -181,6 +173,42 @@ AuxKernel::getVectorPostprocessorValueByName(const VectorPostprocessorName & nam
 {
   _depend_uo.insert(name);
   return VectorPostprocessorInterface::getVectorPostprocessorValueByName(name, vector_name);
+}
+
+const VectorPostprocessorValue &
+AuxKernel::getVectorPostprocessorValue(const std::string & name,
+                                       const std::string & vector_name,
+                                       bool needs_broadcast)
+{
+  _depend_uo.insert(_pars.get<VectorPostprocessorName>(name));
+  return VectorPostprocessorInterface::getVectorPostprocessorValue(
+      name, vector_name, needs_broadcast);
+}
+
+const VectorPostprocessorValue &
+AuxKernel::getVectorPostprocessorValueByName(const VectorPostprocessorName & name,
+                                             const std::string & vector_name,
+                                             bool needs_broadcast)
+{
+  _depend_uo.insert(name);
+  return VectorPostprocessorInterface::getVectorPostprocessorValueByName(
+      name, vector_name, needs_broadcast);
+}
+
+const ScatterVectorPostprocessorValue &
+AuxKernel::getScatterVectorPostprocessorValue(const std::string & name,
+                                              const std::string & vector_name)
+{
+  _depend_uo.insert(_pars.get<VectorPostprocessorName>(name));
+  return VectorPostprocessorInterface::getScatterVectorPostprocessorValue(name, vector_name);
+}
+
+const ScatterVectorPostprocessorValue &
+AuxKernel::getScatterVectorPostprocessorValueByName(const std::string & name,
+                                                    const std::string & vector_name)
+{
+  _depend_uo.insert(name);
+  return VectorPostprocessorInterface::getScatterVectorPostprocessorValueByName(name, vector_name);
 }
 
 void
@@ -253,7 +281,7 @@ AuxKernel::compute()
 const VariableValue &
 AuxKernel::coupledDot(const std::string & var_name, unsigned int comp)
 {
-  MooseVariable * var = getVar(var_name, comp);
+  MooseVariableFEBase * var = getVar(var_name, comp);
   if (var->kind() == Moose::VAR_AUXILIARY)
     mooseError(
         name(),
@@ -265,7 +293,7 @@ AuxKernel::coupledDot(const std::string & var_name, unsigned int comp)
 const VariableValue &
 AuxKernel::coupledDotDu(const std::string & var_name, unsigned int comp)
 {
-  MooseVariable * var = getVar(var_name, comp);
+  MooseVariableFEBase * var = getVar(var_name, comp);
   if (var->kind() == Moose::VAR_AUXILIARY)
     mooseError(
         name(),

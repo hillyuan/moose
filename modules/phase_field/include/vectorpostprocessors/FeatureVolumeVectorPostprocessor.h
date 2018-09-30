@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef FEATUREVOLUMEVECTORPOSTPROCESSOR_H
 #define FEATUREVOLUMEVECTORPOSTPROCESSOR_H
@@ -46,6 +48,7 @@ public:
 protected:
   /// A Boolean indicating how the volume is calculated
   const bool _single_feature_per_elem;
+  const bool _output_centroids;
 
   /// A reference to the feature flood count object
   const FeatureFloodCount & _feature_counter;
@@ -63,7 +66,7 @@ private:
   /// Calculate the integral value of the passed in variable (index)
   Real computeIntegral(std::size_t var_index) const;
 
-  const std::vector<MooseVariable *> & _vars;
+  const std::vector<MooseVariableFEBase *> & _vars;
   std::vector<const VariableValue *> _coupled_sln;
 
   MooseMesh & _mesh;

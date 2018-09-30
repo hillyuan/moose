@@ -45,6 +45,7 @@
   2d = true
   axis_2d = 2
   symmetry_plane = 1
+  incremental = true
 []
 
 [Modules/TensorMechanics/Master]
@@ -95,9 +96,6 @@
   [../]
   [./elastic_stress]
     type = ComputeFiniteStrainElasticStress
-  [../]
-  [./eshelby]
-    type = EshelbyTensor
   [../]
 []
 

@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef GRAINTRACKERINTERFACE_H
 #define GRAINTRACKERINTERFACE_H
@@ -38,32 +40,29 @@ public:
 
   /**
    * Returns a list of active unique feature ids for a particular element. The vector is indexed by
-   * variable number
-   * with each entry containing either an invalid size_t type (no feature active at that location)
-   * or a feature id
-   * if the variable is non-zero at that location.
+   * variable number with each entry containing either an invalid size_t type (no feature active at
+   * that location) or a feature id if the variable is non-zero at that location.
    */
   virtual const std::vector<unsigned int> & getVarToFeatureVector(dof_id_type elem_id) const = 0;
 
   /**
    * Return the variable index (typically order parameter) for the given feature. Returns
-   * "invalid_id"
-   * if the specified feature is inactive.
+   * "invalid_id" if the specified feature is inactive.
    */
   virtual unsigned int getFeatureVar(unsigned int feature_id) const = 0;
 
   /**
    * Returns the number of active grains current stored in the GrainTracker. This value is the same
-   * value
-   * reported when the GrainTracker (FeatureFloodObject) is used as a Postprocessor.
-   * Note: This value will count each piece of a split grain (often enountered in EBSD datasets).
+   * value reported when the GrainTracker (FeatureFloodObject) is used as a Postprocessor.
+   *
+   * Note: This value will count each piece of a split grain (often encountered in EBSD data sets).
    */
   virtual std::size_t getNumberActiveGrains() const = 0;
 
   /**
-   * Returns a number large enough to contain the largest ID for all grains in use.
-   * This method can be used to size a vector or other data structure to maintain
-   * information about all grains (active and inactive) in a simulation.
+   * Returns a number large enough to contain the largest ID for all grains in use. This method can
+   * be used to size a vector or other data structure to maintain information about all grains
+   * (active and inactive) in a simulation.
    */
   virtual std::size_t getTotalFeatureCount() const = 0;
 

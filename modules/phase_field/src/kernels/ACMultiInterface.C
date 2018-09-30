@@ -1,15 +1,19 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "ACMultiInterface.h"
 
 // MOOSE includes
 #include "MooseVariable.h"
 #include "NonlinearSystem.h"
+
+registerMooseObject("PhaseFieldApp", ACMultiInterface);
 
 template <>
 InputParameters
@@ -35,7 +39,7 @@ ACMultiInterface::ACMultiInterface(const InputParameters & parameters)
     _L(getMaterialProperty<Real>("mob_name"))
 {
   if (_num_etas != _kappa_names.size())
-    mooseError("Supply the same nummber of etas and kappa_names.");
+    paramError("kappa_names", "Supply the same number of etas and kappa_names.");
 
   unsigned int nvariables = _fe_problem.getNonlinearSystemBase().nVariables();
 
@@ -60,7 +64,8 @@ ACMultiInterface::ACMultiInterface(const InputParameters & parameters)
   }
 
   if (a < 0)
-    mooseError("Kernel variable must be listed in etas for ACMultiInterface kernel ", name());
+    paramError(
+        "etas", "Kernel variable must be listed in etas for ACMultiInterface kernel ", name());
   else
     _a = a;
 }
@@ -85,11 +90,10 @@ ACMultiInterface::computeQpResidual()
                    (_eta_a[_qp] * (*_grad_eta[b])[_qp] - (*_eta[b])[_qp] * _grad_eta_a[_qp]) *
                    (*_grad_eta[b])[_qp]
                // volume terms
-               +
-               (-(_eta_a[_qp] * (*_eta[b])[_qp] * _grad_test[_i][_qp] +
-                  _test[_i][_qp] * (*_eta[b])[_qp] * _grad_eta_a[_qp] +
-                  _test[_i][_qp] * _eta_a[_qp] * (*_grad_eta[b])[_qp]) *
-                (*_grad_eta[b])[_qp]) -
+               + (-(_eta_a[_qp] * (*_eta[b])[_qp] * _grad_test[_i][_qp] +
+                    _test[_i][_qp] * (*_eta[b])[_qp] * _grad_eta_a[_qp] +
+                    _test[_i][_qp] * _eta_a[_qp] * (*_grad_eta[b])[_qp]) *
+                  (*_grad_eta[b])[_qp]) -
                (-((*_eta[b])[_qp] * (*_eta[b])[_qp] * _grad_test[_i][_qp] +
                   2.0 * _test[_i][_qp] * (*_eta[b])[_qp] * (*_grad_eta[b])[_qp]) *
                 _grad_eta_a[_qp]));
@@ -108,16 +112,17 @@ ACMultiInterface::computeQpJacobian()
     if (b == _a)
       continue;
 
-    sum += (*_kappa[b])[_qp] * (2.0 * _test[_i][_qp] * ((_phi[_j][_qp] * (*_grad_eta[b])[_qp] -
-                                                         (*_eta[b])[_qp] * _grad_phi[_j][_qp]) *
-                                                        (*_grad_eta[b])[_qp]) +
-                                (-(_phi[_j][_qp] * (*_eta[b])[_qp] * _grad_test[_i][_qp] +
-                                   _test[_i][_qp] * (*_eta[b])[_qp] * _grad_phi[_j][_qp] +
-                                   _test[_i][_qp] * _phi[_j][_qp] * (*_grad_eta[b])[_qp]) *
-                                 (*_grad_eta[b])[_qp]) -
-                                (-((*_eta[b])[_qp] * (*_eta[b])[_qp] * _grad_test[_i][_qp] +
-                                   2.0 * _test[_i][_qp] * (*_eta[b])[_qp] * (*_grad_eta[b])[_qp]) *
-                                 _grad_phi[_j][_qp]));
+    sum += (*_kappa[b])[_qp] *
+           (2.0 * _test[_i][_qp] *
+                ((_phi[_j][_qp] * (*_grad_eta[b])[_qp] - (*_eta[b])[_qp] * _grad_phi[_j][_qp]) *
+                 (*_grad_eta[b])[_qp]) +
+            (-(_phi[_j][_qp] * (*_eta[b])[_qp] * _grad_test[_i][_qp] +
+               _test[_i][_qp] * (*_eta[b])[_qp] * _grad_phi[_j][_qp] +
+               _test[_i][_qp] * _phi[_j][_qp] * (*_grad_eta[b])[_qp]) *
+             (*_grad_eta[b])[_qp]) -
+            (-((*_eta[b])[_qp] * (*_eta[b])[_qp] * _grad_test[_i][_qp] +
+               2.0 * _test[_i][_qp] * (*_eta[b])[_qp] * (*_grad_eta[b])[_qp]) *
+             _grad_phi[_j][_qp]));
   }
 
   return _L[_qp] * sum;

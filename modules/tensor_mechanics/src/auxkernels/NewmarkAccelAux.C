@@ -1,19 +1,25 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "NewmarkAccelAux.h"
+
+registerMooseObject("TensorMechanicsApp", NewmarkAccelAux);
 
 template <>
 InputParameters
 validParams<NewmarkAccelAux>()
 {
   InputParameters params = validParams<AuxKernel>();
+  params.addClassDescription("Computes the current acceleration using the Newmark method.");
   params.addRequiredCoupledVar("displacement", "displacement variable");
   params.addRequiredCoupledVar("velocity", "velocity variable");
-  params.addRequiredParam<Real>("beta", "beta parameter");
+  params.addRequiredParam<Real>("beta", "beta parameter for Newmark method");
   return params;
 }
 

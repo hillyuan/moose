@@ -1,11 +1,15 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "BrineFluidProperties.h"
+
+registerMooseObject("FluidPropertiesApp", BrineFluidProperties);
 
 template <>
 InputParameters
@@ -19,15 +23,6 @@ validParams<BrineFluidProperties>()
 BrineFluidProperties::BrineFluidProperties(const InputParameters & parameters)
   : MultiComponentFluidPropertiesPT(parameters), _Mnacl(58.443e-3)
 {
-  // Water97FluidProperties UserObject for water (needed to access vapor pressure)
-  std::string water97_name = name() + ":water97";
-  {
-    std::string class_name = "Water97FluidProperties";
-    InputParameters params = _app.getFactory().getValidParams(class_name);
-    _fe_problem.addUserObject(class_name, water97_name, params);
-  }
-  _water97_fp = &_fe_problem.getUserObject<Water97FluidProperties>(water97_name);
-
   // SinglePhaseFluidPropertiesPT UserObject for water to provide to getComponent
   std::string water_name = name() + ":water";
   {
@@ -126,7 +121,7 @@ BrineFluidProperties::rho(Real pressure, Real temperature, Real xnacl) const
 
   // The density of water at temperature Tv
   // Note: convert Tv to Kelvin to calculate water density
-  water_density = _water_fp->rho(pressure, Tv + _T_c2k);
+  water_density = _water_fp->rho_from_p_T(pressure, Tv + _T_c2k);
 
   // The brine density is given by the water density scaled by the ratio of
   // brine molar mass to pure water molar mass
@@ -153,7 +148,7 @@ BrineFluidProperties::rho_dpTx(Real pressure,
 }
 
 Real
-BrineFluidProperties::mu_from_rho_T(Real water_density, Real temperature, Real xnacl) const
+BrineFluidProperties::mu(Real pressure, Real temperature, Real xnacl) const
 {
   // Correlation requires molal concentration (mol/kg)
   Real mol = massFractionToMolalConc(xnacl);
@@ -166,23 +161,21 @@ BrineFluidProperties::mu_from_rho_T(Real water_density, Real temperature, Real x
   Real a = 1.0 + 0.0816 * mol + 0.0122 * mol2 + 0.128e-3 * mol3 +
            0.629e-3 * Tc * (1.0 - std::exp(-0.7 * mol));
 
-  return a * _water_fp->mu_from_rho_T(water_density, temperature);
+  return a * _water_fp->mu_from_p_T(pressure, temperature);
 }
 
 void
-BrineFluidProperties::mu_drhoTx(Real water_density,
-                                Real temperature,
-                                Real xnacl,
-                                Real dwater_density_dT,
-                                Real & mu,
-                                Real & dmu_drho,
-                                Real & dmu_dT,
-                                Real & dmu_dx) const
+BrineFluidProperties::mu_dpTx(Real pressure,
+                              Real temperature,
+                              Real xnacl,
+                              Real & mu,
+                              Real & dmu_dp,
+                              Real & dmu_dT,
+                              Real & dmu_dx) const
 {
-  // Viscosity of water and derivatives wrt water density and temperature
-  Real muw, dmuw_drhow, dmuw_dT;
-  _water_fp->mu_drhoT_from_rho_T(
-      water_density, temperature, dwater_density_dT, muw, dmuw_drhow, dmuw_dT);
+  // Viscosity of water and derivatives wrt pressure and temperature
+  Real muw, dmuw_dp, dmuw_dT;
+  _water_fp->mu_from_p_T(pressure, temperature, muw, dmuw_dp, dmuw_dT);
 
   // Correlation requires molal concentration (mol/kg)
   Real mol = massFractionToMolalConc(xnacl);
@@ -200,9 +193,34 @@ BrineFluidProperties::mu_drhoTx(Real water_density,
   Real da_dT = 0.629e-3 * (1.0 - std::exp(-0.7 * mol));
 
   mu = a * muw;
-  dmu_drho = a * dmuw_drhow;
+  dmu_dp = a * dmuw_dp;
   dmu_dx = da_dx * muw;
   dmu_dT = da_dT * muw + a * dmuw_dT;
+}
+
+void
+BrineFluidProperties::rho_mu(
+    Real pressure, Real temperature, Real xnacl, Real & rho, Real & mu) const
+{
+  rho = this->rho(pressure, temperature, xnacl);
+  mu = this->mu(pressure, temperature, xnacl);
+}
+
+void
+BrineFluidProperties::rho_mu_dpTx(Real pressure,
+                                  Real temperature,
+                                  Real xnacl,
+                                  Real & rho,
+                                  Real & drho_dp,
+                                  Real & drho_dT,
+                                  Real & drho_dx,
+                                  Real & mu,
+                                  Real & dmu_dp,
+                                  Real & dmu_dT,
+                                  Real & dmu_dx) const
+{
+  this->rho_dpTx(pressure, temperature, xnacl, rho, drho_dp, drho_dT, drho_dx);
+  this->mu_dpTx(pressure, temperature, xnacl, mu, dmu_dp, dmu_dT, dmu_dx);
 }
 
 Real
@@ -238,7 +256,7 @@ BrineFluidProperties::h(Real pressure, Real temperature, Real xnacl) const
 
   // The brine enthalpy is then given by the enthalpy of water at temperature Th
   // Note: water enthalpy requires temperature in Kelvin
-  return _water_fp->h(pressure, Th + _T_c2k);
+  return _water_fp->h_from_p_T(pressure, Th + _T_c2k);
 }
 
 void
@@ -294,7 +312,7 @@ BrineFluidProperties::cp(Real pressure, Real temperature, Real xnacl) const
   // The brine isobaric heat capacity is then given by the isobaric heat
   // capacity of water at temperature Th multiplied by q2
   // Note: water isobaric heat capacity requires temperature in Kelvin
-  return q2 * _water_fp->cp(pressure, Th + _T_c2k);
+  return q2 * _water_fp->cp_from_p_T(pressure, Th + _T_c2k);
 }
 
 Real
@@ -326,7 +344,7 @@ BrineFluidProperties::e_dpTx(Real pressure,
 }
 
 Real
-BrineFluidProperties::k_from_rho_T(Real water_density, Real temperature, Real xnacl) const
+BrineFluidProperties::k(Real pressure, Real temperature, Real xnacl) const
 {
   // Correlation requires molal concentration (mol/kg)
   Real mol = massFractionToMolalConc(xnacl);
@@ -334,7 +352,7 @@ BrineFluidProperties::k_from_rho_T(Real water_density, Real temperature, Real xn
   Real Tc = temperature - _T_c2k;
 
   Real S = 100.0 * _Mnacl * mol / (1.0 + _Mnacl * mol);
-  Real lambdaw = _water_fp->k_from_rho_T(water_density, temperature);
+  Real lambdaw = _water_fp->k_from_p_T(pressure, temperature);
   Real lambda = 1.0 - (2.3434e-3 - 7.924e-6 * Tc + 3.924e-8 * Tc * Tc) * S +
                 (1.06e-5 - 2.0e-8 * Tc - 1.2e-10 * Tc * Tc) * S * S;
 
@@ -357,8 +375,8 @@ BrineFluidProperties::vaporPressure(Real temperature, Real xnacl) const
   Real th20 = std::exp(std::log(temperature) / (a + b * temperature));
 
   // The brine vapour pressure is then found by evaluating the saturation pressure for pure water
-  // using this effective temperature. Note: requires _water97_fp UserObject
-  return _water97_fp->vaporPressure(th20);
+  // using this effective temperature
+  return _water_fp->vaporPressure(th20);
 }
 
 Real

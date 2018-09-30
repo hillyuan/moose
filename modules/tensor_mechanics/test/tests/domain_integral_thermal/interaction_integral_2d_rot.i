@@ -68,6 +68,7 @@
   radius_outer = '80.0 100.0 120.0 140.0'
   convert_J_to_K = true
   symmetry_plane = 0
+  incremental = true
 
   # interaction integral parameters
   disp_x = disp_x
@@ -75,7 +76,7 @@
   block = 1
   youngs_modulus = 207000
   poissons_ratio = 0.3
-  temp = temp
+  temperature = temp
   eigenstrain_names = thermal_expansion
 []
 
@@ -134,10 +135,6 @@
   [../]
   [./elastic_stress]
     type = ComputeFiniteStrainElasticStress
-  [../]
-  [./eshelby]
-    type = EshelbyTensor
-    temperature = temp
   [../]
   [./thermal_expansion_strain]
     type = ComputeThermalExpansionEigenstrain

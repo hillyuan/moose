@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 // Moose includes
 #include "Executioner.h"
@@ -45,6 +40,30 @@ validParams<Executioner>()
                                             "hierarchical decomposition into "
                                             "subsystems to help the solver.");
 
+  std::set<std::string> line_searches = {"contact", "default", "none", "basic"};
+#ifdef LIBMESH_HAVE_PETSC
+  std::set<std::string> petsc_line_searches = Moose::PetscSupport::getPetscValidLineSearches();
+  line_searches.insert(petsc_line_searches.begin(), petsc_line_searches.end());
+#endif // LIBMESH_HAVE_PETSC
+  std::string line_search_string = Moose::stringify(line_searches, " ");
+  MooseEnum line_search(line_search_string, "default");
+  std::string addtl_doc_str(" (Note: none = basic)");
+  params.addParam<MooseEnum>(
+      "line_search", line_search, "Specifies the line search type" + addtl_doc_str);
+  MooseEnum line_search_package("petsc moose", "petsc");
+  params.addParam<MooseEnum>("line_search_package",
+                             line_search_package,
+                             "The solver package to use to conduct the line-search");
+  params.addParam<unsigned>("contact_line_search_allowed_lambda_cuts",
+                            2,
+                            "The number of times lambda is allowed to be cut in half in the "
+                            "contact line search. We recommend this number be roughly bounded by 0 "
+                            "<= allowed_lambda_cuts <= 3");
+  params.addParam<Real>("contact_line_search_ltol",
+                        "The linear relative tolerance to be used while the contact state is "
+                        "changing between non-linear iterations. We recommend that this tolerance "
+                        "be looser than the standard linear tolerance");
+
 // Default Solver Behavior
 #ifdef LIBMESH_HAVE_PETSC
   params += Moose::PetscSupport::getPetscValidParams();
@@ -77,14 +96,18 @@ Executioner::Executioner(const InputParameters & parameters)
   : MooseObject(parameters),
     UserObjectInterface(this),
     PostprocessorInterface(this),
-    Restartable(parameters, "Executioners"),
-    _fe_problem(*parameters.getCheckedPointerParam<FEProblemBase *>(
+    Restartable(this, "Executioners"),
+    PerfGraphInterface(this),
+    _fe_problem(*getCheckedPointerParam<FEProblemBase *>(
         "_fe_problem_base", "This might happen if you don't have a mesh")),
     _initial_residual_norm(std::numeric_limits<Real>::max()),
     _old_initial_residual_norm(std::numeric_limits<Real>::max()),
     _restart_file_base(getParam<FileNameNoExtension>("restart_file_base")),
     _splitting(getParam<std::vector<std::string>>("splitting"))
 {
+  if (_pars.isParamSetByUser("line_search"))
+    _fe_problem.addLineSearch(_pars);
+
 // Extract and store PETSc related settings on FEProblemBase
 #ifdef LIBMESH_HAVE_PETSC
   Moose::PetscSupport::storePetscOptions(_fe_problem, _pars);
@@ -181,12 +204,12 @@ Executioner::addAttributeReporter(const std::string & name,
                                   Real & attribute,
                                   const std::string execute_on)
 {
-  FEProblemBase * problem = parameters().getCheckedPointerParam<FEProblemBase *>(
+  FEProblemBase * problem = getCheckedPointerParam<FEProblemBase *>(
       "_fe_problem_base",
       "Failed to retrieve FEProblemBase when adding a attribute reporter in Executioner");
   InputParameters params = _app.getFactory().getValidParams("ExecutionerAttributeReporter");
   params.set<Real *>("value") = &attribute;
   if (!execute_on.empty())
-    params.set<MultiMooseEnum>("execute_on") = execute_on;
+    params.set<ExecFlagEnum>("execute_on") = execute_on;
   problem->addPostprocessor("ExecutionerAttributeReporter", name, params);
 }

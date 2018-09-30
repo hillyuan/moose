@@ -1,9 +1,12 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 //  This post processor returns the Interaction Integral
 //
 #include "InteractionIntegral.h"
@@ -26,15 +29,18 @@ InteractionIntegral::sifModeType()
   return MooseEnum("KI KII KIII T", "KI");
 }
 
+registerMooseObject("TensorMechanicsApp", InteractionIntegral);
+
 template <>
 InputParameters
 validParams<InteractionIntegral>()
 {
   InputParameters params = validParams<ElementIntegralPostprocessor>();
+  params.addClassDescription("Computes the interaction integral for fracture");
   params.addRequiredCoupledVar(
       "displacements",
       "The displacements appropriate for the simulation geometry and coordinate system");
-  params.addCoupledVar("temp",
+  params.addCoupledVar("temperature",
                        "The temperature (optional). Must be provided to correctly compute "
                        "stress intensity factors in models with thermal strain gradients.");
   params.addRequiredParam<UserObjectName>("crack_front_definition",
@@ -51,6 +57,8 @@ validParams<InteractionIntegral>()
   params.addParam<Real>("poissons_ratio", "Poisson's ratio for the material.");
   params.addParam<Real>("youngs_modulus", "Young's modulus of the material.");
   params.set<bool>("use_displaced_mesh") = false;
+  params.addParam<unsigned int>("ring_first",
+                                "The first ring of elements for volume integral domain");
   params.addParam<unsigned int>("ring_index", "Ring ID");
   params.addParam<MooseEnum>("q_function_type",
                              InteractionIntegral::qFunctionType(),
@@ -79,8 +87,8 @@ InteractionIntegral::InteractionIntegral(const InputParameters & parameters)
                 ? &getMaterialPropertyByName<RankTwoTensor>("elastic_strain")
                 : nullptr),
     _grad_disp(3),
-    _has_temp(isCoupled("temp")),
-    _grad_temp(_has_temp ? coupledGradient("temp") : _grad_zero),
+    _has_temp(isCoupled("temperature")),
+    _grad_temp(_has_temp ? coupledGradient("temperature") : _grad_zero),
     _K_factor(getParam<Real>("K_factor")),
     _has_symmetry_plane(isParamValid("symmetry_plane")),
     _poissons_ratio(getParam<Real>("poissons_ratio")),
@@ -249,7 +257,7 @@ InteractionIntegral::computeIntegral()
   FEType fe_type(Utility::string_to_enum<Order>("first"),
                  Utility::string_to_enum<FEFamily>("lagrange"));
   const unsigned int dim = _current_elem->dim();
-  UniquePtr<FEBase> fe(FEBase::build(dim, fe_type));
+  std::unique_ptr<FEBase> fe(FEBase::build(dim, fe_type));
   fe->attach_quadrature_rule(_qrule);
   _phi_curr_elem = &fe->get_phi();
   _dphi_curr_elem = &fe->get_dphi();

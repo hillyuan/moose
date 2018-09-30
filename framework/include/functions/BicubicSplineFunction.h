@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #ifndef BICUBICSPLINEFUNCTION_H
 #define BICUBICSPLINEFUNCTION_H
@@ -41,6 +36,9 @@ public:
 protected:
   BicubicSplineInterpolation _ipol;
 
+  // Desired normal direction
+  unsigned int _normal_component;
+
   std::vector<Real> _x1;
   std::vector<Real> _x2;
   std::vector<Real> _yx11;
@@ -50,6 +48,10 @@ protected:
 
   Function & _yx1;
   Function & _yx2;
+
+  // The xyz index that x1/x2 should map to
+  Real _x1_index;
+  Real _x2_index;
 };
 
 #endif /* BICUBICSPLINEFUNCTION_H */

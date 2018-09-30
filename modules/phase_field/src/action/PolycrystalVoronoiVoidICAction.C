@@ -1,14 +1,19 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
+
 #include "PolycrystalVoronoiVoidICAction.h"
 #include "PolycrystalVoronoiVoidIC.h"
 #include "Factory.h"
 #include "FEProblem.h"
 #include "Conversion.h"
+
+registerMooseAction("PhaseFieldApp", PolycrystalVoronoiVoidICAction, "add_ic");
 
 template <>
 InputParameters
@@ -18,14 +23,19 @@ validParams<PolycrystalVoronoiVoidICAction>()
   params += PolycrystalVoronoiVoidIC::actionParameters();
   params.addRequiredParam<std::string>("var_name_base", "specifies the base name of the variables");
   params.suppressParameter<VariableName>("variable");
-
+  params.addParam<FileName>(
+      "file_name",
+      "",
+      "File containing grain centroids, if file_name is provided, the centroids "
+      "from the file will be used.");
   return params;
 }
 
 PolycrystalVoronoiVoidICAction::PolycrystalVoronoiVoidICAction(const InputParameters & params)
   : Action(params),
     _op_num(getParam<unsigned int>("op_num")),
-    _var_name_base(getParam<std::string>("var_name_base"))
+    _var_name_base(getParam<std::string>("var_name_base")),
+    _file_name(getParam<FileName>("file_name"))
 {
 }
 

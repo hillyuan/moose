@@ -1,16 +1,11 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "SplineInterpolationBase.h"
 #include "MooseError.h"
@@ -110,11 +105,7 @@ SplineInterpolationBase::sample(const std::vector<Real> & x,
   unsigned int klo, khi;
   findInterval(x, x_int, klo, khi);
 
-  Real h, a, b;
-  computeCoeffs(x, klo, khi, x_int, h, a, b);
-
-  return a * y[klo] + b * y[khi] +
-         ((a * a * a - a) * y2[klo] + (b * b * b - b) * y2[khi]) * (h * h) / 6.0;
+  return sample(x, y, y2, x_int, klo, khi);
 }
 
 Real
@@ -146,4 +137,19 @@ SplineInterpolationBase::sample2ndDerivative(const std::vector<Real> & x,
   computeCoeffs(x, klo, khi, x_int, h, a, b);
 
   return a * y2[klo] + b * y2[khi];
+}
+
+Real
+SplineInterpolationBase::sample(const std::vector<Real> & x,
+                                const std::vector<Real> & y,
+                                const std::vector<Real> & y2,
+                                Real x_int,
+                                unsigned int klo,
+                                unsigned int khi) const
+{
+  Real h, a, b;
+  computeCoeffs(x, klo, khi, x_int, h, a, b);
+
+  return a * y[klo] + b * y[khi] +
+         ((a * a * a - a) * y2[klo] + (b * b * b - b) * y2[khi]) * (h * h) / 6.0;
 }

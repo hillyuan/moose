@@ -7,14 +7,12 @@
   # Mesh block.  Meshes can be read in or automatically generated
   type = GeneratedMesh
   dim = 2 # Problem dimension
-  nx = 11 # Number of elements in the x-direction
-  ny = 11 # Number of elements in the y-direction
+  nx = 12 # Number of elements in the x-direction
+  ny = 12 # Number of elements in the y-direction
   xmax = 1000 # maximum x-coordinate of the mesh
   ymax = 1000 # maximum y-coordinate of the mesh
   elem_type = QUAD4 # Type of elements used in the mesh
   uniform_refine = 1 # Initial uniform refinement of the mesh
-
-  parallel_type = replicated # required for advanced_op_assignment
 []
 
 [GlobalParams]
@@ -44,6 +42,7 @@
   [./grain_tracker]
     type = GrainTracker
     threshold = 0.2
+    verbosity_level = 1
     connecting_threshold = 0.08
     flood_entity_type = ELEMENTAL
     compute_halo_maps = true # For displaying HALO fields
@@ -243,7 +242,6 @@
 []
 
 [Executioner]
-  # Preconditioned JFNK (default)
   # Uses newton iteration to solve the problem.
   type = Transient # Type of executioner, here it is transient with an adaptive time step
   scheme = bdf2 # Type of time integration (2nd order backward euler), defaults to 1st order backward euler
@@ -255,7 +253,7 @@
   nl_max_its = 40 # Max number of nonlinear iterations
   nl_rel_tol = 1e-10 # Absolute tolerance for nonlienar solves
   start_time = 0.0
-  num_steps = 16
+  num_steps = 15
   dt = 300
 []
 
@@ -266,4 +264,9 @@
 [Outputs]
   csv = true
   exodus = true
+  [./perf_graph]
+    type = PerfGraphOutput
+    execute_on = 'initial final'  # Default is "final"
+    level = 2                     # Default is 1
+  [../]
 []

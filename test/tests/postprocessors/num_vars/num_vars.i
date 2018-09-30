@@ -145,7 +145,6 @@
   [../]
   [./h]
     type = AverageElementSize
-    variable = u
   [../]
   [./L2u]
     type = ElementL2Error
@@ -169,6 +168,7 @@
   [../]
   [./num_vars]
     type = NumVars
+    system = 'NL'
   [../]
 []
 

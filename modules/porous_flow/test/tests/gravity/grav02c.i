@@ -14,6 +14,14 @@
   PorousFlowDictator = dictator
 []
 
+[Functions]
+  [./dts]
+    type = PiecewiseLinear
+    y = '1E-3 1E-2 1E-1'
+    x = '1E-3 1E-2 1E-1'
+  [../]
+[]
+
 [Variables]
   [./ppwater]
     initial_condition = -0.1
@@ -31,7 +39,6 @@
     initial_condition = 0
   [../]
 []
-
 
 [Kernels]
   [./mass0]
@@ -57,7 +64,6 @@
     gravity = '-1 0 0'
   [../]
 []
-
 
 [Functions]
   [./ana_ppwater]
@@ -105,35 +111,17 @@
   [./temperature]
     type = PorousFlowTemperature
   [../]
-  [./temperature_nodal]
-    type = PorousFlowTemperature
-    at_nodes = true
-  [../]
-  [./ppss_qp]
-    type = PorousFlow2PhasePP
-    phase0_porepressure = ppwater
-    phase1_porepressure = ppgas
-    capillary_pressure = pc
-  [../]
   [./ppss]
     type = PorousFlow2PhasePP
-    at_nodes = true
     phase0_porepressure = ppwater
     phase1_porepressure = ppgas
     capillary_pressure = pc
   [../]
   [./massfrac]
     type = PorousFlowMassFraction
-    at_nodes = true
     mass_fraction_vars = 'massfrac_ph0_sp0 massfrac_ph1_sp0'
   [../]
   [./simple_fluid0]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid0
-    phase = 0
-    at_nodes = true
-  [../]
-  [./simple_fluid0_qp]
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid0
     phase = 0
@@ -142,33 +130,10 @@
     type = PorousFlowSingleComponentFluid
     fp = simple_fluid1
     phase = 1
-    at_nodes = true
-  [../]
-  [./simple_fluid1_qp]
-    type = PorousFlowSingleComponentFluid
-    fp = simple_fluid1
-    phase = 1
-  [../]
-  [./dens_all]
-    type = PorousFlowJoiner
-    include_old = true
-    at_nodes = true
-    material_property = PorousFlow_fluid_phase_density_nodal
-  [../]
-  [./dens_qp_all]
-    type = PorousFlowJoiner
-    material_property = PorousFlow_fluid_phase_density_qp
-    at_nodes = false
   [../]
   [./porosity]
     type = PorousFlowPorosityConst
-    at_nodes = true
     porosity = 0.1
-  [../]
-  [./visc_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_viscosity_nodal
   [../]
   [./permeability]
     type = PorousFlowPermeabilityConst
@@ -176,20 +141,13 @@
   [../]
   [./relperm_water]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 1
     phase = 0
   [../]
   [./relperm_gas]
     type = PorousFlowRelativePermeabilityCorey
-    at_nodes = true
     n = 1
     phase = 1
-  [../]
-  [./relperm_all]
-    type = PorousFlowJoiner
-    at_nodes = true
-    material_property = PorousFlow_relative_permeability_nodal
   [../]
 []
 
@@ -244,8 +202,7 @@
   solve_type = Newton
   [./TimeStepper]
     type = FunctionDT
-    time_dt = '1E-3 1E-2 1E-1'
-    time_t = '1E-3 1E-2 1E-1'
+    function = dts
   [../]
   end_time = 1.0
 []

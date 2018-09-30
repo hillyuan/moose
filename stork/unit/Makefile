@@ -38,7 +38,6 @@ RICHARDS                  := no
 SOLID_MECHANICS           := no
 STOCHASTIC_TOOLS          := no
 TENSOR_MECHANICS          := no
-WATER_STEAM_EOS           := no
 XFEM                      := no
 POROUS_FLOW               := no
 LEVEL_SET                 := no
@@ -46,8 +45,8 @@ include           $(MOOSE_DIR)/modules/modules.mk
 ###############################################################################
 
 # Extra stuff for GTEST
-ADDITIONAL_INCLUDES	:= -I$(FRAMEWORK_DIR)/contrib/gtest
-ADDITIONAL_LIBS 	:= $(FRAMEWORK_DIR)/contrib/gtest/libgtest.la
+ADDITIONAL_INCLUDES := -I$(FRAMEWORK_DIR)/contrib/gtest
+ADDITIONAL_LIBS     := $(FRAMEWORK_DIR)/contrib/gtest/libgtest.la
 
 # dep apps
 CURRENT_DIR        := $(shell pwd)

@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "CombinedTestApp.h"
 #include "CombinedApp.h"
@@ -23,7 +25,6 @@
 #include "SolidMechanicsTestApp.h"
 #include "StochasticToolsTestApp.h"
 #include "TensorMechanicsTestApp.h"
-#include "WaterSteamEOSTestApp.h"
 #include "XFEMTestApp.h"
 #include "PorousFlowTestApp.h"
 #include "RdgTestApp.h"
@@ -37,30 +38,42 @@ validParams<CombinedTestApp>()
   return params;
 }
 
+registerKnownLabel("CombinedTestApp");
+
 CombinedTestApp::CombinedTestApp(const InputParameters & parameters) : MooseApp(parameters)
 {
-  Moose::registerObjects(_factory);
-  CombinedApp::registerObjects(_factory);
-
-  Moose::associateSyntax(_syntax, _action_factory);
-  CombinedApp::associateSyntax(_syntax, _action_factory);
-
-  bool use_test_objs = getParam<bool>("allow_test_objects");
-  if (use_test_objs)
-  {
-    CombinedTestApp::registerObjects(_factory);
-    CombinedTestApp::associateSyntax(_syntax, _action_factory);
-  }
+  CombinedTestApp::registerAll(
+      _factory, _action_factory, _syntax, getParam<bool>("allow_test_objects"));
 }
 
 CombinedTestApp::~CombinedTestApp() {}
 
-// External entry point for dynamic application loading
-extern "C" void
-CombinedTestApp__registerApps()
+void
+CombinedTestApp::registerAll(Factory & f, ActionFactory & af, Syntax & s, bool use_test_objs)
 {
-  CombinedTestApp::registerApps();
+  CombinedApp::registerAll(f, af, s);
+  if (use_test_objs)
+  {
+    Registry::registerObjectsTo(f, {"CombinedTestApp"});
+    Registry::registerActionsTo(af, {"CombinedTestApp"});
+    ChemicalReactionsTestApp::registerAll(f, af, s, use_test_objs);
+    ContactTestApp::registerAll(f, af, s, use_test_objs);
+    FluidPropertiesTestApp::registerAll(f, af, s, use_test_objs);
+    HeatConductionTestApp::registerAll(f, af, s, use_test_objs);
+    MiscTestApp::registerAll(f, af, s, use_test_objs);
+    NavierStokesTestApp::registerAll(f, af, s, use_test_objs);
+    PhaseFieldTestApp::registerAll(f, af, s, use_test_objs);
+    RichardsTestApp::registerAll(f, af, s, use_test_objs);
+    SolidMechanicsTestApp::registerAll(f, af, s, use_test_objs);
+    StochasticToolsTestApp::registerAll(f, af, s, use_test_objs);
+    TensorMechanicsTestApp::registerAll(f, af, s, use_test_objs);
+    XFEMTestApp::registerAll(f, af, s, use_test_objs);
+    PorousFlowTestApp::registerAll(f, af, s, use_test_objs);
+    RdgTestApp::registerAll(f, af, s, use_test_objs);
+    LevelSetTestApp::registerAll(f, af, s, use_test_objs);
+  }
 }
+
 void
 CombinedTestApp::registerApps()
 {
@@ -68,12 +81,6 @@ CombinedTestApp::registerApps()
   registerApp(CombinedTestApp);
 }
 
-// External entry point for dynamic object registration
-extern "C" void
-CombinedTestApp__registerObjects(Factory & factory)
-{
-  CombinedTestApp::registerObjects(factory);
-}
 void
 CombinedTestApp::registerObjects(Factory & factory)
 {
@@ -88,19 +95,12 @@ CombinedTestApp::registerObjects(Factory & factory)
   SolidMechanicsTestApp::registerObjects(factory);
   StochasticToolsTestApp::registerObjects(factory);
   TensorMechanicsTestApp::registerObjects(factory);
-  WaterSteamEOSTestApp::registerObjects(factory);
   XFEMTestApp::registerObjects(factory);
   PorousFlowTestApp::registerObjects(factory);
   RdgTestApp::registerObjects(factory);
   LevelSetTestApp::registerObjects(factory);
 }
 
-// External entry point for dynamic syntax association
-extern "C" void
-CombinedTestApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
-{
-  CombinedTestApp::associateSyntax(syntax, action_factory);
-}
 void
 CombinedTestApp::associateSyntax(Syntax & syntax, ActionFactory & action_factory)
 {
@@ -115,9 +115,39 @@ CombinedTestApp::associateSyntax(Syntax & syntax, ActionFactory & action_factory
   SolidMechanicsTestApp::associateSyntax(syntax, action_factory);
   StochasticToolsTestApp::associateSyntax(syntax, action_factory);
   TensorMechanicsTestApp::associateSyntax(syntax, action_factory);
-  WaterSteamEOSTestApp::associateSyntax(syntax, action_factory);
   XFEMTestApp::associateSyntax(syntax, action_factory);
   PorousFlowTestApp::associateSyntax(syntax, action_factory);
   RdgTestApp::associateSyntax(syntax, action_factory);
   LevelSetTestApp::associateSyntax(syntax, action_factory);
+}
+
+void
+CombinedTestApp::registerExecFlags(Factory & factory)
+{
+  ChemicalReactionsTestApp::registerExecFlags(factory);
+  ContactTestApp::registerExecFlags(factory);
+  FluidPropertiesTestApp::registerExecFlags(factory);
+  HeatConductionTestApp::registerExecFlags(factory);
+  MiscTestApp::registerExecFlags(factory);
+  NavierStokesTestApp::registerExecFlags(factory);
+  PhaseFieldTestApp::registerExecFlags(factory);
+  RichardsTestApp::registerExecFlags(factory);
+  SolidMechanicsTestApp::registerExecFlags(factory);
+  StochasticToolsTestApp::registerExecFlags(factory);
+  TensorMechanicsTestApp::registerExecFlags(factory);
+  XFEMTestApp::registerExecFlags(factory);
+  PorousFlowTestApp::registerExecFlags(factory);
+  RdgTestApp::registerExecFlags(factory);
+  LevelSetTestApp::registerExecFlags(factory);
+}
+
+extern "C" void
+CombinedTestApp__registerAll(Factory & f, ActionFactory & af, Syntax & s)
+{
+  CombinedTestApp::registerAll(f, af, s);
+}
+extern "C" void
+CombinedTestApp__registerApps()
+{
+  CombinedTestApp::registerApps();
 }

@@ -41,7 +41,6 @@
   num_steps = 5
   dt = 0.01
 
-  # Preconditioned JFNK (default)
   solve_type = 'PJFNK'
 
   petsc_options_iname = '-pc_type -pc_hypre_type'
@@ -52,5 +51,5 @@
   exodus = true
 
   # We can't control perf log output from a subapp
-  print_perf_log = true
+  perf_graph = true
 []

@@ -1,23 +1,23 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "SetupMeshAction.h"
 #include "MooseApp.h"
 #include "MooseMesh.h"
+#include "FileMesh.h"
 #include "FEProblem.h"
 #include "ActionWarehouse.h"
 #include "Factory.h"
+
+registerMooseAction("MooseApp", SetupMeshAction, "setup_mesh");
+
+registerMooseAction("MooseApp", SetupMeshAction, "init_mesh");
 
 template <>
 InputParameters
@@ -160,6 +160,53 @@ SetupMeshAction::act()
   // Create the mesh object and tell it to build itself
   if (_current_task == "setup_mesh")
   {
+    // switch non-file meshes to be a file-mesh if using a pre-split mesh configuration.
+    if (_app.isUseSplit())
+    {
+      auto split_file = _app.parameters().get<std::string>("split_file");
+
+      // Get the split_file extension, if there is one, and use that to decide
+      // between .cpr and .cpa
+      std::string split_file_ext;
+      auto pos = split_file.rfind(".");
+      if (pos != std::string::npos)
+        split_file_ext = split_file.substr(pos + 1, std::string::npos);
+
+      // If split_file already has the .cpr or .cpa extension, we go with
+      // that, otherwise we strip off the extension and append ".cpr".
+      if (split_file != "" && split_file_ext != "cpr" && split_file_ext != "cpa")
+        split_file = MooseUtils::stripExtension(split_file) + ".cpr";
+
+      if (_type != "FileMesh")
+      {
+        if (split_file == "")
+        {
+          if (_app.processor_id() == 0)
+            mooseError(
+                "Cannot use split mesh for a non-file mesh without specifying --split-file on "
+                "command line");
+        }
+
+        _type = "FileMesh";
+        auto new_pars = validParams<FileMesh>();
+
+        // Keep existing parameters where possible
+        new_pars.applyParameters(_moose_object_pars);
+
+        new_pars.set<MeshFileName>("file") = split_file;
+        new_pars.set<MooseApp *>("_moose_app") = _moose_object_pars.get<MooseApp *>("_moose_app");
+        _moose_object_pars = new_pars;
+      }
+      else
+      {
+        if (split_file != "")
+          _moose_object_pars.set<MeshFileName>("file") = split_file;
+        else
+          _moose_object_pars.set<MeshFileName>("file") =
+              MooseUtils::stripExtension(_moose_object_pars.get<MeshFileName>("file")) + ".cpr";
+      }
+    }
+
     _mesh = _factory.create<MooseMesh>(_type, "mesh", _moose_object_pars);
     if (isParamValid("displacements"))
       _displaced_mesh = _factory.create<MooseMesh>(_type, "displaced_mesh", _moose_object_pars);

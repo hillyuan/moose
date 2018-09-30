@@ -1,9 +1,11 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "StressDivergenceTensorsTruss.h"
 
@@ -12,6 +14,8 @@
 #include "Material.h"
 #include "MooseVariable.h"
 #include "SystemBase.h"
+
+registerMooseObject("TensorMechanicsApp", StressDivergenceTensorsTruss);
 
 template <>
 InputParameters
@@ -116,9 +120,10 @@ StressDivergenceTensorsTruss::computeJacobian()
 }
 
 void
-StressDivergenceTensorsTruss::computeOffDiagJacobian(unsigned int jvar)
+StressDivergenceTensorsTruss::computeOffDiagJacobian(MooseVariableFEBase & jvar)
 {
-  if (jvar == _var.number())
+  size_t jvar_num = jvar.number();
+  if (jvar_num == _var.number())
     computeJacobian();
   else
   {
@@ -126,18 +131,18 @@ StressDivergenceTensorsTruss::computeOffDiagJacobian(unsigned int jvar)
     bool disp_coupled = false;
 
     for (unsigned int i = 0; i < _ndisp; ++i)
-      if (jvar == _disp_var[i])
+      if (jvar_num == _disp_var[i])
       {
         coupled_component = i;
         disp_coupled = true;
         break;
       }
 
-    DenseMatrix<Number> & ke = _assembly.jacobianBlock(_var.number(), jvar);
+    DenseMatrix<Number> & ke = _assembly.jacobianBlock(_var.number(), jvar_num);
 
     if (disp_coupled)
       for (unsigned int i = 0; i < _test.size(); ++i)
-        for (unsigned int j = 0; j < _phi.size(); ++j)
+        for (unsigned int j = 0; j < jvar.phiSize(); ++j)
           ke(i, j) += (i == j ? 1 : -1) * computeStiffness(_component, coupled_component);
     else if (false) // Need some code here for coupling with temperature
     {

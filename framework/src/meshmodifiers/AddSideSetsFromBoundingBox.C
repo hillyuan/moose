@@ -1,21 +1,18 @@
-/****************************************************************/
-/*               DO NOT MODIFY THIS HEADER                      */
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*           (c) 2010 Battelle Energy Alliance, LLC             */
-/*                   ALL RIGHTS RESERVED                        */
-/*                                                              */
-/*          Prepared by Battelle Energy Alliance, LLC           */
-/*            Under Contract No. DE-AC07-05ID14517              */
-/*            With the U. S. Department of Energy               */
-/*                                                              */
-/*            See COPYRIGHT for full restrictions               */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "AddSideSetsFromBoundingBox.h"
 #include "Conversion.h"
 #include "MooseMesh.h"
 #include "MooseTypes.h"
+
+registerMooseObject("MooseApp", AddSideSetsFromBoundingBox);
 
 template <>
 InputParameters
@@ -66,7 +63,7 @@ void
 AddSideSetsFromBoundingBox::modify()
 {
   // this modifier is not designed for working with distributed mesh
-  _mesh_ptr->errorIfDistributedMesh("BreakBoundaryOnSubdomain");
+  _mesh_ptr->errorIfDistributedMesh("AddSideSetsFromBoundingBox");
 
   // Check that we have access to the mesh
   if (!_mesh_ptr)
@@ -132,7 +129,8 @@ AddSideSetsFromBoundingBox::modify()
       if (_bounding_box.contains_point(**node) == inside)
       {
         // read out boundary ids for nodes
-        std::vector<short int> boundary_id_list = boundary_info.boundary_ids(*node);
+        std::vector<boundary_id_type> boundary_id_list;
+        boundary_info.boundary_ids(*node, boundary_id_list);
         std::vector<boundary_id_type> boundary_id_old_list =
             _mesh_ptr->getBoundaryIDs(_boundary_id_old);
 

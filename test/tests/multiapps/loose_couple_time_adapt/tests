@@ -1,0 +1,12 @@
+[Tests]
+  [./begin]
+    type = 'Exodiff'
+    input = 'begin.i'
+    exodiff = 'begin.e begin_out_dummy0.e'
+  [../]
+  [./end]
+    type = 'Exodiff'
+    input = 'end.i'
+    exodiff = 'end.e end_out_dummy0.e'
+  [../]
+[]

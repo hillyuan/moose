@@ -1,4 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+#* This file is part of the MOOSE framework
+#* https://www.mooseframework.org
+#*
+#* All rights reserved, see COPYRIGHT for full restrictions
+#* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+#*
+#* Licensed under LGPL 2.1, please see LICENSE for details
+#* https://www.gnu.org/licenses/lgpl-2.1.html
+
 from PyQt5.QtWidgets import QWidget, QMessageBox
 from PyQt5.QtCore import pyqtSignal
 from peacock.base.Plugin import Plugin
@@ -71,11 +80,22 @@ class ExecuteRunnerPlugin(QWidget, Plugin):
         self.exe_path = None
         self.exe_args = []
         self.has_csv = False
+        self._input_file = ""
 
         self.setup()
 
+    def setInputFile(self, input_file):
+        if input_file:
+            self._input_file = os.path.basename(input_file)
+        else:
+            self._input_file = ""
+
     def _tempInputFile(self):
-        return os.path.abspath("peacock_run_exe_tmp.i")
+        if self._input_file:
+            tmp = "peacock_run_exe_tmp_%s" % self._input_file
+        else:
+            tmp = "peacock_run_exe_tmp.i"
+        return os.path.abspath(tmp)
 
     def _showProgressBar(self, show):
         """

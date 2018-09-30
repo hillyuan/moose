@@ -46,6 +46,7 @@
   radius_outer = '25.0 37.5 50.0'
   intersecting_boundary = '1 2'
   symmetry_plane = 2
+  incremental = true
 []
 
 [Modules/TensorMechanics/Master]
@@ -101,9 +102,6 @@
   [../]
   [./elastic_stress]
     type = ComputeFiniteStrainElasticStress
-  [../]
-  [./eshelby]
-    type = EshelbyTensor
   [../]
 []
 

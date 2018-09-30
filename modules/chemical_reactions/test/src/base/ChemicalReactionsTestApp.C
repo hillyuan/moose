@@ -1,3 +1,11 @@
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 #include "ChemicalReactionsTestApp.h"
 #include "ChemicalReactionsApp.h"
 #include "Moose.h"
@@ -12,31 +20,31 @@ validParams<ChemicalReactionsTestApp>()
   return params;
 }
 
+registerKnownLabel("ChemicalReactionsTestApp");
+
 ChemicalReactionsTestApp::ChemicalReactionsTestApp(InputParameters parameters)
   : MooseApp(parameters)
 {
-  Moose::registerObjects(_factory);
-  ChemicalReactionsApp::registerObjects(_factory);
-
-  Moose::associateSyntax(_syntax, _action_factory);
-  ChemicalReactionsApp::associateSyntax(_syntax, _action_factory);
-
-  bool use_test_objs = getParam<bool>("allow_test_objects");
-  if (use_test_objs)
-  {
-    ChemicalReactionsTestApp::registerObjects(_factory);
-    ChemicalReactionsTestApp::associateSyntax(_syntax, _action_factory);
-  }
+  ChemicalReactionsTestApp::registerAll(
+      _factory, _action_factory, _syntax, getParam<bool>("allow_test_objects"));
 }
 
 ChemicalReactionsTestApp::~ChemicalReactionsTestApp() {}
 
-// External entry point for dynamic application loading
-extern "C" void
-ChemicalReactionsTestApp__registerApps()
+void
+ChemicalReactionsTestApp::registerAll(Factory & f,
+                                  ActionFactory & af,
+                                  Syntax & s,
+                                  bool use_test_objects)
 {
-  ChemicalReactionsTestApp::registerApps();
+  ChemicalReactionsApp::registerAll(f, af, s);
+  if (use_test_objects)
+  {
+    Registry::registerObjectsTo(f, {"ChemicalReactionsTestApp"});
+    Registry::registerActionsTo(af, {"ChemicalReactionsTestApp"});
+  }
 }
+
 void
 ChemicalReactionsTestApp::registerApps()
 {
@@ -44,24 +52,33 @@ ChemicalReactionsTestApp::registerApps()
   registerApp(ChemicalReactionsTestApp);
 }
 
-// External entry point for dynamic object registration
-extern "C" void
-ChemicalReactionsTestApp__registerObjects(Factory & factory)
+void
+ChemicalReactionsTestApp::registerObjects(Factory & factory)
 {
-  ChemicalReactionsTestApp::registerObjects(factory);
+  mooseDeprecated("use registerAll instead of registerObjects");
+  Registry::registerObjectsTo(factory, {"ChemicalReactionsTestApp"});
 }
 void
-ChemicalReactionsTestApp::registerObjects(Factory & /*factory*/)
+ChemicalReactionsTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & action_factory)
 {
+  mooseDeprecated("use registerAll instead of associateSyntax");
+  Registry::registerActionsTo(action_factory, {"ChemicalReactionsTestApp"});
+}
+void
+ChemicalReactionsTestApp::registerExecFlags(Factory & /*factory*/)
+{
+  mooseDeprecated("use registerAll instead of registerExecFlags");
 }
 
-// External entry point for dynamic syntax association
 extern "C" void
-ChemicalReactionsTestApp__associateSyntax(Syntax & syntax, ActionFactory & action_factory)
+ChemicalReactionsTestApp__registerAll(Factory & f, ActionFactory & af, Syntax & s)
 {
-  ChemicalReactionsTestApp::associateSyntax(syntax, action_factory);
+  ChemicalReactionsTestApp::registerAll(f, af, s);
 }
-void
-ChemicalReactionsTestApp::associateSyntax(Syntax & /*syntax*/, ActionFactory & /*action_factory*/)
+
+// External entry point for dynamic application loading
+extern "C" void
+ChemicalReactionsTestApp__registerApps()
 {
+  ChemicalReactionsTestApp::registerApps();
 }

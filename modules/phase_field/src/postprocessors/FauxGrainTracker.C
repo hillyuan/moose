@@ -1,15 +1,19 @@
-/****************************************************************/
-/* MOOSE - Multiphysics Object Oriented Simulation Environment  */
-/*                                                              */
-/*          All contents are licensed under LGPL V2.1           */
-/*             See LICENSE for full restrictions                */
-/****************************************************************/
+//* This file is part of the MOOSE framework
+//* https://www.mooseframework.org
+//*
+//* All rights reserved, see COPYRIGHT for full restrictions
+//* https://github.com/idaholab/moose/blob/master/COPYRIGHT
+//*
+//* Licensed under LGPL 2.1, please see LICENSE for details
+//* https://www.gnu.org/licenses/lgpl-2.1.html
 
 #include "FauxGrainTracker.h"
 
 // MOOSE includes
 #include "MooseMesh.h"
 #include "MooseVariable.h"
+
+registerMooseObject("PhaseFieldApp", FauxGrainTracker);
 
 template <>
 InputParameters
@@ -152,12 +156,8 @@ FauxGrainTracker::execute()
 {
   Moose::perf_log.push("execute()", "FauxGrainTracker");
 
-  const MeshBase::element_iterator end = _mesh.getMesh().active_local_elements_end();
-  for (MeshBase::element_iterator el = _mesh.getMesh().active_local_elements_begin(); el != end;
-       ++el)
+  for (const auto & current_elem : _mesh.getMesh().active_local_element_ptr_range())
   {
-    const Elem * current_elem = *el;
-
     // Loop over elements or nodes and populate the data structure with the first variable with a
     // value above a threshold
     if (_is_elemental)
